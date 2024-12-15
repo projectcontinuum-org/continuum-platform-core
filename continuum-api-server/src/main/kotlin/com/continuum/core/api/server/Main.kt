@@ -1,11 +1,11 @@
-package com.continuum.core.continuum_worker
+package com.continuum.core.api.server
 
 import org.springframework.boot.autoconfigure.SpringBootApplication
 import org.springframework.boot.runApplication
 
 @SpringBootApplication
-class ContinuumWorkerApplication
+class Main
 
 fun main(args: Array<String>) {
-	runApplication<ContinuumWorkerApplication>(*args)
+	runApplication<Main>(*args)
 }

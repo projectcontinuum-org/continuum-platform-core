@@ -1,10 +1,10 @@
-package com.continuum.core.continuum_api_server
+package com.continuum.core.worker
 
 import org.junit.jupiter.api.Test
 import org.springframework.boot.test.context.SpringBootTest
 
 @SpringBootTest
-class ContinuumApiServerApplicationTests {
+class MainTests {
 
 	@Test
 	fun contextLoads() {
