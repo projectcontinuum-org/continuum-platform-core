@@ -11,5 +11,5 @@ interface ContinuumWorkflow {
   }
 
   @WorkflowMethod
-  fun start()
+  fun start(continuumWorkflow: ContinuumWorkflow)
 }

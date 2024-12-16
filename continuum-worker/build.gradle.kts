@@ -25,6 +25,9 @@ dependencies {
 	implementation("org.springframework.boot:spring-boot-starter-web")
 	implementation("org.springframework.boot:spring-boot-starter-actuator")
 
+	// Jackson dependencies
+	implementation("com.fasterxml.jackson.module:jackson-module-kotlin:2.18.2")
+
 	// Temporal dependency
 	implementation("io.temporal:temporal-sdk")
 	implementation("io.temporal:temporal-kotlin")

@@ -5,7 +5,9 @@ import io.temporal.spring.boot.WorkflowImpl
 
 @WorkflowImpl(taskQueues = [WORKFLOW_TASK_QUEUE])
 class ContinuumWorkflowImpl: ContinuumWorkflow {
-    override fun start() {
+    override fun start(
+        continuumWorkflow: ContinuumWorkflow
+    ) {
         println("Starting ContinuumWorkflowImpl")
     }
 }
