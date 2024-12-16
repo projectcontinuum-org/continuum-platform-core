@@ -23,7 +23,8 @@ dependencies {
 	implementation("org.jetbrains.kotlin:kotlin-reflect")
 	implementation("org.springframework.boot:spring-boot-starter-web")
 	implementation("org.springframework.boot:spring-boot-starter-actuator")
-	implementation("org.springframework.cloud:spring-cloud-stream")
+	implementation("org.springframework.cloud:spring-cloud-starter-stream-kafka")
+	implementation("org.springframework.cloud:spring-cloud-stream-binder-kafka-reactive")
 
 	// Test dependencies
 	testImplementation("org.springframework.boot:spring-boot-starter-test")

@@ -19,21 +19,28 @@ repositories {
 }
 
 dependencies {
+	// Springboot dependencies
 	implementation("org.springframework.boot:spring-boot-starter")
 	implementation("org.jetbrains.kotlin:kotlin-reflect")
 	implementation("org.springframework.boot:spring-boot-starter-web")
 	implementation("org.springframework.boot:spring-boot-starter-actuator")
-	implementation("org.springframework.cloud:spring-cloud-stream")
+
+	// Temporal dependency
+	implementation("io.temporal:temporal-sdk")
+	implementation("io.temporal:temporal-kotlin")
+	implementation("io.temporal:temporal-spring-boot-starter")
 
 	// Test dependencies
 	testImplementation("org.springframework.boot:spring-boot-starter-test")
 	testImplementation("org.jetbrains.kotlin:kotlin-test-junit5")
 	testRuntimeOnly("org.junit.platform:junit-platform-launcher")
+	implementation("io.temporal:temporal-testing")
 }
 
 dependencyManagement {
 	imports {
 		mavenBom("org.springframework.cloud:spring-cloud-dependencies:2024.0.0")
+		mavenBom("io.temporal:temporal-bom:1.27.0")
 	}
 }
 

@@ -1,0 +1,12 @@
+spring:
+  cloud:
+    function:
+      definition: continuum-user-input
+    stream:
+      bindings:
+        continuum-user-input-in-0:
+          destination: continuum-core-User
+          content-type: application/*+avro
+          group: ${spring.application.name}
+          consumer:
+            use-native-decoding: true

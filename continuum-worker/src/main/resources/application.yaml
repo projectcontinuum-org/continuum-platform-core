@@ -1,0 +1,9 @@
+spring.application.name: continuum-worker
+
+spring:
+  temporal:
+    namespace: ${TEMPORAL_NAMESPACE:default}
+    connection:
+      target: ${TEMPORAL_SERVER_ADDRESS}
+    workersAutoDiscovery:
+      packages: com.continuum.core.worker
