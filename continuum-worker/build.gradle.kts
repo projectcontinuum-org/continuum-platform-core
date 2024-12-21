@@ -25,6 +25,9 @@ dependencies {
 	implementation("org.springframework.boot:spring-boot-starter-web")
 	implementation("org.springframework.boot:spring-boot-starter-actuator")
 
+	// Project dependencies
+	implementation(project(":continuum-commons"))
+
 	// Jackson dependencies
 	implementation("com.fasterxml.jackson.module:jackson-module-kotlin:2.18.2")
 

@@ -1,0 +1,4 @@
+temporal:
+  connection:
+    target: ${TEMPORAL_SERVER_ADDRESS}
+    namespace: ${TEMPORAL_NAMESPACE:default}

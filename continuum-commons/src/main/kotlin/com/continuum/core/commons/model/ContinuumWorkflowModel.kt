@@ -1,9 +1,9 @@
-package com.continuum.core.worker.model
+package com.continuum.core.commons.model
 
 import com.fasterxml.jackson.annotation.JsonCreator
 import com.fasterxml.jackson.annotation.JsonProperty
 
-data class ContinuumWorkflow @JsonCreator constructor(
+data class ContinuumWorkflowModel @JsonCreator constructor(
   @JsonProperty("id") val id: String,
   @JsonProperty("name") val name: String,
   @JsonProperty("active") val active: Boolean = true,

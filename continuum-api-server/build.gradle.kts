@@ -26,6 +26,16 @@ dependencies {
 	implementation("org.springframework.cloud:spring-cloud-starter-stream-kafka")
 	implementation("org.springframework.cloud:spring-cloud-stream-binder-kafka-reactive")
 
+	// Project dependencies
+	implementation(project(":continuum-commons"))
+
+	// Swagger-UI Dependencies
+	implementation("org.springdoc:springdoc-openapi-starter-webmvc-ui:2.5.0")
+
+	// Temporal Dependencies
+	implementation("io.temporal:temporal-sdk")
+	implementation("io.temporal:temporal-kotlin")
+
 	// Test dependencies
 	testImplementation("org.springframework.boot:spring-boot-starter-test")
 	testImplementation("org.jetbrains.kotlin:kotlin-test-junit5")
@@ -35,6 +45,7 @@ dependencies {
 dependencyManagement {
 	imports {
 		mavenBom("org.springframework.cloud:spring-cloud-dependencies:2024.0.0")
+		mavenBom("io.temporal:temporal-bom:1.27.0")
 	}
 }
 

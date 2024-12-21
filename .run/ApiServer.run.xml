@@ -2,6 +2,9 @@
   <configuration default="false" name="ApiServer" type="SpringBootApplicationConfigurationType" factoryName="Spring Boot">
     <option name="ALTERNATIVE_JRE_PATH" value="temurin-21" />
     <option name="ALTERNATIVE_JRE_PATH_ENABLED" value="true" />
+    <envs>
+      <env name="TEMPORAL_SERVER_ADDRESS" value="localhost:7233" />
+    </envs>
     <module name="continuum.continuum-api-server.main" />
     <option name="SPRING_BOOT_MAIN_CLASS" value="com.continuum.core.api.server.Main" />
     <extension name="net.ashald.envfile">
