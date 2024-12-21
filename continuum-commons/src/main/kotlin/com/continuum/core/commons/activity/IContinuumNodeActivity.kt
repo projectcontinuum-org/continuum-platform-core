@@ -5,5 +5,8 @@ import io.temporal.activity.ActivityInterface
 
 @ActivityInterface
 interface IContinuumNodeActivity {
-  fun run(node: ContinuumWorkflowModel.Node): Map<String, Any>
+  fun run(
+    node: ContinuumWorkflowModel.Node,
+    inputs: Map<String, Any>
+  ): Map<String, Any?>
 }
