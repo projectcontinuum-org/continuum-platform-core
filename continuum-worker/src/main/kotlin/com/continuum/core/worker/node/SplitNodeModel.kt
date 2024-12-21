@@ -1,5 +1,6 @@
 package com.continuum.core.worker.node
 
+import com.continuum.core.commons.model.ContinuumWorkflowModel
 import com.continuum.core.commons.node.ProcessNodeModel
 import com.fasterxml.jackson.databind.ObjectMapper
 import org.slf4j.LoggerFactory
@@ -12,6 +13,24 @@ class SplitNodeModel : ProcessNodeModel() {
     private val LOGGER = LoggerFactory.getLogger(SplitNodeModel::class.java)
     private val objectMapper = ObjectMapper()
   }
+
+  override val inputPorts = mapOf(
+    "input-1" to ContinuumWorkflowModel.NodePort(
+      name = "input string",
+      contentType = "string"
+    )
+  )
+
+  override val outputPorts = mapOf(
+    "output-1" to ContinuumWorkflowModel.NodePort(
+      name = "part 1",
+      contentType = "string"
+    ),
+    "output-2" to ContinuumWorkflowModel.NodePort(
+      name = "part 2",
+      contentType = "string"
+    )
+  )
 
   override fun execute(inputs: Map<String, Any>): Map<String, Any?>{
     LOGGER.info("Splitting the input: $${objectMapper.writeValueAsString(inputs)}")
