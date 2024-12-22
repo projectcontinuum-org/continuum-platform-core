@@ -3,6 +3,7 @@ package com.continuum.core.worker.activity
 import com.continuum.core.commons.activity.IContinuumNodeActivity
 import com.continuum.core.commons.constant.TaskQueues
 import com.continuum.core.commons.model.ContinuumWorkflowModel
+import com.continuum.core.commons.model.PortData
 import com.continuum.core.commons.node.ProcessNodeModel
 import com.continuum.core.commons.node.TriggerNodeModel
 import io.temporal.spring.boot.ActivityImpl
@@ -39,8 +40,8 @@ class ContinuumNodeActivity(
 
     override fun run(
         node: ContinuumWorkflowModel.Node,
-        inputs: Map<String, Any>
-    ): Map<String, Any?> {
+        inputs: Map<String, PortData>
+    ): Map<String, PortData> {
         // Find the node to execute
         if (processNodeMap.containsKey(node.data.nodeModel)) {
             return processNodeMap[node.data.nodeModel]!!.run(inputs)

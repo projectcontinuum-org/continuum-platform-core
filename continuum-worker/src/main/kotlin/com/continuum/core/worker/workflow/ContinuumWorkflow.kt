@@ -4,6 +4,7 @@ import com.continuum.core.commons.activity.IContinuumNodeActivity
 import com.continuum.core.commons.constant.TaskQueues
 import com.continuum.core.commons.constant.TaskQueues.WORKFLOW_TASK_QUEUE
 import com.continuum.core.commons.model.ContinuumWorkflowModel
+import com.continuum.core.commons.model.PortData
 import com.continuum.core.commons.workflow.IContinuumWorkflow
 import io.temporal.activity.ActivityOptions
 import io.temporal.common.RetryOptions
@@ -18,7 +19,7 @@ class ContinuumWorkflow : IContinuumWorkflow {
 
     private val LOGGER = Workflow.getLogger(ContinuumWorkflow::class.java)
 
-    private val nodeOutputMap = mutableMapOf<String, Map<String, Any?>>()
+    private val nodeOutputMap = mutableMapOf<String, Map<String, PortData>>()
 
     private val retryOptions: RetryOptions = RetryOptions {
         setMaximumInterval(Duration.ofSeconds(100))
@@ -71,10 +72,10 @@ class ContinuumWorkflow : IContinuumWorkflow {
     private fun getNodeInputs(
         continuumWorkflow: ContinuumWorkflowModel,
         node: ContinuumWorkflowModel.Node
-    ): Map<String, Any> {
+    ): Map<String, PortData> {
         val nodeParentEdges = continuumWorkflow.getParentEdges(node)
         val nodeInputs = nodeParentEdges.associate { edge ->
-            edge.targetHandle to (nodeOutputMap[edge.source]?.get(edge.sourceHandle) ?: emptyMap<String, Any>())
+            edge.targetHandle to nodeOutputMap[edge.source]!![edge.sourceHandle]!!
         }
         return nodeInputs
     }
