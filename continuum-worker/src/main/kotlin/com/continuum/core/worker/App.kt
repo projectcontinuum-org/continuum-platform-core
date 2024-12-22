@@ -11,16 +11,16 @@ import org.springframework.boot.runApplication
 class App
 
 fun main(args: Array<String>) {
-	registerKotlinMapper()
-	runApplication<App>(*args)
+    registerKotlinMapper()
+    runApplication<App>(*args)
 }
 
 fun registerKotlinMapper() {
-	val mapper = JacksonJsonPayloadConverter.newDefaultObjectMapper()
-	val km = KotlinModule.Builder().build()
-	mapper.registerModule(km)
-	val jacksonConverter = JacksonJsonPayloadConverter(mapper)
-	val dataConverter = DefaultDataConverter.newDefaultInstance()
-		.withPayloadConverterOverrides(jacksonConverter)
-	GlobalDataConverter.register(dataConverter)
+    val mapper = JacksonJsonPayloadConverter.newDefaultObjectMapper()
+    val km = KotlinModule.Builder().build()
+    mapper.registerModule(km)
+    val jacksonConverter = JacksonJsonPayloadConverter(mapper)
+    val dataConverter = DefaultDataConverter.newDefaultInstance()
+        .withPayloadConverterOverrides(jacksonConverter)
+    GlobalDataConverter.register(dataConverter)
 }

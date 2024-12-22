@@ -7,12 +7,12 @@ import io.temporal.workflow.WorkflowMethod
 
 @WorkflowInterface
 interface IContinuumWorkflow {
-  companion object {
-    val STATUS_ATTR: SearchAttributeKey<String> = SearchAttributeKey.forKeyword("CustomStringField")
-  }
+    companion object {
+        val STATUS_ATTR: SearchAttributeKey<String> = SearchAttributeKey.forKeyword("CustomStringField")
+    }
 
-  @WorkflowMethod
-  fun start(
-    continuumWorkflow: ContinuumWorkflowModel
-  )
+    @WorkflowMethod
+    fun start(
+        continuumWorkflow: ContinuumWorkflowModel
+    )
 }

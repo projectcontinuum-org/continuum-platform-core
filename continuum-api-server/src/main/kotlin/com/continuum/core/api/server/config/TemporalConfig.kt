@@ -10,28 +10,28 @@ import org.springframework.context.annotation.Configuration
 
 @Configuration
 class TemporalConfig(
-  @Value("\${temporal.connection.target}")
-  private val temporalServiceAddress: String
+    @Value("\${temporal.connection.target}")
+    private val temporalServiceAddress: String
 ) {
 
-  @Bean
-  fun workflowServiceStubs(): WorkflowServiceStubs {
-    return WorkflowServiceStubs
-      .newServiceStubs(WorkflowServiceStubsOptions.newBuilder().setTarget(temporalServiceAddress).build())
-  }
+    @Bean
+    fun workflowServiceStubs(): WorkflowServiceStubs {
+        return WorkflowServiceStubs
+            .newServiceStubs(WorkflowServiceStubsOptions.newBuilder().setTarget(temporalServiceAddress).build())
+    }
 
-  @Bean
-  fun workflowClient(
-    @Value("\${temporal.connection.namespace}")
-    temporalNamespace: String,
-    workflowServiceStubs: WorkflowServiceStubs
-  ): WorkflowClient {
-    return WorkflowClient.newInstance(
-      workflowServiceStubs,
-      WorkflowClientOptions.newBuilder()
-        .setNamespace(temporalNamespace)
-        .build()
-    )
-  }
+    @Bean
+    fun workflowClient(
+        @Value("\${temporal.connection.namespace}")
+        temporalNamespace: String,
+        workflowServiceStubs: WorkflowServiceStubs
+    ): WorkflowClient {
+        return WorkflowClient.newInstance(
+            workflowServiceStubs,
+            WorkflowClientOptions.newBuilder()
+                .setNamespace(temporalNamespace)
+                .build()
+        )
+    }
 
 }

@@ -4,6 +4,6 @@ package com.continuum.core.commons.constant
 // Couldn't use kotlin enum as you need to use the string form available via `MyEnum.enumMember.name`, which is not a constant.
 
 object TaskQueues {
-  const val WORKFLOW_TASK_QUEUE = "WORKFLOW_TASK_QUEUE"
-  const val ACTIVITY_TASK_QUEUE = "ACTIVITY_TASK_QUEUE"
+    const val WORKFLOW_TASK_QUEUE = "WORKFLOW_TASK_QUEUE"
+    const val ACTIVITY_TASK_QUEUE = "ACTIVITY_TASK_QUEUE"
 }

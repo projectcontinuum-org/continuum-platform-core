@@ -13,22 +13,22 @@ import org.springframework.web.bind.annotation.RestController
 @RestController
 @RequestMapping("/workflow")
 class WorkflowController(
-  val workflowClient: WorkflowClient
+    val workflowClient: WorkflowClient
 ) {
 
-  @PostMapping("/start")
-  fun startWorkflow(
-    @RequestBody
-    continuumWorkflowModel: ContinuumWorkflowModel
-  ): String {
-    val continuumWorkflow = workflowClient.newWorkflowStub(
-      IContinuumWorkflow::class.java,
-      WorkflowOptions.newBuilder()
-        .setTaskQueue(TaskQueues.WORKFLOW_TASK_QUEUE)
-        .build()
-    )
-    continuumWorkflow.start(continuumWorkflowModel)
-    return "Started workflow"
-  }
+    @PostMapping("/start")
+    fun startWorkflow(
+        @RequestBody
+        continuumWorkflowModel: ContinuumWorkflowModel
+    ): String {
+        val continuumWorkflow = workflowClient.newWorkflowStub(
+            IContinuumWorkflow::class.java,
+            WorkflowOptions.newBuilder()
+                .setTaskQueue(TaskQueues.WORKFLOW_TASK_QUEUE)
+                .build()
+        )
+        continuumWorkflow.start(continuumWorkflowModel)
+        return "Started workflow"
+    }
 
 }

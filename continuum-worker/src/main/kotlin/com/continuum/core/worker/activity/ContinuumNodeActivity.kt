@@ -14,39 +14,39 @@ import org.springframework.stereotype.Component
 @Component
 @ActivityImpl(taskQueues = [TaskQueues.ACTIVITY_TASK_QUEUE])
 class ContinuumNodeActivity(
-  private val processNodesModelProvider: ObjectProvider<ProcessNodeModel>,
-  private val triggerNodeModelProvider: ObjectProvider<TriggerNodeModel>
-): IContinuumNodeActivity {
+    private val processNodesModelProvider: ObjectProvider<ProcessNodeModel>,
+    private val triggerNodeModelProvider: ObjectProvider<TriggerNodeModel>
+) : IContinuumNodeActivity {
 
-  private val processNodeMap = mutableMapOf<String, ProcessNodeModel>()
-  private val triggerNodeMap = mutableMapOf<String, TriggerNodeModel>()
+    private val processNodeMap = mutableMapOf<String, ProcessNodeModel>()
+    private val triggerNodeMap = mutableMapOf<String, TriggerNodeModel>()
 
-  companion object {
-    private val LOGGER = LoggerFactory.getLogger(ContinuumNodeActivity::class.java)
-  }
-
-  @PostConstruct
-  fun onInit() {
-    processNodesModelProvider.forEach {
-      processNodeMap[it.javaClass.simpleName] = it
+    companion object {
+        private val LOGGER = LoggerFactory.getLogger(ContinuumNodeActivity::class.java)
     }
-    triggerNodeModelProvider.forEach {
-      triggerNodeMap[it.javaClass.simpleName] = it
-    }
-    LOGGER.info("Registered process nodes: ${processNodeMap.keys}")
-    LOGGER.info("Registered trigger nodes: ${triggerNodeMap.keys}")
-  }
 
-  override fun run(
-    node: ContinuumWorkflowModel.Node,
-    inputs: Map<String, Any>
-  ): Map<String, Any?> {
-    // Find the node to execute
-    if(processNodeMap.containsKey(node.data.nodeModel)) {
-      return processNodeMap[node.data.nodeModel]!!.run(inputs)
-    } else if(triggerNodeMap.containsKey(node.data.nodeModel)) {
-      return triggerNodeMap[node.data.nodeModel]!!.run()
+    @PostConstruct
+    fun onInit() {
+        processNodesModelProvider.forEach {
+            processNodeMap[it.javaClass.simpleName] = it
+        }
+        triggerNodeModelProvider.forEach {
+            triggerNodeMap[it.javaClass.simpleName] = it
+        }
+        LOGGER.info("Registered process nodes: ${processNodeMap.keys}")
+        LOGGER.info("Registered trigger nodes: ${triggerNodeMap.keys}")
     }
-    throw IllegalArgumentException("Node model not found: ${node.data.nodeModel}")
-  }
+
+    override fun run(
+        node: ContinuumWorkflowModel.Node,
+        inputs: Map<String, Any>
+    ): Map<String, Any?> {
+        // Find the node to execute
+        if (processNodeMap.containsKey(node.data.nodeModel)) {
+            return processNodeMap[node.data.nodeModel]!!.run(inputs)
+        } else if (triggerNodeMap.containsKey(node.data.nodeModel)) {
+            return triggerNodeMap[node.data.nodeModel]!!.run()
+        }
+        throw IllegalArgumentException("Node model not found: ${node.data.nodeModel}")
+    }
 }
