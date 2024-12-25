@@ -3,7 +3,7 @@ package com.continuum.core.commons.node
 import com.continuum.core.commons.model.ContinuumWorkflowModel
 import com.continuum.core.commons.model.PortData
 
-abstract class ProcessNodeModel {
+abstract class ProcessNodeModel: ContinuumNodeModel {
     abstract val inputPorts: Map<String, ContinuumWorkflowModel.NodePort>
     abstract val outputPorts: Map<String, ContinuumWorkflowModel.NodePort>
 

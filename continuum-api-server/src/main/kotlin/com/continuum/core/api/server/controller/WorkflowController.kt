@@ -3,6 +3,7 @@ package com.continuum.core.api.server.controller
 import com.continuum.core.commons.constant.TaskQueues
 import com.continuum.core.commons.model.ContinuumWorkflowModel
 import com.continuum.core.commons.workflow.IContinuumWorkflow
+import io.temporal.api.common.v1.WorkflowExecution
 import io.temporal.client.WorkflowClient
 import io.temporal.client.WorkflowOptions
 import org.springframework.web.bind.annotation.PostMapping
@@ -11,12 +12,12 @@ import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.RestController
 
 @RestController
-@RequestMapping("/workflow")
+@RequestMapping("/api/v1/workflow")
 class WorkflowController(
     val workflowClient: WorkflowClient
 ) {
 
-    @PostMapping("/start")
+    @PostMapping
     fun startWorkflow(
         @RequestBody
         continuumWorkflowModel: ContinuumWorkflowModel
@@ -27,8 +28,11 @@ class WorkflowController(
                 .setTaskQueue(TaskQueues.WORKFLOW_TASK_QUEUE)
                 .build()
         )
-        continuumWorkflow.start(continuumWorkflowModel)
-        return "Started workflow"
+        val workflowExecution: WorkflowExecution = WorkflowClient.start(
+            continuumWorkflow::start,
+            continuumWorkflowModel
+        )
+        return workflowExecution.workflowId
     }
 
 }

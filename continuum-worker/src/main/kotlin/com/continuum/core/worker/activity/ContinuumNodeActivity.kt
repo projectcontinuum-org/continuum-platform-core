@@ -29,10 +29,10 @@ class ContinuumNodeActivity(
     @PostConstruct
     fun onInit() {
         processNodesModelProvider.forEach {
-            processNodeMap[it.javaClass.simpleName] = it
+            processNodeMap[it.javaClass.name] = it
         }
         triggerNodeModelProvider.forEach {
-            triggerNodeMap[it.javaClass.simpleName] = it
+            triggerNodeMap[it.javaClass.name] = it
         }
         LOGGER.info("Registered process nodes: ${processNodeMap.keys}")
         LOGGER.info("Registered trigger nodes: ${triggerNodeMap.keys}")
