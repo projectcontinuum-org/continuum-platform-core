@@ -97,23 +97,7 @@ class ContinuumWorkflow : IContinuumWorkflow {
             sendUpdateEvent()
             LOGGER.info("All nodes executed----------------------------------")
         } while (nodesToExecute.isNotEmpty())
-        if (!WorkflowUnsafe.isReplaying()) {
-            MqttHelper.publishWorkflowSnapshot(
-                Workflow.getInfo().workflowId,
-                MqttHelper.WorkflowUpdateEvent(
-                    jobId = Workflow.getInfo().workflowId,
-                    data = MqttHelper.WorkflowUpdate(
-                        executionUUID = Workflow.getInfo().workflowId,
-                        progressPercentage = 0,
-                        status = "FINISHED",
-                        nodeToOutputsMap = nodeToOutputsMap,
-                        createdAtTimestampUtc = Workflow.getInfo().runStartedTimestampMillis,
-                        updatesAtTimestampUtc = Instant.now().toEpochMilli(),
-                        workflow = continuumWorkflow
-                    )
-                )
-            )
-        }
+        sendUpdateEvent("FINISHED")
     }
 
     private fun getNodeInputs(
@@ -145,7 +129,9 @@ class ContinuumWorkflow : IContinuumWorkflow {
         return nodesToExecute
     }
 
-    fun sendUpdateEvent() {
+    fun sendUpdateEvent(
+        status: String = "RUNNING"
+    ) {
         // Check if the Workflow is being replayed
         if (!WorkflowUnsafe.isReplaying()) {
             MqttHelper.publishWorkflowSnapshot(
@@ -155,7 +141,7 @@ class ContinuumWorkflow : IContinuumWorkflow {
                     data = MqttHelper.WorkflowUpdate(
                         executionUUID = Workflow.getInfo().workflowId,
                         progressPercentage = 0,
-                        status = "RUNNING",
+                        status = status,
                         nodeToOutputsMap = nodeToOutputsMap,
                         createdAtTimestampUtc = Workflow.getInfo().runStartedTimestampMillis,
                         updatesAtTimestampUtc = Instant.now().toEpochMilli(),
