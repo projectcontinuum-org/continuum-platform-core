@@ -36,6 +36,9 @@ dependencies {
     implementation("io.temporal:temporal-kotlin")
     implementation("io.temporal:temporal-spring-boot-starter")
 
+    // MQTT dependencies
+    implementation("org.eclipse.paho:org.eclipse.paho.client.mqttv3:1.2.5")
+
     // Test dependencies
     testImplementation("org.springframework.boot:spring-boot-starter-test")
     testImplementation("org.jetbrains.kotlin:kotlin-test-junit5")

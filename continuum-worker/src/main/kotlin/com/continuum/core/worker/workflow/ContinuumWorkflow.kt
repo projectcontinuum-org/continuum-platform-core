@@ -4,28 +4,37 @@ import com.continuum.core.commons.activity.IContinuumNodeActivity
 import com.continuum.core.commons.constant.TaskQueues
 import com.continuum.core.commons.constant.TaskQueues.WORKFLOW_TASK_QUEUE
 import com.continuum.core.commons.model.ContinuumWorkflowModel
+import com.continuum.core.commons.model.ExecutionStatus
 import com.continuum.core.commons.model.PortData
+import com.continuum.core.commons.model.WorkflowSnapshot
 import com.continuum.core.commons.workflow.IContinuumWorkflow
+import com.continuum.core.worker.utils.MqttHelper
+import com.fasterxml.jackson.databind.ObjectMapper
 import io.temporal.activity.ActivityOptions
 import io.temporal.common.RetryOptions
 import io.temporal.spring.boot.WorkflowImpl
 import io.temporal.workflow.Async
 import io.temporal.workflow.Promise
 import io.temporal.workflow.Workflow
+import io.temporal.workflow.unsafe.WorkflowUnsafe
 import java.time.Duration
+import java.time.Instant
 
 @WorkflowImpl(taskQueues = [WORKFLOW_TASK_QUEUE])
 class ContinuumWorkflow : IContinuumWorkflow {
 
     private val LOGGER = Workflow.getLogger(ContinuumWorkflow::class.java)
 
-    private val nodeOutputMap = mutableMapOf<String, Map<String, PortData>>()
+    private val nodeToOutputsMap = mutableMapOf<String, Map<String, PortData>>()
+    private var currentRunningWorkflow: ContinuumWorkflowModel? = null
 
     private val retryOptions: RetryOptions = RetryOptions {
         setMaximumInterval(Duration.ofSeconds(100))
         setBackoffCoefficient(2.0)
         setMaximumAttempts(500)
     }
+
+    private val objectMapper = ObjectMapper()
 
     private val baseActivityOptions: ActivityOptions = ActivityOptions {
         setStartToCloseTimeout(Duration.ofSeconds(60))
@@ -44,29 +53,67 @@ class ContinuumWorkflow : IContinuumWorkflow {
         continuumWorkflow: ContinuumWorkflowModel
     ) {
         LOGGER.info("Starting ContinuumWorkflowImpl")
-        run(continuumWorkflow)
+        try {
+            Workflow.upsertTypedSearchAttributes(
+                IContinuumWorkflow.WORKFLOW_STATUS
+                    .valueSet(ExecutionStatus.RUNNING.value)
+            )
+            run(continuumWorkflow)
+            Workflow.upsertTypedSearchAttributes(
+                IContinuumWorkflow.WORKFLOW_STATUS
+                    .valueSet(ExecutionStatus.COMPLETED.value)
+            )
+        } catch (e: Exception) {
+            LOGGER.error("Error in executing workflow", e)
+            Workflow.upsertTypedSearchAttributes(
+                IContinuumWorkflow.WORKFLOW_STATUS
+                    .valueSet(ExecutionStatus.FAILED.value)
+            )
+        }
     }
 
     private fun run(
         continuumWorkflow: ContinuumWorkflowModel
     ) {
+        currentRunningWorkflow = continuumWorkflow
         do {
             val nodesToExecute = getNextNodesToExecute(
                 continuumWorkflow,
-                nodeOutputMap
+                nodeToOutputsMap
             )
             val nodeExecutionPromises = nodesToExecute.map { node ->
                 val nodeInputs = getNodeInputs(continuumWorkflow, node)
-                Pair(node.id, Async.function {
+                node.data.status = ContinuumWorkflowModel.NodeStatus.BUSY
+                Pair(node, Async.function {
                     continuumNodeActivity.run(node, nodeInputs)
                 })
             }
+            sendUpdateEvent()
             Promise.allOf(nodeExecutionPromises.map { it.second }).get()
             nodeExecutionPromises.forEach {
-                nodeOutputMap[it.first] = it.second.get()
+                it.first.data.status = ContinuumWorkflowModel.NodeStatus.SUCCESS
+                nodeToOutputsMap[it.first.id] = it.second.get()
             }
+            sendUpdateEvent()
             LOGGER.info("All nodes executed----------------------------------")
         } while (nodesToExecute.isNotEmpty())
+        if (!WorkflowUnsafe.isReplaying()) {
+            MqttHelper.publishWorkflowSnapshot(
+                Workflow.getInfo().workflowId,
+                MqttHelper.WorkflowUpdateEvent(
+                    jobId = Workflow.getInfo().workflowId,
+                    data = MqttHelper.WorkflowUpdate(
+                        executionUUID = Workflow.getInfo().workflowId,
+                        progressPercentage = 0,
+                        status = "FINISHED",
+                        nodeToOutputsMap = nodeToOutputsMap,
+                        createdAtTimestampUtc = Workflow.getInfo().runStartedTimestampMillis,
+                        updatesAtTimestampUtc = Instant.now().toEpochMilli(),
+                        workflow = continuumWorkflow
+                    )
+                )
+            )
+        }
     }
 
     private fun getNodeInputs(
@@ -75,7 +122,7 @@ class ContinuumWorkflow : IContinuumWorkflow {
     ): Map<String, PortData> {
         val nodeParentEdges = continuumWorkflow.getParentEdges(node)
         val nodeInputs = nodeParentEdges.associate { edge ->
-            edge.targetHandle to nodeOutputMap[edge.source]!![edge.sourceHandle]!!
+            edge.targetHandle to nodeToOutputsMap[edge.source]!![edge.sourceHandle]!!
         }
         return nodeInputs
     }
@@ -96,5 +143,33 @@ class ContinuumWorkflow : IContinuumWorkflow {
             }
         }
         return nodesToExecute
+    }
+
+    fun sendUpdateEvent() {
+        // Check if the Workflow is being replayed
+        if (!WorkflowUnsafe.isReplaying()) {
+            MqttHelper.publishWorkflowSnapshot(
+                Workflow.getInfo().workflowId,
+                MqttHelper.WorkflowUpdateEvent(
+                    jobId = Workflow.getInfo().workflowId,
+                    data = MqttHelper.WorkflowUpdate(
+                        executionUUID = Workflow.getInfo().workflowId,
+                        progressPercentage = 0,
+                        status = "RUNNING",
+                        nodeToOutputsMap = nodeToOutputsMap,
+                        createdAtTimestampUtc = Workflow.getInfo().runStartedTimestampMillis,
+                        updatesAtTimestampUtc = Instant.now().toEpochMilli(),
+                        workflow = currentRunningWorkflow!!
+                    )
+                )
+            )
+        }
+    }
+
+    override fun getWorkflowSnapshot(): WorkflowSnapshot {
+        return WorkflowSnapshot(
+            workflowSnapshot = currentRunningWorkflow!!,
+            nodeToOutputsMap = nodeToOutputsMap
+        )
     }
 }

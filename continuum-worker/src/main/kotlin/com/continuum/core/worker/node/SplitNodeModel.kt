@@ -58,6 +58,8 @@ class SplitNodeModel : ProcessNodeModel() {
 
     override fun execute(inputs: Map<String, PortData>): Map<String, PortData> {
         LOGGER.info("Splitting the input: ${objectMapper.writeValueAsString(inputs)}")
+        // Wait for 10 seconds
+        Thread.sleep(10000)
         inputs["input-1"]?.let { portData ->
             if(portData.status == PortDataStatus.SUCCESS && portData.contentType == TEXT_PLAIN_VALUE) {
                 LOGGER.info("Input data: '${portData.data}'")

@@ -1,6 +1,7 @@
 package com.continuum.core.commons.model
 
 import com.fasterxml.jackson.annotation.JsonCreator
+import com.fasterxml.jackson.annotation.JsonIgnore
 import com.fasterxml.jackson.annotation.JsonProperty
 
 data class ContinuumWorkflowModel @JsonCreator constructor(
@@ -15,14 +16,17 @@ data class ContinuumWorkflowModel @JsonCreator constructor(
         edges.groupBy { it.target }.mapValues { it.value.map { edge -> edge.source } }
     private val nodeParentEdges: Map<String, List<Edge>> = edges.groupBy { it.target }
 
+    @JsonIgnore
     fun getRootNodes(): List<Node> {
         return nodes.filter { node -> !nodeParents.containsKey(node.id) }
     }
 
+    @JsonIgnore
     fun getParentNodes(node: Node): List<Node> {
         return nodeParents[node.id]?.mapNotNull { nodesMap[it] } ?: emptyList()
     }
 
+    @JsonIgnore
     fun getParentEdges(node: Node): List<Edge> {
         return nodeParentEdges[node.id] ?: emptyList()
     }
@@ -65,11 +69,23 @@ data class ContinuumWorkflowModel @JsonCreator constructor(
         @JsonProperty("outputs") val outputs: Map<String, NodePort>? = null,
         @JsonProperty("properties") val properties: Map<String, Any>? = null,
         @JsonProperty("propertiesSchema") val propertiesSchema: Map<String, Any>? = null,
-        @JsonProperty("propertiesUISchema") val propertiesUISchema: Map<String, Any>? = null
+        @JsonProperty("propertiesUISchema") val propertiesUISchema: Map<String, Any>? = null,
+        @JsonProperty("status") var status: NodeStatus? = null,
     )
 
     data class NodePort @JsonCreator constructor(
         @JsonProperty("name") val name: String,
         @JsonProperty("contentType") val contentType: String
     )
+
+    enum class NodeStatus {
+        ACTIVE,
+        CONFIGURED,
+        BUSY,
+        SUCCESS,
+        FAILED,
+        WARNING,
+        PRE_PROCESSING,
+        POST_PROCESSING
+    }
 }
