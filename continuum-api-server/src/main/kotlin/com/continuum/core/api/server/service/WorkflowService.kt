@@ -74,7 +74,7 @@ class WorkflowService(
     ): List<WorkflowStatus> {
         val requestBuilder = ListWorkflowExecutionsRequest.newBuilder()
             .setNamespace(workflowClient.options.namespace)
-            .setQuery("WorkflowType='${IContinuumWorkflow::class.java.simpleName}'")
+            .setQuery("WorkflowType='${IContinuumWorkflow::class.java.simpleName}' && ExecutionStatus='WORKFLOW_EXECUTION_STATUS_RUNNING'")
         nextToken?.let { requestBuilder.setNextPageToken(it) }
         val listResponse = workflowClient.workflowServiceStubs.blockingStub()
             .listWorkflowExecutions(requestBuilder.build())

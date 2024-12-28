@@ -19,6 +19,7 @@ import io.temporal.workflow.Workflow
 import io.temporal.workflow.unsafe.WorkflowUnsafe
 import java.time.Duration
 import java.time.Instant
+import javax.sound.sampled.Port
 
 @WorkflowImpl(taskQueues = [WORKFLOW_TASK_QUEUE])
 class ContinuumWorkflow : IContinuumWorkflow {
@@ -51,7 +52,7 @@ class ContinuumWorkflow : IContinuumWorkflow {
 
     override fun start(
         continuumWorkflow: ContinuumWorkflowModel
-    ) {
+    ): Map<String, Map<String, PortData>> {
         LOGGER.info("Starting ContinuumWorkflowImpl")
         try {
             Workflow.upsertTypedSearchAttributes(
@@ -63,41 +64,49 @@ class ContinuumWorkflow : IContinuumWorkflow {
                 IContinuumWorkflow.WORKFLOW_STATUS
                     .valueSet(ExecutionStatus.COMPLETED.value)
             )
+            sendUpdateEvent("FINISHED")
         } catch (e: Exception) {
             LOGGER.error("Error in executing workflow", e)
             Workflow.upsertTypedSearchAttributes(
                 IContinuumWorkflow.WORKFLOW_STATUS
                     .valueSet(ExecutionStatus.FAILED.value)
             )
+            sendUpdateEvent("FAILED")
         }
+        return nodeToOutputsMap
     }
 
     private fun run(
         continuumWorkflow: ContinuumWorkflowModel
     ) {
         currentRunningWorkflow = continuumWorkflow
+        val nodeExecutionPromises = mutableListOf<Pair<ContinuumWorkflowModel.Node, Promise<IContinuumNodeActivity.NodeActivityOutput>>>()
         do {
             val nodesToExecute = getNextNodesToExecute(
                 continuumWorkflow,
                 nodeToOutputsMap
             )
-            val nodeExecutionPromises = nodesToExecute.map { node ->
+            LOGGER.info("Nodes to execute: ${nodesToExecute.map { it.id }}")
+            val morePromises = nodesToExecute.map { node ->
                 val nodeInputs = getNodeInputs(continuumWorkflow, node)
                 node.data.status = ContinuumWorkflowModel.NodeStatus.BUSY
-                Pair(node, Async.function {
-                    continuumNodeActivity.run(node, nodeInputs)
-                })
+                Pair(node, Async.function {continuumNodeActivity.run(node, nodeInputs)})
             }
+            nodeExecutionPromises.addAll(morePromises)
             sendUpdateEvent()
-            Promise.allOf(nodeExecutionPromises.map { it.second }).get()
-            nodeExecutionPromises.forEach {
-                it.first.data.status = ContinuumWorkflowModel.NodeStatus.SUCCESS
-                nodeToOutputsMap[it.first.id] = it.second.get()
+            if (nodeExecutionPromises.isNotEmpty()) {
+                val nodeOutput = Promise.anyOf(nodeExecutionPromises.map { it.second }).get()
+                continuumWorkflow.nodes.first { it.id == nodeOutput.nodeId }.data.status = ContinuumWorkflowModel.NodeStatus.SUCCESS
+                nodeToOutputsMap[nodeOutput.nodeId] = nodeOutput.outputs
+                // remove the completed promises
+                nodeExecutionPromises.removeAll { it.first.id == nodeOutput.nodeId }
             }
-            sendUpdateEvent()
-            LOGGER.info("All nodes executed----------------------------------")
-        } while (nodesToExecute.isNotEmpty())
-        sendUpdateEvent("FINISHED")
+            LOGGER.info("NodeExecutionPromises size: ${nodeExecutionPromises.size}")
+        } while (getNextNodesToExecute(
+                continuumWorkflow,
+                nodeToOutputsMap
+            ).isNotEmpty() || nodeExecutionPromises.isNotEmpty())
+        LOGGER.info("All nodes executed----------------------------------")
     }
 
     private fun getNodeInputs(
@@ -122,7 +131,10 @@ class ContinuumWorkflow : IContinuumWorkflow {
             val allParentsProducedOutput = nodeParents.all { parent ->
                 nodeOutputMap.containsKey(parent.id)
             }
-            if (allParentsProducedOutput && !nodeOutputMap.containsKey(node.id)) {
+            LOGGER.info("Node: ${node.id} allParentsProducedOutput: $allParentsProducedOutput executed: ${nodeOutputMap.containsKey(node.id)} status: ${node.data.status}")
+            if (allParentsProducedOutput &&
+                !nodeOutputMap.containsKey(node.id) &&
+                node.data.status == null) {
                 nodesToExecute.add(node)
             }
         }

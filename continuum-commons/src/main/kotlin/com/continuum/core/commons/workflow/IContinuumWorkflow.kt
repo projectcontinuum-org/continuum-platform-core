@@ -1,6 +1,7 @@
 package com.continuum.core.commons.workflow
 
 import com.continuum.core.commons.model.ContinuumWorkflowModel
+import com.continuum.core.commons.model.PortData
 import com.continuum.core.commons.model.WorkflowSnapshot
 import io.temporal.common.SearchAttributeKey
 import io.temporal.workflow.QueryMethod
@@ -18,7 +19,7 @@ interface IContinuumWorkflow {
     @WorkflowMethod
     fun start(
         continuumWorkflow: ContinuumWorkflowModel
-    )
+    ): Map<String, Map<String, PortData>>
 
     @QueryMethod
     fun getWorkflowSnapshot(): WorkflowSnapshot

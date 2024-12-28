@@ -41,12 +41,18 @@ class ContinuumNodeActivity(
     override fun run(
         node: ContinuumWorkflowModel.Node,
         inputs: Map<String, PortData>
-    ): Map<String, PortData> {
+    ): IContinuumNodeActivity.NodeActivityOutput {
         // Find the node to execute
         if (processNodeMap.containsKey(node.data.nodeModel)) {
-            return processNodeMap[node.data.nodeModel]!!.run(inputs)
+            return IContinuumNodeActivity.NodeActivityOutput(
+                nodeId = node.id,
+                outputs = processNodeMap[node.data.nodeModel]!!.run(inputs)
+            )
         } else if (triggerNodeMap.containsKey(node.data.nodeModel)) {
-            return triggerNodeMap[node.data.nodeModel]!!.run()
+            return IContinuumNodeActivity.NodeActivityOutput(
+                nodeId = node.id,
+                outputs = triggerNodeMap[node.data.nodeModel]!!.run()
+            )
         }
         throw IllegalArgumentException("Node model not found: ${node.data.nodeModel}")
     }

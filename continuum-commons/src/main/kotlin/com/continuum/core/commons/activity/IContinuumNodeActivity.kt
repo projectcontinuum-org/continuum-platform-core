@@ -9,5 +9,10 @@ interface IContinuumNodeActivity {
     fun run(
         node: ContinuumWorkflowModel.Node,
         inputs: Map<String, PortData>
-    ): Map<String, PortData>
+    ): NodeActivityOutput
+
+    data class NodeActivityOutput(
+        val nodeId: String,
+        val outputs: Map<String, PortData>
+    )
 }
