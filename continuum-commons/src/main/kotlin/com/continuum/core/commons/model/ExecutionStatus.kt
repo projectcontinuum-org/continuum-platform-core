@@ -4,7 +4,6 @@ import io.temporal.api.enums.v1.EventType.*
 import io.temporal.api.history.v1.HistoryEvent
 
 enum class ExecutionStatus(val value: Long) {
-    UNKNOWN(-1),
     SCHEDULED(0),
     RUNNING(10),
     COMPLETED(20),
@@ -21,7 +20,7 @@ enum class ExecutionStatus(val value: Long) {
                 EVENT_TYPE_WORKFLOW_EXECUTION_COMPLETED -> COMPLETED
                 EVENT_TYPE_WORKFLOW_EXECUTION_FAILED -> FAILED
                 EVENT_TYPE_WORKFLOW_EXECUTION_TIMED_OUT -> TIMED_OUT
-                else -> UNKNOWN
+                else -> SCHEDULED
             }
         }
     }

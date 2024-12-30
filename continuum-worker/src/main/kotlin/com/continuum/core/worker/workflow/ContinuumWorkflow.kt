@@ -12,6 +12,7 @@ import com.continuum.core.worker.utils.MqttHelper
 import com.fasterxml.jackson.databind.ObjectMapper
 import io.temporal.activity.ActivityOptions
 import io.temporal.common.RetryOptions
+import io.temporal.failure.ApplicationFailure
 import io.temporal.spring.boot.WorkflowImpl
 import io.temporal.workflow.Async
 import io.temporal.workflow.Promise

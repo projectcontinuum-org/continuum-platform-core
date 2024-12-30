@@ -11,9 +11,12 @@ data class ContinuumWorkflowModel @JsonCreator constructor(
     @JsonProperty("nodes") val nodes: List<Node> = emptyList(),
     @JsonProperty("edges") val edges: List<Edge> = emptyList()
 ) {
+    @JsonIgnore
     private val nodesMap: Map<String, Node> = nodes.associateBy { it.id }
+    @JsonIgnore
     private val nodeParents: Map<String, List<String>> =
         edges.groupBy { it.target }.mapValues { it.value.map { edge -> edge.source } }
+    @JsonIgnore
     private val nodeParentEdges: Map<String, List<Edge>> = edges.groupBy { it.target }
 
     @JsonIgnore
