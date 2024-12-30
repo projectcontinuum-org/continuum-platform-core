@@ -7,7 +7,12 @@ import io.temporal.api.enums.v1.EventType
 
 class TreeHelper {
     companion object {
-        fun addItemToParent(treeRoots: MutableList<TreeItem<Execution>>, execution: Execution, categoryPath: MutableList<String>, maxChildren: Int = 10) {
+        fun addItemToParent(
+            treeRoots: MutableList<TreeItem<Execution>>,
+            execution: Execution,
+            categoryPath: MutableList<String>,
+            maxChildren: Int = 10
+        ) {
             if (categoryPath.isEmpty()) {
                 // only keep first 5 elements in treeRoots
                 if (treeRoots.size > maxChildren) {
@@ -17,14 +22,14 @@ class TreeHelper {
                 if (index != -1) {
                     treeRoots[index] = TreeItem(
                         id = execution.id,
-                        name = java.util.Date(execution.createdAtTimestampUtc).toLocaleString(),
+                        name = java.util.Date(execution.createdAtTimestampUtc).toString(),
                         itemInfo = execution
                     )
                 } else {
                     treeRoots.add(
                         TreeItem(
                             id = execution.id,
-                            name = java.util.Date(execution.createdAtTimestampUtc).toLocaleString(),
+                            name = java.util.Date(execution.createdAtTimestampUtc).toString(),
                             itemInfo = execution
                         )
                     )
@@ -42,7 +47,7 @@ class TreeHelper {
                 }
                 category = treeRoots.filter { it.name == categoryPath[0] }
                 categoryPath.removeAt(0)
-                addItemToParent(category[0].children!!, execution, categoryPath)
+                addItemToParent(category[0].children!!, execution, categoryPath, maxChildren)
             }
         }
 
@@ -58,7 +63,10 @@ class TreeHelper {
             }
         }
 
-        fun getSubTree(treeRoots: MutableList<TreeItem<Execution>>, categoryPath: MutableList<String>): List<TreeItem<Execution>> {
+        fun getSubTree(
+            treeRoots: MutableList<TreeItem<Execution>>,
+            categoryPath: MutableList<String>
+        ): List<TreeItem<Execution>> {
             return if (categoryPath.isEmpty()) {
                 treeRoots
             } else {

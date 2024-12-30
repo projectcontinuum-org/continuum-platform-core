@@ -12,6 +12,8 @@ import com.fasterxml.jackson.databind.ObjectMapper
 import com.google.protobuf.ByteString
 import io.temporal.api.common.v1.WorkflowExecution
 import io.temporal.api.enums.v1.EventType
+import io.temporal.api.workflowservice.v1.CountWorkflowExecutionsRequest
+import io.temporal.api.workflowservice.v1.CountWorkflowExecutionsResponse
 import io.temporal.api.workflowservice.v1.ListWorkflowExecutionsRequest
 import io.temporal.client.WorkflowClient
 import io.temporal.client.WorkflowException
@@ -74,11 +76,12 @@ class WorkflowService(
     }
 
     fun listAllWorkflow(
+        query: String = "",
         nextToken: ByteString? = null
     ): List<WorkflowStatus> {
         val requestBuilder = ListWorkflowExecutionsRequest.newBuilder()
             .setNamespace(workflowClient.options.namespace)
-            .setQuery("WorkflowType='${IContinuumWorkflow::class.java.simpleName}'")
+            .setQuery(query)
         nextToken?.let { requestBuilder.setNextPageToken(it) }
         val listResponse = workflowClient.workflowServiceStubs.blockingStub()
             .listWorkflowExecutions(requestBuilder.build())
@@ -94,10 +97,21 @@ class WorkflowService(
         }
         val workflowMutableList = workflowsList.toMutableList()
         if(listResponse.nextPageToken.size() > 0) {
-            val otherList = listAllWorkflow(listResponse.nextPageToken)
+            val otherList = listAllWorkflow(query, listResponse.nextPageToken)
             workflowMutableList.addAll(otherList)
         }
         return workflowMutableList
+    }
+
+    fun countWorkflow(
+        query: String
+    ): CountWorkflowExecutionsResponse {
+        val requestBuilder = CountWorkflowExecutionsRequest.newBuilder()
+            .setNamespace(workflowClient.options.namespace)
+            .setQuery(query)
+        val  countWorkflowExecutionsResponse = workflowClient.workflowServiceStubs.blockingStub()
+            .countWorkflowExecutions(requestBuilder.build())
+        return countWorkflowExecutionsResponse
     }
 
     fun getWorkflowStatusById(
@@ -129,7 +143,12 @@ class WorkflowService(
     ): List<TreeHelper.TreeItem<TreeHelper.Execution>> {
         val subTree = TreeHelper.getSubTree(treeRoots, baseDir.split("/").toMutableList()).toMutableList()
         TreeHelper.sortTree(subTree) { first, second ->
-            first.itemInfo!!.createdAtTimestampUtc.compareTo(second.itemInfo!!.createdAtTimestampUtc) * -1
+            if(first.itemInfo == null || second.itemInfo == null) {
+                // compare names if itemInfo is null
+                first.name.compareTo(second.name)
+            } else {
+                first.itemInfo!!.createdAtTimestampUtc.compareTo(second.itemInfo!!.createdAtTimestampUtc) * -1
+            }
         }
         return subTree
     }
@@ -138,7 +157,7 @@ class WorkflowService(
     fun refreshWorkflowTree() {
         val baseDir = ""
         LOGGER.info("Refreshing Workflow tree...")
-        listAllWorkflow().filter { it.metadata[IContinuumWorkflow.WORKFLOW_FILE_PATH.name]?.startsWith("\"$baseDir") ?: false }.forEach {
+        listAllWorkflow().forEach {
             val categoryPath = it.metadata[IContinuumWorkflow.WORKFLOW_FILE_PATH.name]
                 // remove the first and last '"'
                 ?.replace("\"", "")
@@ -162,12 +181,13 @@ class WorkflowService(
                     ).getWorkflowSnapshot().nodeToOutputsMap
                 } catch (e: WorkflowException) {
                     workflowOutput = mapOf()
-                    LOGGER.error("Error querying workflow!")
+                    LOGGER.error("Error querying workflowId: ${it.workflowId}!")
                 }
             }
             // Get the start and end time of the workflow id
-            TreeHelper.addItemToParent(treeRoots,
-                TreeHelper.Execution(
+            TreeHelper.addItemToParent(
+                treeRoots = treeRoots,
+                execution = TreeHelper.Execution(
                     id = it.workflowId,
                     status = ExecutionStatus.fromHistoryEvents(history.events),
                     workflow_snapshot = workflowInput,
@@ -180,7 +200,8 @@ class WorkflowService(
                         (lastEvent?.eventTime?.nanos ?: 0).toLong()
                     ).toEpochMilli()
                 ),
-                categoryPath
+                categoryPath = categoryPath,
+                maxChildren = 100
             )
         }
     }

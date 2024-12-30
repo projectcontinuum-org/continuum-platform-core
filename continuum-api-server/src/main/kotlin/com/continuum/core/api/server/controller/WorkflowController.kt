@@ -1,5 +1,6 @@
 package com.continuum.core.api.server.controller
 
+import com.continuum.core.api.server.model.CountWorkflowResponse
 import com.continuum.core.api.server.model.WorkflowStatus
 import com.continuum.core.api.server.service.WorkflowService
 import com.continuum.core.api.server.utils.TreeHelper
@@ -34,8 +35,34 @@ class WorkflowController(
     }
 
     @GetMapping("/list")
-    fun listWorkflow(): List<WorkflowStatus> {
+    fun listWorkflow(
+        @RequestParam(
+            required = false,
+            defaultValue = ""
+        )
+        query: String
+    ): List<WorkflowStatus> {
         return workflowService.listAllWorkflow()
+    }
+
+    @GetMapping("/count")
+    fun countWorkflow(
+        @RequestParam(
+            required = false,
+            defaultValue = ""
+        )
+        query: String
+    ): CountWorkflowResponse {
+        val response = workflowService.countWorkflow(query)
+        return CountWorkflowResponse(
+            count = response.count.toInt(),
+            groups = response.groupsList.map {
+                CountWorkflowResponse.Group(
+                    name = it.groupValuesList.first().data.toStringUtf8(),
+                    count = it.count.toInt()
+                )
+            }
+        )
     }
 
     @GetMapping("/tree")
