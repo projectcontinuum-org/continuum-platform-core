@@ -89,14 +89,15 @@ class ContinuumWorkflow : IContinuumWorkflow {
             LOGGER.info("Nodes to execute: ${nodesToExecute.map { it.id }}")
             val morePromises = nodesToExecute.map { node ->
                 val nodeInputs = getNodeInputs(continuumWorkflow, node)
-                node.data.status = ContinuumWorkflowModel.NodeStatus.BUSY
+                setNodeAnimationAndStatus(node, ContinuumWorkflowModel.NodeStatus.BUSY)
                 Pair(node, Async.function {continuumNodeActivity.run(node, nodeInputs)})
             }
             nodeExecutionPromises.addAll(morePromises)
             sendUpdateEvent()
             if (nodeExecutionPromises.isNotEmpty()) {
                 val nodeOutput = Promise.anyOf(nodeExecutionPromises.map { it.second }).get()
-                continuumWorkflow.nodes.first { it.id == nodeOutput.nodeId }.data.status = ContinuumWorkflowModel.NodeStatus.SUCCESS
+                val completedNode = continuumWorkflow.nodes.first { it.id == nodeOutput.nodeId }
+                setNodeAnimationAndStatus(completedNode, ContinuumWorkflowModel.NodeStatus.SUCCESS)
                 nodeToOutputsMap[nodeOutput.nodeId] = nodeOutput.outputs
                 // remove the completed promises
                 nodeExecutionPromises.removeAll { it.first.id == nodeOutput.nodeId }
@@ -131,7 +132,7 @@ class ContinuumWorkflow : IContinuumWorkflow {
             val allParentsProducedOutput = nodeParents.all { parent ->
                 nodeOutputMap.containsKey(parent.id)
             }
-            LOGGER.info("Node: ${node.id} allParentsProducedOutput: $allParentsProducedOutput executed: ${nodeOutputMap.containsKey(node.id)} status: ${node.data.status}")
+            LOGGER.debug("Node: ${node.id} allParentsProducedOutput: $allParentsProducedOutput executed: ${nodeOutputMap.containsKey(node.id)} status: ${node.data.status}")
             if (allParentsProducedOutput &&
                 !nodeOutputMap.containsKey(node.id) &&
                 node.data.status == null) {
@@ -141,7 +142,7 @@ class ContinuumWorkflow : IContinuumWorkflow {
         return nodesToExecute
     }
 
-    fun sendUpdateEvent(
+    private fun sendUpdateEvent(
         status: String = "RUNNING"
     ) {
         // Check if the Workflow is being replayed
@@ -162,6 +163,18 @@ class ContinuumWorkflow : IContinuumWorkflow {
                 )
             )
         }
+    }
+
+    private fun setNodeAnimationAndStatus(
+        node: ContinuumWorkflowModel.Node,
+        nodeStatus: ContinuumWorkflowModel.NodeStatus
+    ) {
+        node.data.status = nodeStatus
+        currentRunningWorkflow?.edges
+            ?.filter { it.target == node.id }
+            ?.forEach {
+                it.animated = nodeStatus == ContinuumWorkflowModel.NodeStatus.BUSY
+            }
     }
 
     override fun getWorkflowSnapshot(): WorkflowSnapshot {

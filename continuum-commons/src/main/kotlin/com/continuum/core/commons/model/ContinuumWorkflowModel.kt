@@ -34,6 +34,7 @@ data class ContinuumWorkflowModel @JsonCreator constructor(
     data class Edge @JsonCreator constructor(
         @JsonProperty("id") val id: String,
         @JsonProperty("type") val type: String? = null,
+        @JsonProperty("animated") var animated: Boolean? = null,
         @JsonProperty("source") val source: String,
         @JsonProperty("target") val target: String,
         @JsonProperty("sourceHandle") val sourceHandle: String,
