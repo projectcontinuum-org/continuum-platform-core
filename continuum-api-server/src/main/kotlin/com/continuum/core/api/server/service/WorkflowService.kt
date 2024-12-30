@@ -65,11 +65,11 @@ class WorkflowService(
                     .setNamespace(workflowClient.options.namespace)
                     .setQuery("WorkflowType='${IContinuumWorkflow::class.java.simpleName}' && ExecutionStatus='WORKFLOW_EXECUTION_STATUS_RUNNING'")
                     .build()
-            ).executionsList.map { WorkflowStatus(
-                it.execution.workflowId,
-                it.type.name,
-                it.status,
-                it.searchAttributes.indexedFieldsMap
+            ).executionsList.map {execution -> WorkflowStatus(
+                execution.execution.workflowId,
+                execution.type.name,
+                execution.status,
+                execution.searchAttributes.indexedFieldsMap
                     .filterKeys { !it.equals("BuildIds") }
                     .mapValues { it.value.data.toStringUtf8() }
             ) }
