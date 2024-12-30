@@ -180,7 +180,7 @@ class ContinuumWorkflow : IContinuumWorkflow {
 
     override fun getWorkflowSnapshot(): WorkflowSnapshot {
         return WorkflowSnapshot(
-            workflowSnapshot = currentRunningWorkflow!!,
+//            workflowSnapshot = currentRunningWorkflow!!,
             nodeToOutputsMap = nodeToOutputsMap
         )
     }
