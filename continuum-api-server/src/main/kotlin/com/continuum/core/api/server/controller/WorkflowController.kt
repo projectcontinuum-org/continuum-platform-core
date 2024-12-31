@@ -68,9 +68,14 @@ class WorkflowController(
     @GetMapping("/tree")
     fun getWorkflowTree(
         @RequestParam
-        baseDir: String
+        baseDir: String,
+        @RequestParam(
+            required = false,
+            defaultValue = ""
+        )
+        query: String
     ): List<TreeHelper.TreeItem<TreeHelper.Execution>> {
-        return workflowService.getWorkflowTree(baseDir)
+        return workflowService.getWorkflowTree(baseDir, query)
     }
 
 }

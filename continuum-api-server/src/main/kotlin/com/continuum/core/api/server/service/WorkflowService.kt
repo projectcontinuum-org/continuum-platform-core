@@ -36,8 +36,6 @@ class WorkflowService(
         private val objectMapper: ObjectMapper = ObjectMapper()
     }
 
-    val treeRoots = mutableListOf<TreeHelper.TreeItem<TreeHelper.Execution>>()
-
     fun startWorkflow(
         continuumWorkflowModel: ContinuumWorkflowModel
     ): String {
@@ -123,11 +121,11 @@ class WorkflowService(
                     .setNamespace(workflowClient.options.namespace)
                     .setQuery("WorkflowType='${IContinuumWorkflow::class.java.simpleName}' && WorkflowId='$workflowId'")
                     .build()
-            ).executionsList.map { WorkflowStatus(
-                it.execution.workflowId,
-                it.type.name,
-                it.status,
-                it.searchAttributes.indexedFieldsMap
+            ).executionsList.map { execution -> WorkflowStatus(
+                execution.execution.workflowId,
+                execution.type.name,
+                execution.status,
+                execution.searchAttributes.indexedFieldsMap
                     .filterKeys { !it.equals("BuildIds") }
                     .mapValues { it.value.data.toStringUtf8() }
             ) }
@@ -139,37 +137,41 @@ class WorkflowService(
     }
 
     fun getWorkflowTree(
-        baseDir: String
+        baseDir: String,
+        query: String = ""
     ): List<TreeHelper.TreeItem<TreeHelper.Execution>> {
-        val subTree = TreeHelper.getSubTree(treeRoots, baseDir.split("/").toMutableList()).toMutableList()
-        TreeHelper.sortTree(subTree) { first, second ->
+        val treeRoots = loadWorkflowTree(baseDir, query)
+        TreeHelper.sortTree(treeRoots) { first, second ->
             if(first.itemInfo == null || second.itemInfo == null) {
                 // compare names if itemInfo is null
                 first.name.compareTo(second.name)
             } else {
-                first.itemInfo!!.createdAtTimestampUtc.compareTo(second.itemInfo!!.createdAtTimestampUtc) * -1
+                first.itemInfo.createdAtTimestampUtc.compareTo(second.itemInfo.createdAtTimestampUtc) * -1
             }
         }
-        return subTree
+        return treeRoots
     }
 
-    @Scheduled(fixedDelay = 5000)
-    fun refreshWorkflowTree() {
-        val baseDir = ""
+    private fun loadWorkflowTree(
+        baseDir: String,
+        query: String
+    ): MutableList<TreeHelper.TreeItem<TreeHelper.Execution>> {
+        val treeRoots = mutableListOf<TreeHelper.TreeItem<TreeHelper.Execution>>()
         LOGGER.info("Refreshing Workflow tree...")
-        listAllWorkflow().forEach {
+        listAllWorkflow(query).forEach {
             val categoryPath = it.metadata[IContinuumWorkflow.WORKFLOW_FILE_PATH.name]
-                // remove the first and last '"'
                 ?.replace("\"", "")
                 ?.replace(baseDir, "")
-                ?.split("/")?.toMutableList() ?: mutableListOf()
+                ?.split("/")
+                ?.drop(1)
+                ?.toMutableList() ?: mutableListOf()
             val history = workflowClient.fetchHistory(it.workflowId)
             val startEvent = history.events
                 .firstOrNull { evt -> evt.eventType == EventType.EVENT_TYPE_WORKFLOW_TASK_SCHEDULED }
             val lastEvent = history.lastEvent
             val workflowInputString = history.events[0].workflowExecutionStartedEventAttributes.input.payloadsList[0].data.toStringUtf8()
             val workflowInput = objectMapper.readValue(workflowInputString, ContinuumWorkflowModel::class.java)
-            var workflowOutput: Map<String, Map<String, PortData>>? = null
+            var workflowOutput: Map<String, Map<String, PortData>>?
             if(lastEvent.eventType == EventType.EVENT_TYPE_WORKFLOW_EXECUTION_COMPLETED) {
                 val workflowOutputString = lastEvent.workflowExecutionCompletedEventAttributes.result.payloadsList[0].data.toStringUtf8()
                 workflowOutput = objectMapper.readValue(workflowOutputString, object : TypeReference<Map<String, Map<String, PortData>>>() {})
@@ -204,5 +206,6 @@ class WorkflowService(
                 maxChildren = 100
             )
         }
+        return treeRoots
     }
 }
