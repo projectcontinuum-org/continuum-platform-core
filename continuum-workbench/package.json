@@ -21,7 +21,7 @@
   },
   "scripts": {
     "build:prd": "theia build --mode=production",
-    "build": "yarn rebuild && theia build --mode=development",
+    "build:dev": "theia build --mode=development",
     "rebuild": "theia rebuild:browser --cacheRoot ..",
     "start": "theia start --plugins=local-dir:./plugins --port 3001",
     "watch": "yarn rebuild && theia build --watch --mode development"

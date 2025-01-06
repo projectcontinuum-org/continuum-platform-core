@@ -5,7 +5,6 @@
 // @ts-check
 const configs = require('./gen-webpack.config.js');
 const nodeConfig = require('./gen-webpack.node.config.js');
-const path = require("path");
 
 /**
  * Expose bundled modules on window.theia.moduleName namespace, e.g.
@@ -15,12 +14,6 @@ const path = require("path");
  test: /\.js$/,
  loader: require.resolve('@theia/application-manager/lib/expose-loader')
  }); */
-
-configs.forEach(config => {
-    config.output.path = path.resolve(__dirname, 'build', 'frontend')
-});
-
-nodeConfig.config.output.path = path.resolve(__dirname, 'build', 'backend')
 
 module.exports = [
     ...configs,
