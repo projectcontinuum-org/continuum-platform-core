@@ -1,0 +1,32 @@
+{
+  "private": true,
+  "name": "@continuum/workbench",
+  "version": "0.0.0",
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "dependencies": {
+    "@theia/core": "latest",
+    "@theia/filesystem": "latest",
+    "@theia/markers": "latest",
+    "@theia/messages": "latest",
+    "@theia/monaco": "latest",
+    "@theia/navigator": "latest",
+    "@theia/preferences": "latest",
+    "@theia/process": "latest",
+    "@theia/workspace": "latest"
+  },
+  "devDependencies": {
+    "@theia/cli": "latest"
+  },
+  "scripts": {
+    "build:prd": "theia build --mode=production",
+    "build": "yarn rebuild && theia build --mode=development",
+    "rebuild": "theia rebuild:browser --cacheRoot ..",
+    "start": "theia start --plugins=local-dir:./plugins --port 3001",
+    "watch": "yarn rebuild && theia build --watch --mode development"
+  },
+  "theia": {
+    "target": "browser"
+  }
+}

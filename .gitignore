@@ -39,3 +39,5 @@ out/
 
 ### Kotlin ###
 .kotlin
+/continuum-workbench/lib/
+/continuum-workbench/node_modules/
