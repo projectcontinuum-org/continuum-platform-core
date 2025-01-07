@@ -2,7 +2,7 @@ import * as React from "react";
 import { EdgeProps, getBezierPath } from "reactflow";
 import "./BaseEdge.css"
 
-export default class BaseEdge extends React.Component {
+export default class BaseEdge extends React.Component<any, any> {
     private xEqual = this.props.sourceX === this.props.targetX;
     private yEqual = this.props.sourceY === this.props.targetY;
     private edgePath: any;
