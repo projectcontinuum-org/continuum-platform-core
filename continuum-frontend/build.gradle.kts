@@ -21,6 +21,7 @@ tasks.register<YarnTask>("build") {
 
 tasks.register<Delete>("clean") {
     delete("continuum-workbench/lib")
+    delete("workflow-editor-extension/lib")
 }
 
 tasks.named("build") {

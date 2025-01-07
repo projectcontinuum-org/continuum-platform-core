@@ -27,6 +27,6 @@
   "workspaces": [
     "continuum-core",
     "continuum-workbench",
-    "workflow-editor-extention"
+    "workflow-editor-extension"
   ]
 }

@@ -1,5 +1,5 @@
 {
-  "name": "@continuum/workflow-editor-extention",
+  "name": "@continuum/workflow-editor-extension",
   "keywords": [
     "theia-extension",
     "continuum"

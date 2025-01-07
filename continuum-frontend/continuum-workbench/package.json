@@ -16,7 +16,7 @@
     "@theia/process": "latest",
     "@theia/workspace": "latest",
     "@continuum/core": "*",
-    "@continuum/workflow-editor-extention": "*"
+    "@continuum/workflow-editor-extension": "*"
   },
   "devDependencies": {
     "@theia/cli": "latest"
