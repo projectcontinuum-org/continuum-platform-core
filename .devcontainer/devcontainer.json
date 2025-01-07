@@ -1,6 +1,11 @@
 {
   "name": "Dev Container",
   "dockerFile": "Dockerfile",
+  "features": {
+    "ghcr.io/devcontainers/features/sshd:1": {
+      "version": "latest"
+    }
+  },
   "settings": {
     "terminal.integrated.shell.linux": "/bin/bash"
   },
@@ -12,6 +17,6 @@
     "esbenp.prettier-vscode",
     "dbaeumer.vscode-eslint"
   ],
-  "postCreateCommand": "yarn install",
+  "postCreateCommand": "gradle build",
   "remoteUser": "vscode"
 }
