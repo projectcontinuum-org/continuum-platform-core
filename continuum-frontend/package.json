@@ -1,0 +1,32 @@
+{
+  "name": "continuum-frontend",
+  "private": true,
+  "scripts": {
+    "build": "turbo build --no-cache",
+    "dev": "turbo dev",
+    "lint": "turbo lint",
+    "clean": "turbo clean",
+    "format": "prettier --write \"**/*.{ts,tsx,md}\"",
+    "watch": "turbo watch",
+    "start:backend": "turbo start --filter=@continuum/backend",
+    "build:backend": "turbo build --filter=@continuum/backend",
+    "start:workbench": "turbo start --filter=@continuum/workbench",
+    "build:workbench": "turbo build --filter=@continuum/workbench",
+    "start:workbench-thin": "turbo start --filter=@continuum/workbench-thin",
+    "build:workbench-thin": "turbo build --filter=@continuum/workbench-thin",
+    "migrate:model": "turbo migrate --filter=@continuum/model"
+  },
+  "devDependencies": {
+    "prettier": "^3.1.1",
+    "turbo": "^1.13.3"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "packageManager": "yarn@1.22.21",
+  "workspaces": [
+    "continuum-core",
+    "continuum-workbench",
+    "workflow-editor-extention"
+  ]
+}

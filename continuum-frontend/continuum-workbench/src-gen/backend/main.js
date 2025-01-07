@@ -60,6 +60,10 @@ globalThis.extensionInfo = [
     {
         "name": "@theia/process",
         "version": "1.57.1"
+    },
+    {
+        "name": "@continuum/workflow-editor-extention",
+        "version": "0.0.0"
     }
 ];
 

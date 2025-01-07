@@ -92,6 +92,7 @@ module.exports = (async () => {
         await load(container, import('@theia/userstorage/lib/browser/user-storage-frontend-module'));
         await load(container, import('@theia/preferences/lib/browser/preference-frontend-module'));
         await load(container, import('@theia/process/lib/common/process-common-module'));
+        await load(container, import('@continuum/workflow-editor-extention/lib/browser/WorkflowEditorExtentionModule'));
         
         MonacoInit.init(container);
         ;

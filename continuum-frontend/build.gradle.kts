@@ -16,19 +16,14 @@ tasks.register<YarnTask>("yarnInstall") {
 
 tasks.register<YarnTask>("build") {
     dependsOn("yarnInstall")
-    args.set(listOf("run", "build:prd"))
-}
-
-tasks.register<YarnTask>("buildDev") {
-    dependsOn("yarnInstall")
-    args.set(listOf("run", "build:dev"))
+    args.set(listOf("run", "build"))
 }
 
 tasks.register<Delete>("clean") {
-    delete("lib")
-    delete("build")
+    delete("continuum-workbench/lib")
 }
 
 tasks.named("build") {
     dependsOn("clean")
 }
+

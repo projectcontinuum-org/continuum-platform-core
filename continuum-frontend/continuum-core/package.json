@@ -1,0 +1,42 @@
+{
+  "name": "@continuum/core",
+  "version": "1.0.0",
+  "description": "",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "type": "module",
+  "scripts": {
+    "clean": "rm -R dist",
+    "build": "tsc",
+    "prepublish": "npm run build",
+    "watch": "tsc -w"
+  },
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "@types/react": "^18.2.37",
+    "@types/react-dom": "^18.2.15",
+    "@typescript-eslint/eslint-plugin": "^6.10.0",
+    "@typescript-eslint/parser": "^6.10.0",
+    "@vitejs/plugin-react": "^4.2.0",
+    "copyfile": "^0.1.2",
+    "eslint": "^8.53.0",
+    "eslint-plugin-react-hooks": "^4.6.0",
+    "eslint-plugin-react-refresh": "^0.4.4",
+    "typescript": "^5.2.2",
+    "typescript-plugin-css-modules": "^5.0.2",
+    "@jsonforms/core": "3.2.0"
+  },
+  "files": [
+    "dist/**/*"
+  ],
+  "dependencies": {
+    "@types/node": "^20.10.8",
+    "crypto": "^1.0.1",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "react-icon": "^1.0.0",
+    "react-icons": "^4.12.0",
+    "reactflow": "^11.10.1"
+  }
+}

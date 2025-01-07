@@ -39,5 +39,10 @@ out/
 
 ### Kotlin ###
 .kotlin
-/continuum-workbench/lib/
-/continuum-workbench/node_modules/
+
+
+### Node.js ###
+**/.turbo/
+**/node_modules/
+**/continuum-workbench/lib/
+**/continuum-core/dist/
