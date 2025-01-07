@@ -1,0 +1,44 @@
+.workflow-editor {
+    height: 100%;
+    width: 100%;
+  }
+  
+  .workflow-editor .react-flow {
+    background-color: var(--mui-palette-background-default);
+    color: var(--mui-palette-text-primary);
+    width: 100%;
+  }
+  
+  .workflow-editor .react-flow__controls button {
+    background-color: var(--mui-palette-background-default);
+    color: var(--mui-palette-text-primary);
+    border: 1px solid var(--mui-palette-secondary-main);
+    border-bottom: none;
+    /* background-color: ; */
+  }
+  
+  .workflow-editor .react-flow__controls button:hover {
+    background-color: var(--mui-palette-action-hover);
+  }
+  
+  .workflow-editor .react-flow__controls button:first-child {
+    border-radius: 5px 5px 0 0;
+  }
+  
+  .workflow-editor .react-flow__controls button:last-child {
+    border-bottom: 1px solid var(--mui-palette-secondary-main);
+    border-radius: 0 0 5px 5px;
+  }
+  
+  .workflow-editor .react-flow__controls button path {
+    fill: var(--mui-palette-text-primary);
+  }
+  
+  /* .workflow-editor .react-flow__controls button path:hover {
+    background-color: var(--mui-palette-secondary-light);
+  } */
+  
+  .workflow-editor .react-flow__attribution {
+    display: none;
+  }
+  

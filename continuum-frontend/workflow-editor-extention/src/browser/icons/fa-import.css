@@ -1,0 +1,19 @@
+@import url('https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css');
+
+.continuum-file.workflow-file-icon.file-icon {
+    padding-left: 2px;
+}
+
+.workflow-file-icon {
+    padding-right: 5px;
+}
+
+.continuum-file.workflow-file-icon.file-icon::before {
+    margin-right: 4px;
+    font-size: var(--theia-ui-font-size1);
+}
+
+.continuum-widget.workflow-file-icon.p-TabBar-tabIcon {
+    padding: 2px;
+    margin-right: 4px;
+}

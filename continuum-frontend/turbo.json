@@ -1,0 +1,51 @@
+{
+  "$schema": "https://turbo.build/schema.json",
+  "globalDependencies": [
+    "**/.env.*local"
+  ],
+  "pipeline": {
+    "watch": {
+      "dependsOn": [
+        "build"
+      ]
+    },
+    "build": {
+      "dependsOn": [
+        "^build"
+      ],
+      "outputs": [
+        ".next/**",
+        "!.next/cache/**"
+      ]
+    },
+    "lint": {
+      "dependsOn": [
+        "^lint"
+      ]
+    },
+    "dev": {
+      "cache": false,
+      "persistent": true
+    },
+    "clean": {
+      "dependsOn": [
+        "^clean"
+      ]
+    },
+    "start": {
+      "dependsOn": [
+        "^start"
+      ]
+    },
+    "migrate": {
+      "dependsOn": [
+        "^migrate"
+      ]
+    },
+    "build:prd": {
+      "dependsOn": [
+        "^build"
+      ]
+    }
+  }
+}

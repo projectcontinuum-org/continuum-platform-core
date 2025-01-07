@@ -1,0 +1,60 @@
+{
+  "name": "@continuum/workflow-editor-extention",
+  "keywords": [
+    "theia-extension",
+    "continuum"
+  ],
+  "version": "0.0.0",
+  "files": [
+    "lib",
+    "src"
+  ],
+  "dependencies": {
+    "@continuum/core": "*",
+    "@emotion/react": "^11.11.3",
+    "@emotion/styled": "^11.11.0",
+    "@fontsource/roboto": "^5.0.8",
+    "@jsonforms/core": "3.2.0",
+    "@jsonforms/material-renderers": "3.2.0",
+    "@jsonforms/react": "3.2.0",
+    "@mui/icons-material": "^5.15.6",
+    "@mui/lab": "^5.0.0-alpha.162",
+    "@mui/material": "^5.15.6",
+    "@mui/x-data-grid": "^7.8.0",
+    "@mui/x-date-pickers": "latest",
+    "@mui/x-tree-view": "^6.17.0",
+    "@react-spring/web": "^9.7.3",
+    "@theia/core": "latest",
+    "@theia/editor": "latest",
+    "@theia/filesystem": "latest",
+    "@theia/monaco": "latest",
+    "ldrs": "^1.0.2",
+    "react": "^18",
+    "react-dom": "^18",
+    "react-draggable": "^4.4.6",
+    "react-icons": "^5.0.1",
+    "react-inlinesvg": "^4.1.1",
+    "react-svg": "^16.1.32",
+    "reactflow": "^11.10.1",
+    "zustand": "^4.5.0",
+    "mqtt": "5.10.3"
+  },
+  "devDependencies": {
+    "@types/react": "^18",
+    "@types/react-dom": "^18",
+    "copyfiles": "latest",
+    "rimraf": "latest",
+    "typescript": "^5"
+  },
+  "scripts": {
+    "clean": "rimraf lib",
+    "build": "tsc && yarn run copy-files",
+    "watch": "tsc -w",
+    "copy-files": "copyfiles -u 1 src/**/*.html src/**/*.css lib/"
+  },
+  "theiaExtensions": [
+    {
+      "frontend": "lib/browser/WorkflowEditorExtentionModule"
+    }
+  ]
+}
