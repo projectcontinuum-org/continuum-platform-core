@@ -10,8 +10,7 @@ RUN apt-get update && \
 
 # Install Node.js and Yarn
 RUN curl -fsSL https://deb.nodesource.com/setup_22.x | bash - && \
-    apt-get install -y nodejs && \
-    npm install -g yarn
+    apt-get install -y nodejs
 
 # Set the default shell to bash
 SHELL ["/bin/bash", "-c"]
