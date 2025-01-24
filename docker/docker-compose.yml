@@ -10,7 +10,7 @@ services:
     ports:
       - 5432:5432
     volumes:
-      - /var/lib/postgresql/data
+      - postgresql-data:/var/lib/postgresql/data
   temporal:
     container_name: temporal
     depends_on:
@@ -21,14 +21,14 @@ services:
       - POSTGRES_USER=temporal
       - POSTGRES_PWD=temporal
       - POSTGRES_SEEDS=postgresql
-      - DYNAMIC_CONFIG_FILE_PATH=config/dynamicconfig/development-sql.yaml
+      - DYNAMIC_CONFIG_FILE_PATH=/etc/temporal/config/dynamicconfig/development-sql.yaml
     image: temporalio/auto-setup:${TEMPORAL_VERSION}
     networks:
       - temporal-network
     ports:
       - 7233:7233
     volumes:
-      - ./dynamicconfig:/etc/temporal/config/dynamicconfig
+      - ./temporal/dynamicconfig:/etc/temporal/config/dynamicconfig
   temporal-admin-tools:
     container_name: temporal-admin-tools
     depends_on:
@@ -60,9 +60,15 @@ services:
       - 31884:1884
     volumes:
       - ./mosquitto/config:/mosquitto/config
-      - ./mosquitto/log:/mosquitto/log
-      - ./mosquitto/data:/mosquitto/data
+      - mosquitto-log:/mosquitto/log
+      - mosquitto-data:/mosquitto/data
 networks:
   temporal-network:
     driver: bridge
     name: temporal-network
+volumes:
+  postgresql-data:
+    driver: local
+  mosquitto-log:
+    driver: local
+  mosquitto-data:

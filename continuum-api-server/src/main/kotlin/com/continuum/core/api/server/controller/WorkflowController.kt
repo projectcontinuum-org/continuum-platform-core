@@ -42,7 +42,7 @@ class WorkflowController(
         )
         query: String
     ): List<WorkflowStatus> {
-        return workflowService.listAllWorkflow()
+        return workflowService.listAllWorkflow(query)
     }
 
     @GetMapping("/count")
