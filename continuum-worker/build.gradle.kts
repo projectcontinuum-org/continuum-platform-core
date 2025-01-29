@@ -27,6 +27,7 @@ dependencies {
 
     // Project dependencies
     implementation(project(":continuum-commons"))
+    implementation(project(":continuum-avro-schemas"))
 
     // Jackson dependencies
     implementation("com.fasterxml.jackson.module:jackson-module-kotlin:2.18.2")
@@ -39,6 +40,13 @@ dependencies {
     // MQTT dependencies
     implementation("org.eclipse.paho:org.eclipse.paho.client.mqttv3:1.2.5")
 
+    // AWS dependencies
+    implementation("software.amazon.awssdk:s3")
+    implementation("software.amazon.awssdk:sts")
+    implementation("software.amazon.awssdk:sso")
+    implementation("software.amazon.awssdk:ssooidc")
+    implementation("software.amazon.awssdk.crt:aws-crt:0.33.10")
+
     // Test dependencies
     testImplementation("org.springframework.boot:spring-boot-starter-test")
     testImplementation("org.jetbrains.kotlin:kotlin-test-junit5")
@@ -50,6 +58,7 @@ dependencyManagement {
     imports {
         mavenBom("org.springframework.cloud:spring-cloud-dependencies:2024.0.0")
         mavenBom("io.temporal:temporal-bom:1.27.0")
+        mavenBom("software.amazon.awssdk:bom:2.30.7")
     }
 }
 

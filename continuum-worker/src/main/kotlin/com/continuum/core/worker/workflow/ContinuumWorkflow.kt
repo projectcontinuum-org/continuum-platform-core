@@ -39,7 +39,7 @@ class ContinuumWorkflow : IContinuumWorkflow {
     private val objectMapper = ObjectMapper()
 
     private val baseActivityOptions: ActivityOptions = ActivityOptions {
-        setStartToCloseTimeout(Duration.ofSeconds(60))
+        setStartToCloseTimeout(Duration.ofDays(60))
         setRetryOptions(retryOptions)
         setTaskQueue(TaskQueues.ACTIVITY_TASK_QUEUE)
     }

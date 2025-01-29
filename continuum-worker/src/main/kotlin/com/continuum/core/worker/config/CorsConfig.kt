@@ -1,9 +1,15 @@
 package com.continuum.core.worker.config
 
+import org.springframework.beans.factory.annotation.Value
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
 import org.springframework.web.servlet.config.annotation.CorsRegistry
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer
+import software.amazon.awssdk.auth.credentials.ProfileCredentialsProvider
+import software.amazon.awssdk.regions.Region
+import software.amazon.awssdk.services.s3.S3AsyncClient
+import software.amazon.awssdk.services.s3.S3Client
+import software.amazon.awssdk.services.s3.internal.crt.S3CrtAsyncClient
 
 @Configuration
 class CorsConfig {
@@ -17,5 +23,20 @@ class CorsConfig {
                     .allowedHeaders("*")
             }
         }
+    }
+
+    @Bean
+    fun s3AsyncClient(
+        @Value("\${continuum.core.worker.aws-profile-name}")
+        awsProfileName: String
+    ): S3AsyncClient {
+        return S3CrtAsyncClient.builder()
+            .region(Region.US_EAST_2)
+            .credentialsProvider(
+                ProfileCredentialsProvider.builder()
+                    .profileName(awsProfileName)
+                    .build()
+            )
+            .build()
     }
 }

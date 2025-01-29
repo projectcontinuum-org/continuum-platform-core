@@ -1,6 +1,0 @@
-@namespace("com.continuum.core.avro.schema")
-protocol UserProtocol {
-	record User {
-		string name;
-	}
-}

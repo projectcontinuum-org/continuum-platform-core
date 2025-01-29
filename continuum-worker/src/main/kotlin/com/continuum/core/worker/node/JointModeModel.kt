@@ -4,10 +4,16 @@ import com.continuum.core.commons.model.ContinuumWorkflowModel
 import com.continuum.core.commons.model.PortData
 import com.continuum.core.commons.model.PortDataStatus
 import com.continuum.core.commons.node.ProcessNodeModel
+import com.continuum.core.commons.utils.NodeInputReader
+import com.continuum.core.commons.utils.NodeOutputWriter
+import com.continuum.data.table.DataCell
+import com.continuum.data.table.DataRow
 import com.fasterxml.jackson.databind.ObjectMapper
 import org.slf4j.LoggerFactory
 import org.springframework.http.MediaType.TEXT_PLAIN_VALUE
 import org.springframework.stereotype.Component
+import java.nio.ByteBuffer
+import java.nio.charset.StandardCharsets
 
 @Component
 class JointModeModel: ProcessNodeModel() {
@@ -54,18 +60,31 @@ class JointModeModel: ProcessNodeModel() {
         outputs = outputPorts,
     )
 
-    override fun execute(inputs: Map<String, PortData>): Map<String, PortData> {
+    override fun execute(
+        properties: Map<String, Any>?,
+        inputs: Map<String, NodeInputReader>,
+        nodeOutputWriter: NodeOutputWriter
+    ) {
         // Wait for random seconds
-        Thread.sleep((1..5).random() * 500L)
+//        Thread.sleep((1..5).random() * 500L)
         LOGGER.info("Jointing the input: ${objectMapper.writeValueAsString(inputs)}")
-        val input1 = inputs["input-1"]?.data as String
-        val input2 = inputs["input-2"]?.data as String
-        val output = PortData(
-            data = "$input1 $input2",
-            status = PortDataStatus.SUCCESS,
-            contentType = TEXT_PLAIN_VALUE
-        )
-        return mapOf("output-1" to output)
+        inputs["input-1"]?.use { reader1 ->
+            inputs["input-2"]?.use { reader2 ->
+                var input1 = reader1.read()
+                var input2 = reader2.read()
+                while (input1 != null && input2 != null) {
+                    val rowNumber = input1.rowNumber
+                    val dataCells = "${StandardCharsets.UTF_8.decode(input1.cells.first().value)} ${StandardCharsets.UTF_8.decode(input2.cells.first().value)}"
+                    nodeOutputWriter.createOutputPortWriter("output-1").use {
+                        it.write(rowNumber, mapOf(
+                            "message" to dataCells
+                        ))
+                    }
+                    input1 = reader1.read()
+                    input2 = reader2.read()
+                }
+            }
+        }
     }
 
 }

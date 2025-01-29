@@ -10,3 +10,6 @@ spring:
           group: ${spring.application.name}
           consumer:
             use-native-decoding: true
+continuum.core:
+  worker:
+    cache-storage-path: /tmp

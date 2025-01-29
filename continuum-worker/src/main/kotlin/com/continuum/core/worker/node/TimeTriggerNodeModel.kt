@@ -4,8 +4,12 @@ import com.continuum.core.commons.model.ContinuumWorkflowModel
 import com.continuum.core.commons.model.PortData
 import com.continuum.core.commons.model.PortDataStatus
 import com.continuum.core.commons.node.TriggerNodeModel
+import com.continuum.core.commons.utils.NodeOutputWriter
+import com.continuum.data.table.DataCell
+import com.continuum.data.table.DataRow
 import org.springframework.http.MediaType.TEXT_PLAIN_VALUE
 import org.springframework.stereotype.Component
+import java.nio.ByteBuffer
 import java.time.Instant
 
 @Component
@@ -29,15 +33,53 @@ class TimeTriggerNodeModel : TriggerNodeModel() {
         nodeModel = this.javaClass.name,
         icon = "mui/Bolt",
         outputs = outputPorts,
-    )
-
-    override fun execute(): Map<String, PortData> {
-        return mapOf(
-            "output-1" to PortData(
-                status = PortDataStatus.SUCCESS,
-                contentType = TEXT_PLAIN_VALUE,
-                data = "Hello world from ${Instant.now()}"
+        properties = mapOf(
+            "message" to "Hello world from",
+            "rowCount" to 10
+        ),
+        propertiesSchema = mapOf(
+            "type" to "object",
+            "properties" to mapOf(
+                "message" to mapOf(
+                    "type" to "string"
+                ),
+                "rowCount" to mapOf(
+                    "type" to "number",
+                    "minimum" to 1,
+                )
+            ),
+            "required" to listOf(
+                "message",
+                "rowCount"
+            )
+        ),
+        propertiesUISchema = mapOf(
+            "type" to "VerticalLayout",
+            "elements" to listOf(
+                mapOf(
+                    "type" to "Control",
+                    "scope" to "#/properties/message"
+                ),
+                mapOf(
+                    "type" to "Control",
+                    "scope" to "#/properties/rowCount"
+                )
             )
         )
+    )
+
+    override fun execute(
+        properties: Map<String, Any>?,
+        nodeOutputWriter: NodeOutputWriter
+    ) {
+        val rowCount = properties?.get("rowCount").toString().toLongOrNull() ?: 10L
+        val message = properties?.get("message") as? String ?: "Hello world from"
+        nodeOutputWriter.createOutputPortWriter("output-1").use {
+            for (i in 0 until rowCount) {
+                it.write(i, mapOf(
+                    "message" to "$message ${Instant.now()}"
+                ))
+            }
+        }
     }
 }

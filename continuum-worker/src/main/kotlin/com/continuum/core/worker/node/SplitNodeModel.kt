@@ -4,12 +4,16 @@ import com.continuum.core.commons.model.ContinuumWorkflowModel
 import com.continuum.core.commons.model.PortData
 import com.continuum.core.commons.model.PortDataStatus
 import com.continuum.core.commons.node.ProcessNodeModel
+import com.continuum.core.commons.utils.NodeInputReader
+import com.continuum.core.commons.utils.NodeOutputWriter
+import com.continuum.data.table.DataCell
+import com.continuum.data.table.DataRow
 import com.fasterxml.jackson.databind.ObjectMapper
 import org.slf4j.LoggerFactory
-import org.springframework.http.MediaType.APPLICATION_JSON
 import org.springframework.http.MediaType.TEXT_PLAIN_VALUE
 import org.springframework.stereotype.Component
-import org.springframework.util.MimeType
+import java.nio.ByteBuffer
+import java.nio.charset.StandardCharsets
 
 @Component
 class SplitNodeModel : ProcessNodeModel() {
@@ -56,46 +60,42 @@ class SplitNodeModel : ProcessNodeModel() {
         outputs = outputPorts,
     )
 
-    override fun execute(inputs: Map<String, PortData>): Map<String, PortData> {
+    override fun execute(
+        properties: Map<String, Any>?,
+        inputs: Map<String, NodeInputReader>,
+        nodeOutputWriter: NodeOutputWriter
+    ) {
         LOGGER.info("Splitting the input: ${objectMapper.writeValueAsString(inputs)}")
         // Wait for random seconds
-        Thread.sleep((1..5).random() * 500L)
-        inputs["input-1"]?.let { portData ->
-            if(portData.status == PortDataStatus.SUCCESS && portData.contentType == TEXT_PLAIN_VALUE) {
-                LOGGER.info("Input data: '${portData.data}'")
-                return splitString(portData.data.toString())
-            } else {
-                throw IllegalArgumentException("Invalid input data")
-            }
-        }
-        throw IllegalArgumentException("Invalid input data")
+//        Thread.sleep((1..5).random() * 500L)
+        splitString(inputs["input-1"]!!, nodeOutputWriter)
     }
 
     fun splitString(
-        stringToSplit: String
-    ): Map<String, PortData> {
-        val parts = stringToSplit.split(" ", limit = 2)
-        return if (parts.size > 1) {
-            mapOf(
-                "output-1" to PortData(
-                    status = PortDataStatus.SUCCESS,
-                    contentType = TEXT_PLAIN_VALUE,
-                    data = parts[0]
-                ),
-                "output-2" to PortData(
-                    status = PortDataStatus.SUCCESS,
-                    contentType = TEXT_PLAIN_VALUE,
-                    data = parts[1]
-                )
+        nodeInputReader: NodeInputReader,
+        nodeOutputWriter: NodeOutputWriter
+    ) {
+        nodeInputReader.use { reader ->
+            var input = reader.read()
+            val outputWriters = mutableListOf(
+                nodeOutputWriter.createOutputPortWriter("output-1")
             )
-        } else {
-            mapOf(
-                "output-1" to PortData(
-                    status = PortDataStatus.SUCCESS,
-                    contentType = TEXT_PLAIN_VALUE,
-                    data = parts[0]
-                )
-            )
+            while (input != null) {
+                val rowNumber = input.rowNumber
+                val dataCell = input.cells.first()
+                val stringToSplit = StandardCharsets.UTF_8.decode(dataCell.value).toString()
+                val parts = stringToSplit.split(" ", limit = 2)
+                if(parts.size > outputWriters.size) {
+                    outputWriters.add(nodeOutputWriter.createOutputPortWriter("output-${outputWriters.size + 1}"))
+                }
+                parts.forEachIndexed { index, part ->
+                    outputWriters[index].write(rowNumber, mapOf(
+                        "part-${index + 1}" to part
+                    ))
+                }
+                input = reader.read()
+            }
+            outputWriters.forEach { it.close() }
         }
     }
 }

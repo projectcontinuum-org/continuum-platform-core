@@ -47,3 +47,5 @@ out/
 **/continuum-workbench/lib/
 **/workflow-editor-extension/lib/
 **/continuum-core/dist/
+
+.continuum-cache/
