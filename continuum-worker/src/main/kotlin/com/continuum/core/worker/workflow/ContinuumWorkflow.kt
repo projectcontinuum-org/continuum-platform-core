@@ -165,13 +165,13 @@ class ContinuumWorkflow : IContinuumWorkflow {
                 )
             )
 
-            EventStoreHelper.sendEvent(
-                EventStoreHelper.WorkflowStatusUpdateEvent(
-                    workflowId = Workflow.getInfo().workflowId,
-                    runId = Workflow.getInfo().runId,
-                    workflowUpdate = eventMetadata.data
-                )
-            )
+//            EventStoreHelper.sendEvent(
+//                EventStoreHelper.WorkflowStatusUpdateEvent(
+//                    workflowId = Workflow.getInfo().workflowId,
+//                    runId = Workflow.getInfo().runId,
+//                    workflowUpdate = eventMetadata.data
+//                )
+//            )
 
             MqttHelper.publishWorkflowSnapshot(
                 Workflow.getInfo().workflowId,
