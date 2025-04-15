@@ -8,8 +8,8 @@ import com.continuum.core.commons.model.ExecutionStatus
 import com.continuum.core.commons.model.PortData
 import com.continuum.core.commons.model.WorkflowSnapshot
 import com.continuum.core.commons.workflow.IContinuumWorkflow
+import com.continuum.core.worker.utils.EventStoreHelper
 import com.continuum.core.worker.utils.MqttHelper
-import com.eventstore.dbclient.EventData
 import com.eventstore.dbclient.EventStoreDBClient
 import com.eventstore.dbclient.EventStoreDBConnectionString
 import com.fasterxml.jackson.databind.ObjectMapper
@@ -22,7 +22,6 @@ import io.temporal.workflow.Workflow
 import io.temporal.workflow.unsafe.WorkflowUnsafe
 import java.time.Duration
 import java.time.Instant
-import java.util.*
 
 
 @WorkflowImpl(taskQueues = [WORKFLOW_TASK_QUEUE])
@@ -32,11 +31,6 @@ class ContinuumWorkflow : IContinuumWorkflow {
 
     private val nodeToOutputsMap = mutableMapOf<String, Map<String, PortData>>()
     private var currentRunningWorkflow: ContinuumWorkflowModel? = null
-
-    var esdbClient: EventStoreDBClient = EventStoreDBClient.create(
-        EventStoreDBConnectionString
-            .parseOrThrow("esdb://localhost:2113?tls=false")
-    )
 
     private val retryOptions: RetryOptions = RetryOptions {
         setMaximumInterval(Duration.ofSeconds(100))
@@ -170,17 +164,14 @@ class ContinuumWorkflow : IContinuumWorkflow {
                     workflow = currentRunningWorkflow!!
                 )
             )
-            val eventData = EventData
-                .builderAsJson(
-                    UUID.randomUUID(),
-                    "WorkflowStatusUpdate",
-                    objectMapper.writeValueAsString(eventMetadata)
+
+            EventStoreHelper.sendEvent(
+                EventStoreHelper.WorkflowStatusUpdateEvent(
+                    workflowId = Workflow.getInfo().workflowId,
+                    runId = Workflow.getInfo().runId,
+                    workflowUpdate = eventMetadata.data
                 )
-                .build()
-            esdbClient.appendToStream(
-                "run-id:${Workflow.getInfo().runId}",
-                eventData
-            ).get()
+            )
 
             MqttHelper.publishWorkflowSnapshot(
                 Workflow.getInfo().workflowId,
