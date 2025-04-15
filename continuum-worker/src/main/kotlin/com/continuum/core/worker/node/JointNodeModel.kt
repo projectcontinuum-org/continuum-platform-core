@@ -1,25 +1,20 @@
 package com.continuum.core.worker.node
 
 import com.continuum.core.commons.model.ContinuumWorkflowModel
-import com.continuum.core.commons.model.PortData
-import com.continuum.core.commons.model.PortDataStatus
 import com.continuum.core.commons.node.ProcessNodeModel
 import com.continuum.core.commons.utils.NodeInputReader
 import com.continuum.core.commons.utils.NodeOutputWriter
-import com.continuum.data.table.DataCell
-import com.continuum.data.table.DataRow
 import com.fasterxml.jackson.databind.ObjectMapper
 import org.slf4j.LoggerFactory
 import org.springframework.http.MediaType.TEXT_PLAIN_VALUE
 import org.springframework.stereotype.Component
-import java.nio.ByteBuffer
 import java.nio.charset.StandardCharsets
 
 @Component
-class JointModeModel: ProcessNodeModel() {
+class JointNodeModel: ProcessNodeModel() {
 
     companion object {
-        private val LOGGER = LoggerFactory.getLogger(JointModeModel::class.java)
+        private val LOGGER = LoggerFactory.getLogger(JointNodeModel::class.java)
         private val objectMapper = ObjectMapper()
     }
 
@@ -68,23 +63,24 @@ class JointModeModel: ProcessNodeModel() {
         // Wait for random seconds
 //        Thread.sleep((1..5).random() * 500L)
         LOGGER.info("Jointing the input: ${objectMapper.writeValueAsString(inputs)}")
-        inputs["input-1"]?.use { reader1 ->
-            inputs["input-2"]?.use { reader2 ->
-                var input1 = reader1.read()
-                var input2 = reader2.read()
-                while (input1 != null && input2 != null) {
-                    val rowNumber = input1.rowNumber
-                    val dataCells = "${StandardCharsets.UTF_8.decode(input1.cells.first().value)} ${StandardCharsets.UTF_8.decode(input2.cells.first().value)}"
-                    nodeOutputWriter.createOutputPortWriter("output-1").use {
-                        it.write(rowNumber, mapOf(
+        nodeOutputWriter.createOutputPortWriter("output-1").use { writer ->
+            inputs["input-1"]?.use { reader1 ->
+                inputs["input-2"]?.use { reader2 ->
+                    var input1 = reader1.read()
+                    var input2 = reader2.read()
+                    while (input1 != null && input2 != null) {
+                        val rowNumber = input1.rowNumber
+                        val dataCells = "${StandardCharsets.UTF_8.decode(input1.cells.first().value)} ${StandardCharsets.UTF_8.decode(input2.cells.first().value)}"
+                        writer.write(rowNumber, mapOf(
                             "message" to dataCells
                         ))
+                        input1 = reader1.read()
+                        input2 = reader2.read()
                     }
-                    input1 = reader1.read()
-                    input2 = reader2.read()
                 }
             }
         }
+
     }
 
 }

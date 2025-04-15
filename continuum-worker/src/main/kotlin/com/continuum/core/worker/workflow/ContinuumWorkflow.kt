@@ -9,10 +9,12 @@ import com.continuum.core.commons.model.PortData
 import com.continuum.core.commons.model.WorkflowSnapshot
 import com.continuum.core.commons.workflow.IContinuumWorkflow
 import com.continuum.core.worker.utils.MqttHelper
+import com.eventstore.dbclient.EventData
+import com.eventstore.dbclient.EventStoreDBClient
+import com.eventstore.dbclient.EventStoreDBConnectionString
 import com.fasterxml.jackson.databind.ObjectMapper
 import io.temporal.activity.ActivityOptions
 import io.temporal.common.RetryOptions
-import io.temporal.failure.ApplicationFailure
 import io.temporal.spring.boot.WorkflowImpl
 import io.temporal.workflow.Async
 import io.temporal.workflow.Promise
@@ -20,7 +22,8 @@ import io.temporal.workflow.Workflow
 import io.temporal.workflow.unsafe.WorkflowUnsafe
 import java.time.Duration
 import java.time.Instant
-import javax.sound.sampled.Port
+import java.util.*
+
 
 @WorkflowImpl(taskQueues = [WORKFLOW_TASK_QUEUE])
 class ContinuumWorkflow : IContinuumWorkflow {
@@ -29,6 +32,11 @@ class ContinuumWorkflow : IContinuumWorkflow {
 
     private val nodeToOutputsMap = mutableMapOf<String, Map<String, PortData>>()
     private var currentRunningWorkflow: ContinuumWorkflowModel? = null
+
+    var esdbClient: EventStoreDBClient = EventStoreDBClient.create(
+        EventStoreDBConnectionString
+            .parseOrThrow("esdb://localhost:2113?tls=false")
+    )
 
     private val retryOptions: RetryOptions = RetryOptions {
         setMaximumInterval(Duration.ofSeconds(100))
@@ -55,6 +63,7 @@ class ContinuumWorkflow : IContinuumWorkflow {
         continuumWorkflow: ContinuumWorkflowModel
     ): Map<String, Map<String, PortData>> {
         LOGGER.info("Starting ContinuumWorkflowImpl")
+
         try {
             Workflow.upsertTypedSearchAttributes(
                 IContinuumWorkflow.WORKFLOW_STATUS
@@ -148,20 +157,34 @@ class ContinuumWorkflow : IContinuumWorkflow {
     ) {
         // Check if the Workflow is being replayed
         if (!WorkflowUnsafe.isReplaying()) {
+
+            val eventMetadata = MqttHelper.WorkflowUpdateEvent(
+                jobId = Workflow.getInfo().workflowId,
+                data = MqttHelper.WorkflowUpdate(
+                    executionUUID = Workflow.getInfo().workflowId,
+                    progressPercentage = 0,
+                    status = status,
+                    nodeToOutputsMap = nodeToOutputsMap,
+                    createdAtTimestampUtc = Workflow.getInfo().runStartedTimestampMillis,
+                    updatesAtTimestampUtc = Instant.now().toEpochMilli(),
+                    workflow = currentRunningWorkflow!!
+                )
+            )
+            val eventData = EventData
+                .builderAsJson(
+                    UUID.randomUUID(),
+                    "WorkflowStatusUpdate",
+                    objectMapper.writeValueAsString(eventMetadata)
+                )
+                .build()
+            esdbClient.appendToStream(
+                "run-id:${Workflow.getInfo().runId}",
+                eventData
+            ).get()
+
             MqttHelper.publishWorkflowSnapshot(
                 Workflow.getInfo().workflowId,
-                MqttHelper.WorkflowUpdateEvent(
-                    jobId = Workflow.getInfo().workflowId,
-                    data = MqttHelper.WorkflowUpdate(
-                        executionUUID = Workflow.getInfo().workflowId,
-                        progressPercentage = 0,
-                        status = status,
-                        nodeToOutputsMap = nodeToOutputsMap,
-                        createdAtTimestampUtc = Workflow.getInfo().runStartedTimestampMillis,
-                        updatesAtTimestampUtc = Instant.now().toEpochMilli(),
-                        workflow = currentRunningWorkflow!!
-                    )
-                )
+                eventMetadata
             )
         }
     }

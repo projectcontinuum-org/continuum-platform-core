@@ -62,6 +62,20 @@ services:
       - ./mosquitto/config:/mosquitto/config
       - mosquitto-log:/mosquitto/log
       - mosquitto-data:/mosquitto/data
+#  eventstore-db:
+#    image: docker.eventstore.com/eventstore/eventstore:24.10
+#    environment:
+#      - EVENTSTORE_CLUSTER_SIZE=1
+#      - EVENTSTORE_RUN_PROJECTIONS=All
+#      - EVENTSTORE_START_STANDARD_PROJECTIONS=true
+#      - EVENTSTORE_NODE_PORT=2113
+#      - EVENTSTORE_INSECURE=true
+#      - EVENTSTORE_ENABLE_ATOM_PUB_OVER_HTTP=true
+#    ports:
+#      - 2113:2113
+#    volumes:
+#      - eventstore-data:/var/lib/eventstore
+#      - eventstore-logs:/var/log/eventstore
 networks:
   temporal-network:
     driver: bridge
@@ -72,3 +86,5 @@ volumes:
   mosquitto-log:
     driver: local
   mosquitto-data:
+  eventstore-data:
+  eventstore-logs:

@@ -11,7 +11,6 @@ import com.continuum.core.commons.utils.NodeInputReader
 import com.continuum.core.commons.utils.NodeOutputWriter
 import io.temporal.activity.Activity
 import io.temporal.spring.boot.ActivityImpl
-import io.temporal.workflow.Workflow
 import jakarta.annotation.PostConstruct
 import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.ObjectProvider
@@ -20,10 +19,14 @@ import org.springframework.stereotype.Component
 import software.amazon.awssdk.services.s3.S3AsyncClient
 import software.amazon.awssdk.services.s3.model.GetObjectRequest
 import software.amazon.awssdk.services.s3.model.PutObjectRequest
+import software.amazon.awssdk.transfer.s3.S3TransferManager
+import software.amazon.awssdk.transfer.s3.model.DownloadFileRequest
+import software.amazon.awssdk.transfer.s3.model.UploadFileRequest
+import software.amazon.awssdk.transfer.s3.progress.LoggingTransferListener
 import java.nio.file.Files
 import java.nio.file.Path
-import kotlin.io.path.exists
 import kotlin.io.path.listDirectoryEntries
+import kotlin.system.measureTimeMillis
 
 @Component
 @ActivityImpl(taskQueues = [TaskQueues.ACTIVITY_TASK_QUEUE])
@@ -31,6 +34,7 @@ class ContinuumNodeActivity(
     private val processNodesModelProvider: ObjectProvider<ProcessNodeModel>,
     private val triggerNodeModelProvider: ObjectProvider<TriggerNodeModel>,
     private val s3AsyncClient: S3AsyncClient,
+    private val s3TransferManager: S3TransferManager,
     @Value("\${continuum.core.worker.cache-bucket-name}")
     private val cacheBucketName: String,
     @Value("\${continuum.core.worker.cache-bucket-base-path}")
@@ -65,16 +69,20 @@ class ContinuumNodeActivity(
         Files.createDirectories(cacheStoragePath.resolve("${Activity.getExecutionContext().info.runId}/${node.id}"))
         // Find the node to execute
         if (processNodeMap.containsKey(node.data.nodeModel)) {
+            LOGGER.info("Downloading input files for node ${node.id} (${node.data.nodeModel})")
             val nodeInputs = prepareNodeInputs(node.id, inputs)
+            LOGGER.info("Input files downloaded for node ${node.id} (${node.data.nodeModel})")
             processNodeMap[node.data.nodeModel]!!.run(
                 node = node,
                 inputs = nodeInputs,
                 nodeOutputWriter = NodeOutputWriter(cacheStoragePath.resolve("${Activity.getExecutionContext().info.runId}/${node.id}"))
             )
-
+            LOGGER.info("Uploading output files for node ${node.id} (${node.data.nodeModel})")
+            val nodeOutput = prepareNodeOutputs(node.id)
+            LOGGER.info("Output files uploaded for node ${node.id} (${node.data.nodeModel})")
             return IContinuumNodeActivity.NodeActivityOutput(
                 nodeId = node.id,
-                outputs = prepareNodeOutputs(node.id)
+                outputs = nodeOutput
             )
         } else if (triggerNodeMap.containsKey(node.data.nodeModel)) {
             triggerNodeMap[node.data.nodeModel]!!.run(
@@ -98,13 +106,26 @@ class ContinuumNodeActivity(
             val filePath = cacheStoragePath.resolve("$workflowRunId/$nodeId/input.${it.key}.parquet")
             Files.deleteIfExists(filePath)
             val destinationKey = "$cacheBucketBasePath/${it.value.data.toString().removePrefix("{remote}")}"
-            s3AsyncClient.getObject(
-                GetObjectRequest.builder()
-                    .bucket(cacheBucketName)
-                    .key(destinationKey)
-                    .build(),
-                filePath
-            ).get()
+
+            val uploadTime = measureTimeMillis {
+                s3TransferManager.downloadFile(
+                    DownloadFileRequest.builder()
+                        .getObjectRequest(
+                            GetObjectRequest.builder()
+                                .bucket(cacheBucketName)
+                                .key(destinationKey)
+                                .build()
+                        )
+                        .destination(filePath)
+                        .addTransferListener(
+                            LoggingTransferListener.create()
+                        )
+                        .build()
+                ).completionFuture().get()
+            }
+
+            LOGGER.info("Download '$filePath' time: $uploadTime ms")
+
             NodeInputReader(filePath)
         }
     }
@@ -119,13 +140,24 @@ class ContinuumNodeActivity(
             val portId = it.fileName.toString().substringAfter("output.").substringBefore(".parquet")
             val relativeFileKey = "$workflowRunId/$nodeId/output.$portId.parquet"
             val destinationKey = "$cacheBucketBasePath/$relativeFileKey"
-            s3AsyncClient.putObject(
-                PutObjectRequest.builder()
-                    .bucket(cacheBucketName)
-                    .key(destinationKey)
-                    .build(),
-                it
-            ).get()
+
+            val uploadTime = measureTimeMillis {
+                s3TransferManager.uploadFile(
+                    UploadFileRequest.builder()
+                        .putObjectRequest(
+                            PutObjectRequest.builder()
+                                .bucket(cacheBucketName)
+                                .key(destinationKey)
+                                .build()
+                        )
+                        .source(it)
+                        .addTransferListener(
+                            LoggingTransferListener.create()
+                        )
+                        .build()
+                ).completionFuture().get()
+            }
+            LOGGER.info("Upload '$it' time: $uploadTime ms")
             val portData = PortData(
                 data = "{remote}${relativeFileKey}",
                 contentType = "application/parquet",

@@ -34,7 +34,7 @@ class TimeTriggerNodeModel : TriggerNodeModel() {
         icon = "mui/Bolt",
         outputs = outputPorts,
         properties = mapOf(
-            "message" to "Hello world from",
+            "message" to "Logging at",
             "rowCount" to 10
         ),
         propertiesSchema = mapOf(
@@ -73,7 +73,7 @@ class TimeTriggerNodeModel : TriggerNodeModel() {
         nodeOutputWriter: NodeOutputWriter
     ) {
         val rowCount = properties?.get("rowCount").toString().toLongOrNull() ?: 10L
-        val message = properties?.get("message") as? String ?: "Hello world from"
+        val message = properties?.get("message") as? String ?: "Logging at"
         nodeOutputWriter.createOutputPortWriter("output-1").use {
             for (i in 0 until rowCount) {
                 it.write(i, mapOf(

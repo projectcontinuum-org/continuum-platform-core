@@ -8,8 +8,8 @@ import org.springframework.web.servlet.config.annotation.WebMvcConfigurer
 import software.amazon.awssdk.auth.credentials.ProfileCredentialsProvider
 import software.amazon.awssdk.regions.Region
 import software.amazon.awssdk.services.s3.S3AsyncClient
-import software.amazon.awssdk.services.s3.S3Client
 import software.amazon.awssdk.services.s3.internal.crt.S3CrtAsyncClient
+import software.amazon.awssdk.transfer.s3.S3TransferManager
 
 @Configuration
 class CorsConfig {
@@ -37,6 +37,15 @@ class CorsConfig {
                     .profileName(awsProfileName)
                     .build()
             )
+            .build()
+    }
+
+    @Bean
+    fun s3TransferManager(
+        s3AsyncClient: S3AsyncClient
+    ): S3TransferManager {
+        return S3TransferManager.builder()
+            .s3Client(s3AsyncClient)
             .build()
     }
 }

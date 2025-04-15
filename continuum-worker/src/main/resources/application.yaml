@@ -13,3 +13,7 @@ continuum.core:
     cache-bucket-name: ${CONTINUUM_CACHE_BUCKET_NAME:jarvis-dev-jarvis-stage-area-3a355f49}
     cache-bucket-base-path: ${CONTINUUM_CACHE_BUCKET_BASE_PATH:staging-data/test}
     cache-storage-path: ${CONTINUUM_CACHE_STORAGE_PATH:./.continuum-cache}
+logging:
+  level:
+    root: error
+    com.continuum.core.worker: info

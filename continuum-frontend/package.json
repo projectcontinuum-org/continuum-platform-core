@@ -8,13 +8,10 @@
     "clean": "turbo clean",
     "format": "prettier --write \"**/*.{ts,tsx,md}\"",
     "watch": "turbo watch",
-    "start:backend": "turbo start --filter=@continuum/backend",
-    "build:backend": "turbo build --filter=@continuum/backend",
     "start:workbench": "turbo start --filter=@continuum/workbench",
     "build:workbench": "turbo build --filter=@continuum/workbench",
     "start:workbench-thin": "turbo start --filter=@continuum/workbench-thin",
-    "build:workbench-thin": "turbo build --filter=@continuum/workbench-thin",
-    "migrate:model": "turbo migrate --filter=@continuum/model"
+    "build:workbench-thin": "turbo build --filter=@continuum/workbench-thin"
   },
   "devDependencies": {
     "prettier": "^3.1.1",

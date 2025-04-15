@@ -46,18 +46,22 @@ dependencies {
     implementation("software.amazon.awssdk:sso")
     implementation("software.amazon.awssdk:ssooidc")
     implementation("software.amazon.awssdk.crt:aws-crt:0.33.10")
+    implementation("software.amazon.awssdk:s3-transfer-manager")
+
+    // ESDB dependencies
+    implementation("com.eventstore:db-client-java:5.0.0")
 
     // Test dependencies
     testImplementation("org.springframework.boot:spring-boot-starter-test")
     testImplementation("org.jetbrains.kotlin:kotlin-test-junit5")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
-    implementation("io.temporal:temporal-testing")
+    testImplementation("io.temporal:temporal-testing")
 }
 
 dependencyManagement {
     imports {
         mavenBom("org.springframework.cloud:spring-cloud-dependencies:2024.0.0")
-        mavenBom("io.temporal:temporal-bom:1.27.0")
+        mavenBom("io.temporal:temporal-bom:1.28.0")
         mavenBom("software.amazon.awssdk:bom:2.30.7")
     }
 }
