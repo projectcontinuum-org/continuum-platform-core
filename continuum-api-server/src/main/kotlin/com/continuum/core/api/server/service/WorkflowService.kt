@@ -10,6 +10,7 @@ import com.continuum.core.commons.workflow.IContinuumWorkflow
 import com.fasterxml.jackson.core.type.TypeReference
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.google.protobuf.ByteString
+import com.google.protobuf.MapEntry
 import io.temporal.api.common.v1.WorkflowExecution
 import io.temporal.api.enums.v1.EventType
 import io.temporal.api.workflowservice.v1.CountWorkflowExecutionsRequest
@@ -45,7 +46,7 @@ class WorkflowService(
                 .setTaskQueue(TaskQueues.WORKFLOW_TASK_QUEUE)
                 .setTypedSearchAttributes(SearchAttributes.newBuilder()
                     .set(IContinuumWorkflow.WORKFLOW_FILE_PATH, continuumWorkflowModel.name)
-                    .set(IContinuumWorkflow.WORKFLOW_STATUS, ExecutionStatus.SCHEDULED.value)
+                    .set(IContinuumWorkflow.WORKFLOW_STATUS, ExecutionStatus.UNKNOWN.value)
                     .build())
                 .build()
         )
@@ -177,10 +178,30 @@ class WorkflowService(
                 workflowOutput = objectMapper.readValue(workflowOutputString, object : TypeReference<Map<String, Map<String, PortData>>>() {})
             } else {
                 try {
-                    workflowOutput = workflowClient.newWorkflowStub(
-                        IContinuumWorkflow::class.java,
-                        it.workflowId
-                    ).getWorkflowSnapshot().nodeToOutputsMap
+                    // Project the workflow events into output
+                    LOGGER.debug("Querying workflowId: ${it.workflowId} for output...")
+                    workflowOutput = history.events.filter { evt -> evt.eventType == EventType.EVENT_TYPE_ACTIVITY_TASK_COMPLETED }
+                        .associate { evt ->
+                            val outputStr = evt.activityTaskCompletedEventAttributes.result.payloadsList[0].data.toStringUtf8()
+                            val nodeOutput = objectMapper.readValue(outputStr, object : TypeReference<Map<String, Any>>() {})
+                            val nodeId = nodeOutput["nodeId"] as String
+                            val output = objectMapper.readValue(
+                                objectMapper.writeValueAsString(nodeOutput["outputs"]),
+                                object : TypeReference<Map<String, PortData>>() {}
+                            )
+                            LOGGER.debug("NodeId: {}, output: {}", nodeId, output)
+                            nodeId to output
+                        }.filter { entry -> entry.value.isNotEmpty() }
+                    LOGGER.debug(
+                        "Querying workflowId: {} for output... {} outputs found!",
+                        it.workflowId,
+                        workflowOutput
+                    )
+
+//                    workflowOutput = workflowClient.newWorkflowStub(
+//                        IContinuumWorkflow::class.java,
+//                        it.workflowId
+//                    ).getWorkflowSnapshot().nodeToOutputsMap
                 } catch (e: WorkflowException) {
                     workflowOutput = mapOf()
                     LOGGER.error("Error querying workflowId: ${it.workflowId}!")

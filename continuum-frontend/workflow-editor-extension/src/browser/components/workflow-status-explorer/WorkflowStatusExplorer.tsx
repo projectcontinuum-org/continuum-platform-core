@@ -13,10 +13,11 @@ import WorkflowTreeService from '../../service/WorkflowTreeService';
 import ChecklistRtlSharpIcon from '@mui/icons-material/ChecklistRtlSharp';
 import ClearSharpIcon from '@mui/icons-material/ClearSharp';
 import QuestionMarkSharpIcon from '@mui/icons-material/QuestionMarkSharp';
-import HourglassTopSharpIcon from '@mui/icons-material/HourglassTopSharp';
 import { SelectionService, URI } from '@theia/core';
 import { OpenerService } from '@theia/core/lib/browser';
 import RefreshIcon from '@mui/icons-material/Refresh';
+import ClearIcon from '@mui/icons-material/Clear';
+import BlockIcon from '@mui/icons-material/Block';
 
 const { useCallback, useEffect, useRef, useState } = React;
 const workflowTreeSerfice = new WorkflowTreeService();
@@ -45,12 +46,13 @@ function WorkflowStatusTreeItem({ node, children, onDoubleClick }: {
             nodeId={node.id}
             labelText={node.name}
             labelIcon={
-                node.itemInfo?.status == "SCHEDULED" ? <HourglassTopSharpIcon fontSize='small' color="warning"/> : 
-                node.itemInfo?.status == "RUNNING" ? <CircularProgress size={20} color="info" 
+                node.itemInfo?.status == "WORKFLOW_EXECUTION_STARTED" ? <CircularProgress size={20} color="info"
                     variant={Object.keys(node.itemInfo.nodeToOutputsMap).length > 0 ? "determinate" : "indeterminate"}
                     value={Object.keys(node.itemInfo.nodeToOutputsMap).length/node.itemInfo.workflow_snapshot.nodes.length * 100}/> : 
-                node.itemInfo?.status == "COMPLETED" ? <ChecklistRtlSharpIcon fontSize='small' color="success"/> : 
-                node.itemInfo?.status == "FAILED" ? <ClearSharpIcon fontSize='small' color="error"/> : 
+                node.itemInfo?.status == "WORKFLOW_EXECUTION_COMPLETED" ? <ChecklistRtlSharpIcon fontSize='small' color="success"/> :
+                node.itemInfo?.status == "WORKFLOW_EXECUTION_FAILED" ? <ClearSharpIcon fontSize='small' color="error"/> :
+                node.itemInfo?.status == "WORKFLOW_EXECUTION_CANCELED" ? <ClearIcon fontSize='small' color="error"/> :
+                node.itemInfo?.status == "WORKFLOW_EXECUTION_TERMINATED" ? <BlockIcon fontSize='small' color="error"/> :
                 <QuestionMarkSharpIcon fontSize='small' color="warning"/>
             }
             color={theme.palette.text.primary}

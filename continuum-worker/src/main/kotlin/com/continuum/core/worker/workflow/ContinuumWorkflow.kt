@@ -61,19 +61,19 @@ class ContinuumWorkflow : IContinuumWorkflow {
         try {
             Workflow.upsertTypedSearchAttributes(
                 IContinuumWorkflow.WORKFLOW_STATUS
-                    .valueSet(ExecutionStatus.RUNNING.value)
+                    .valueSet(ExecutionStatus.WORKFLOW_EXECUTION_STARTED.value)
             )
             run(continuumWorkflow)
             Workflow.upsertTypedSearchAttributes(
                 IContinuumWorkflow.WORKFLOW_STATUS
-                    .valueSet(ExecutionStatus.COMPLETED.value)
+                    .valueSet(ExecutionStatus.WORKFLOW_EXECUTION_COMPLETED.value)
             )
             sendUpdateEvent("FINISHED")
         } catch (e: Exception) {
             LOGGER.error("Error in executing workflow", e)
             Workflow.upsertTypedSearchAttributes(
                 IContinuumWorkflow.WORKFLOW_STATUS
-                    .valueSet(ExecutionStatus.FAILED.value)
+                    .valueSet(ExecutionStatus.WORKFLOW_EXECUTION_FAILED.value)
             )
             sendUpdateEvent("FAILED")
         }
