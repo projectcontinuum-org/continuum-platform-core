@@ -15,21 +15,42 @@ export function TableOutputView({outputData}: TableOutputViewProps) {
     const [columns, setColumns] = React.useState<GridColDef<any>[]>([]);
     const [page, setPage] = React.useState<number>(0);
     const [pageSize, setPageSize] = React.useState<number>(25);
+    const [loading, setLoading] = React.useState<boolean>(true);
     
     useEffect(()=>{
         dataService.getNodeData(outputData.data, page + 1, pageSize).then((data) => {
-            if(data.rows.length > 0) {
+            if(data.data.length > 0) {
                 console.log(`Page: ${JSON.stringify(data)}`)
-                setRowsCount(data.metadata.total);
-                setRows(data.rows.map((row, idx)=>({id:idx, ...row})));
-                setColumns(Object.entries(data.rows[0]).map(([key])=>({ field: key, headerName: key, width: 150 })));
+                setRowsCount(data.totalElements);
+                setRows(data.data.map((row: Array<any>, idx: number) => {
+                    let newRow: any = {id: idx};
+                    row.forEach((cell: any) => {
+                        if(cell.contentType === "text/plain") {
+                            newRow[cell.name] = atob(cell.value);
+                        } else {
+                            newRow[cell.name] = cell.value;
+                        }
+                    });
+                    return newRow;
+                }));
+                setColumns(data.data[0].map((cell: any)=>({ field: cell.name, headerName: cell.name, width: 150 })));
+                setLoading(false);
             }
         });
+        return () => {
+            setRows([]);
+            setRowsCount(0);
+            setColumns([]);
+            setLoading(true);
+        }
     }, [outputData, page, pageSize, setRowsCount, setRows, setColumns]);
 
     const onPaginationModelChange = useCallback((model: GridPaginationModel)=>{
+        setRows([]);
+        setColumns([]);
         setPage(model.page);
         setPageSize(model.pageSize);
+        setLoading(true);
     }, [setPage, setPageSize]);
 
     return (
@@ -44,6 +65,7 @@ export function TableOutputView({outputData}: TableOutputViewProps) {
                 pageSize: pageSize
             }}
             onPaginationModelChange={onPaginationModelChange}
+            loading={loading}
             sx={{
                 minWidth: "500px",
             }}/>

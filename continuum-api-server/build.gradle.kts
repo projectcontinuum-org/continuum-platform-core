@@ -28,6 +28,7 @@ dependencies {
 
     // Project dependencies
     implementation(project(":continuum-commons"))
+    implementation(project(":continuum-avro-schemas"))
 
     // Swagger-UI Dependencies
     implementation("org.springdoc:springdoc-openapi-starter-webmvc-ui:2.5.0")
@@ -35,6 +36,15 @@ dependencies {
     // Temporal Dependencies
     implementation("io.temporal:temporal-sdk")
     implementation("io.temporal:temporal-kotlin")
+
+    // DuckDB Dependencies
+    implementation("org.duckdb:duckdb_jdbc:1.2.2.0")
+
+    // AWS dependencies
+    implementation("software.amazon.awssdk:s3")
+    implementation("software.amazon.awssdk:sts")
+    implementation("software.amazon.awssdk:sso")
+    implementation("software.amazon.awssdk:ssooidc")
 
     // Test dependencies
     testImplementation("org.springframework.boot:spring-boot-starter-test")
@@ -46,6 +56,7 @@ dependencyManagement {
     imports {
         mavenBom("org.springframework.cloud:spring-cloud-dependencies:2024.0.0")
         mavenBom("io.temporal:temporal-bom:1.28.0")
+        mavenBom("software.amazon.awssdk:bom:2.30.7")
     }
 }
 
