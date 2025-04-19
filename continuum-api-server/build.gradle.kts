@@ -45,6 +45,8 @@ dependencies {
     implementation("software.amazon.awssdk:sts")
     implementation("software.amazon.awssdk:sso")
     implementation("software.amazon.awssdk:ssooidc")
+    implementation("software.amazon.awssdk.crt:aws-crt:0.33.10")
+    implementation("software.amazon.awssdk:s3-transfer-manager")
 
     // Test dependencies
     testImplementation("org.springframework.boot:spring-boot-starter-test")

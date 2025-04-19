@@ -2,22 +2,26 @@ package com.continuum.core.api.server.repository
 
 import com.continuum.core.api.server.model.CellDto
 import com.continuum.core.api.server.model.Page
-import com.continuum.core.api.server.model.RowDto
 import org.duckdb.DuckDBArray
 import org.duckdb.DuckDBConnection
 import org.duckdb.DuckDBResultSet
 import org.duckdb.DuckDBStruct
+import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.stereotype.Repository
 import software.amazon.awssdk.services.s3.model.GetObjectRequest
 import software.amazon.awssdk.services.s3.presigner.S3Presigner
 import software.amazon.awssdk.services.s3.presigner.model.GetObjectPresignRequest
+import software.amazon.awssdk.transfer.s3.S3TransferManager
+import software.amazon.awssdk.transfer.s3.model.DownloadFileRequest
+import java.io.File
 import java.net.URI
 import java.time.Duration
 
 @Repository
 class NodeOutputRepository(
     private val duckDBConnection: DuckDBConnection,
+    private val s3TransferManager: S3TransferManager,
     private val s3Presigner: S3Presigner,
     @Value("\${continuum.core.api-server.cache-bucket-name}")
     val s3BucketName: String = "continuum-data",
@@ -25,7 +29,14 @@ class NodeOutputRepository(
     val s3BucketBasePath: String,
     @Value("\${continuum.core.api-server.dataFileExtension:parquet}")
     val dataFileExtension: String,
+    @Value("\${continuum.core.api-server.cache-directory-base-path}")
+    val cacheDirectoryBasePath: String
 ) {
+
+    companion object {
+        private val LOGGER = LoggerFactory.getLogger(NodeOutputRepository::class.java)
+    }
+
     fun getOutput(
         workflowId: String,
         nodeId: String,
@@ -100,18 +111,35 @@ class NodeOutputRepository(
         nodeId: String,
         outputId: String
     ): URI {
-        val key = "$s3BucketBasePath/$workflowId/$nodeId/output.$outputId.$dataFileExtension"
-        // Generate a pre-signed URL for the S3 object
-        val getObjectRequest = GetObjectRequest.builder()
-            .bucket(s3BucketName)
-            .key(key)
-            .build()
+        val relativeKey = "$workflowId/$nodeId/output.$outputId.$dataFileExtension"
+        val bucketKey = "$s3BucketBasePath/$relativeKey"
+        val localCachePath = listOf(
+            cacheDirectoryBasePath,
+            workflowId,
+            nodeId,
+            "output.$outputId.$dataFileExtension"
+        ).joinToString(File.separator)
+        val localCacheFile = File(localCachePath)
 
-        val presignedGetObjectRequest = s3Presigner.presignGetObject { r: GetObjectPresignRequest.Builder ->
-            r.getObjectRequest(getObjectRequest)
-                .signatureDuration(Duration.ofMinutes(10))
+        // Check if the file exists locally
+        if (!localCacheFile.exists()) {
+            LOGGER.debug("Downloading file from S3: $bucketKey to $localCachePath")
+            s3TransferManager
+                .downloadFile(
+                    DownloadFileRequest.builder()
+                        .getObjectRequest(
+                            GetObjectRequest.builder()
+                                .bucket(s3BucketName)
+                                .key(bucketKey)
+                                .build()
+                        )
+                        .destination(localCacheFile.toPath())
+                        .build()
+                )
         }
 
-        return presignedGetObjectRequest.url().toURI()
+        return URI("$localCachePath").also {
+            LOGGER.debug("Using local cache file: $localCachePath for S3 object: $bucketKey")
+        }
     }
 }

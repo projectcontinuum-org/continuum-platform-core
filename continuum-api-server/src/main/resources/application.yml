@@ -8,3 +8,4 @@ continuum.core.api-server:
   cache-bucket-name: ${CONTINUUM_CACHE_BUCKET_NAME:jarvis-dev-jarvis-stage-area-3a355f49}
   cache-bucket-region: ${CONTINUUM_CACHE_BUCKET_REGION:us-east-2}
   cache-bucket-base-path: ${CONTINUUM_CACHE_BUCKET_BASE_PATH:staging-data/test}
+  cache-directory-base-path: ${CONTINUUM_CACHE_DIRECTORY:./.continuum-cache}

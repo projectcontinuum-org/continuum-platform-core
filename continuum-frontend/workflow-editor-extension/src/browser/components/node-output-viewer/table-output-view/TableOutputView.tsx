@@ -18,7 +18,7 @@ export function TableOutputView({outputData}: TableOutputViewProps) {
     const [loading, setLoading] = React.useState<boolean>(true);
     
     useEffect(()=>{
-        dataService.getNodeData(outputData.data, page + 1, pageSize).then((data) => {
+        dataService.getNodeData(outputData.data, page, pageSize).then((data) => {
             if(data.data.length > 0) {
                 console.log(`Page: ${JSON.stringify(data)}`)
                 setRowsCount(data.totalElements);
@@ -33,21 +33,15 @@ export function TableOutputView({outputData}: TableOutputViewProps) {
                     });
                     return newRow;
                 }));
-                setColumns(data.data[0].map((cell: any)=>({ field: cell.name, headerName: cell.name, width: 150 })));
+                setColumns(data.data[0].map((cell: any)=>({ field: cell.name, headerName: cell.name, flex: 1, minWidth: 150 })));
                 setLoading(false);
             }
         });
-        return () => {
-            setRows([]);
-            setRowsCount(0);
-            setColumns([]);
-            setLoading(true);
-        }
     }, [outputData, page, pageSize, setRowsCount, setRows, setColumns]);
 
     const onPaginationModelChange = useCallback((model: GridPaginationModel)=>{
         setRows([]);
-        setColumns([]);
+        // setColumns([]);
         setPage(model.page);
         setPageSize(model.pageSize);
         setLoading(true);
@@ -67,7 +61,21 @@ export function TableOutputView({outputData}: TableOutputViewProps) {
             onPaginationModelChange={onPaginationModelChange}
             loading={loading}
             sx={{
-                minWidth: "500px",
+                width: "80vw", // 50% of the viewport width
+                height: "80vh", // 50% of the viewport height
+                "& .MuiDataGrid-virtualScroller": {
+                    overflowY: "auto", // Make only the rows scrollable
+                },
+                "& .MuiDataGrid-columnHeaders": {
+                    position: "sticky",
+                    top: 0,
+                    zIndex: 1, // Ensure the header stays on top
+                },
+                "& .MuiDataGrid-footerContainer": {
+                    position: "sticky",
+                    bottom: 0,
+                    zIndex: 1, // Ensure the footer stays on top
+                }
             }}/>
     );
 }

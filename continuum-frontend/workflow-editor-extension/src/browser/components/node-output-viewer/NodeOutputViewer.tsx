@@ -46,7 +46,18 @@ export default function NodeOutputViewer({ onClose, open, nodeOutputs }: NodeOut
     return (
         <StyledDialog 
             open={open}
-            onClose={onClose}>
+            onClose={onClose}
+            maxWidth={false} // Disable default max width
+            fullWidth // Allow dialog to adjust to content width
+            scroll="paper" // Enable scrolling if content overflows
+            sx={{
+              '& .MuiDialog-paper': {
+                width: 'auto', // Adjust width to fit content
+                maxWidth: '90vw', // Optional: Limit max width to 90% of the viewport
+                height: 'auto', // Adjust height to fit content
+                maxHeight: '90vh', // Optional: Limit max height to 90% of the viewport
+              },
+            }}>
             <DialogTitle>Node Outputs</DialogTitle>
             <IconButton
                 aria-label="close"

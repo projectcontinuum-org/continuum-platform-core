@@ -11,15 +11,6 @@ export interface DataPage {
 export default class DataService {
     private readonly apiBaseUrl: string = 'http://localhost:8080/api/v1/data';
 
-    // async getNodeDataV1(
-    //     filePath: string,
-    //     page: number,
-    //     limit: number): Promise<DataPage> {
-    //     filePath = encodeURI(filePath.replace("{remote}/", ""));
-    //     const response = await fetch(`${this.apiBaseUrl}/?page=${page}&limit=${limit}&filePath=${filePath}`);
-    //     return response.json();
-    // }
-
     async getNodeData(
       filePath: string,
       page: number,
@@ -29,7 +20,7 @@ export default class DataService {
         const workflowId = parts[0];
         const nodeId = parts[1];
         const outputId = parts[2].split(".")[1];
-        const response = await fetch(`${this.apiBaseUrl}/${encodeURI(workflowId)}/nodes/${encodeURI(nodeId)}/outputs/${encodeURI(outputId)}?page=${page}&limit=${limit}`);
+        const response = await fetch(`${this.apiBaseUrl}/${encodeURI(workflowId)}/nodes/${encodeURI(nodeId)}/outputs/${encodeURI(outputId)}?page=${page}&pageSize=${limit}`);
         return response.json();
     }
 }
