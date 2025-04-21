@@ -11,6 +11,7 @@ import { IBaseNodeData, IWorkflow } from "@continuum/core";
 import NodeDialog, { NodeDialogProps } from "../node-dialog/NodeDialog";
 import WorkflowService from "../../service/WorkflowService";
 import LockClockIcon from '@mui/icons-material/LockClock';
+import SendIcon from '@mui/icons-material/Send';
 
 const workflowService = new WorkflowService();
 
@@ -86,7 +87,7 @@ function WorkflowEditor({ workflow, onChange }: WorkflowEditorProps)  {
         return true;
     }, [flowEdges, flowNodes, hasCycle]);
 
-    const onActivate = React.useCallback(async () => {
+    const onRun = React.useCallback(async () => {
         console.log({ flowNodes, flowEdges });
         try {
             await workflowService.activateWorkflow({
@@ -96,7 +97,7 @@ function WorkflowEditor({ workflow, onChange }: WorkflowEditorProps)  {
                 edges: flowEdges,
                 nodes: flowNodes,
             });
-            setIsActive(true);
+            // setIsActive(true);
         } catch (error) {
             console.error(error);
         }
@@ -129,23 +130,6 @@ function WorkflowEditor({ workflow, onChange }: WorkflowEditorProps)  {
         setSelectedNode(clickedNode);
     }, [setNodeDialogProps, onNodeDialogSaved, onNodeDialogClose, setSelectedNode]);
 
-    const onDeactivate = React.useCallback(async () => {
-        console.log({ flowNodes, flowEdges });
-        try {
-            await workflowService.activateWorkflow({
-                id: workflow.id,
-                name: workflow.name,
-                active: false,
-                edges: flowEdges,
-                nodes: flowNodes,
-            });
-            setIsActive(false);
-        } catch (error) {
-            console.error(error);
-        }
-    }, [flowEdges, flowNodes, setIsActive]);
-
-
     return (
         <Box
             sx={{
@@ -176,8 +160,7 @@ function WorkflowEditor({ workflow, onChange }: WorkflowEditorProps)  {
                 fitView>
                 <Controls />
                 <Panel position="bottom-center">
-                    {!isActive ? <Button variant="contained" onClick={onActivate}>Activate</Button> :
-                     <Button variant="contained" onClick={onDeactivate}>Deactivate</Button>}
+                    <Button variant="contained" onClick={onRun} endIcon={<SendIcon />}>Run</Button>
                 </Panel>
                 {isActive && <Panel position="top-right">
                     <IconButton aria-label="delete">

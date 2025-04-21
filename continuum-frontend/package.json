@@ -15,7 +15,8 @@
   },
   "devDependencies": {
     "prettier": "^3.1.1",
-    "turbo": "^1.13.3"
+    "turbo": "^1.13.3",
+    "@fortawesome/react-fontawesome": "^0.2.0"
   },
   "engines": {
     "node": ">=20"

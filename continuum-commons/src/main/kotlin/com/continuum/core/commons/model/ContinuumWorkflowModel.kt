@@ -52,7 +52,7 @@ data class ContinuumWorkflowModel @JsonCreator constructor(
         @JsonProperty("width") val width: Int,
         @JsonProperty("height") val height: Int,
         @JsonProperty("selected") val selected: Boolean,
-        @JsonProperty("positionAbsolute") val positionAbsolute: Position,
+        @JsonProperty("positionAbsolute") val positionAbsolute: Position? = null,
         @JsonProperty("dragging") val dragging: Boolean
     )
 
