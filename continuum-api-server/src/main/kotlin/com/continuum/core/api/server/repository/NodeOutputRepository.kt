@@ -123,6 +123,13 @@ class NodeOutputRepository(
 
         // Check if the file exists locally
         if (!localCacheFile.exists()) {
+
+            // Ensure parent directories exist
+            val parentDir = localCacheFile.parentFile
+            if (parentDir != null && !parentDir.exists()) {
+                parentDir.mkdirs()
+            }
+
             LOGGER.debug("Downloading file from S3: $bucketKey to $localCachePath")
             s3TransferManager
                 .downloadFile(
@@ -136,9 +143,11 @@ class NodeOutputRepository(
                         .destination(localCacheFile.toPath())
                         .build()
                 )
+                .completionFuture()
+                .join()
         }
 
-        return URI("$localCachePath").also {
+        return URI(localCachePath).also {
             LOGGER.debug("Using local cache file: $localCachePath for S3 object: $bucketKey")
         }
     }

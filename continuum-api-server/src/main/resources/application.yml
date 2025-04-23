@@ -3,9 +3,10 @@ temporal:
   connection:
     target: ${TEMPORAL_SERVER_ADDRESS}
     namespace: ${TEMPORAL_NAMESPACE:default}
-continuum.core.api-server:
-  aws-profile-name: continuum-worker
-  cache-bucket-name: ${CONTINUUM_CACHE_BUCKET_NAME:jarvis-dev-jarvis-stage-area-3a355f49}
-  cache-bucket-region: ${CONTINUUM_CACHE_BUCKET_REGION:us-east-2}
-  cache-bucket-base-path: ${CONTINUUM_CACHE_BUCKET_BASE_PATH:staging-data/test}
-  cache-directory-base-path: ${CONTINUUM_CACHE_DIRECTORY:./.continuum-cache}
+continuum.core:
+  api-server:
+    aws-profile-name: ${CONTINUUM_AWS_PROFILE_NAME:app}
+    cache-bucket-name: ${CONTINUUM_CACHE_BUCKET_NAME}
+    cache-bucket-region: ${CONTINUUM_CACHE_BUCKET_REGION:us-east-2}
+    cache-bucket-base-path: ${CONTINUUM_CACHE_BUCKET_BASE_PATH:staging-data/test}
+    cache-directory-base-path: ${CONTINUUM_CACHE_DIRECTORY:./.continuum-cache}

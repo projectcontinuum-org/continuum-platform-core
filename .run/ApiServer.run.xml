@@ -3,6 +3,8 @@
     <option name="ALTERNATIVE_JRE_PATH" value="temurin-21" />
     <option name="ALTERNATIVE_JRE_PATH_ENABLED" value="true" />
     <envs>
+      <env name="CONTINUUM_AWS_PROFILE_NAME" value="jarvis-dev" />
+      <env name="CONTINUUM_CACHE_BUCKET_NAME" value="jarvis-replication-test-bucket" />
       <env name="TEMPORAL_SERVER_ADDRESS" value="localhost:7233" />
     </envs>
     <module name="continuum.continuum-api-server.main" />

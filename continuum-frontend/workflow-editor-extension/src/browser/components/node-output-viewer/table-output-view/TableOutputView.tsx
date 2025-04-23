@@ -61,8 +61,8 @@ export function TableOutputView({outputData}: TableOutputViewProps) {
             onPaginationModelChange={onPaginationModelChange}
             loading={loading}
             sx={{
-                width: "80vw", // 50% of the viewport width
-                height: "80vh", // 50% of the viewport height
+                width: "70vw", // 70% of the viewport width
+                height: "70vh", // 70% of the viewport height
                 "& .MuiDataGrid-virtualScroller": {
                     overflowY: "auto", // Make only the rows scrollable
                 },
