@@ -98,7 +98,7 @@ class ContinuumNodeActivity(
         return IContinuumNodeActivity.NodeActivityOutput(
             nodeId = node.id,
             outputs = mapOf(
-                "error" to PortData(
+                "\$error" to PortData(
                     data = "Node model '${node.data.nodeModel}' not found",
                     contentType = "text/plain",
                     status = PortDataStatus.FAILED

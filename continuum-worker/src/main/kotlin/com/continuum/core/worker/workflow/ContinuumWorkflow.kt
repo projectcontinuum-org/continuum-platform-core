@@ -12,6 +12,7 @@ import com.continuum.core.worker.utils.StatusHelper
 import com.fasterxml.jackson.databind.ObjectMapper
 import io.temporal.activity.ActivityOptions
 import io.temporal.common.RetryOptions
+import io.temporal.failure.ApplicationFailure
 import io.temporal.spring.boot.WorkflowImpl
 import io.temporal.workflow.Async
 import io.temporal.workflow.Promise
@@ -27,6 +28,7 @@ class ContinuumWorkflow : IContinuumWorkflow {
     private val LOGGER = Workflow.getLogger(ContinuumWorkflow::class.java)
 
     private val nodeToOutputsMap = mutableMapOf<String, Map<String, PortData>>()
+    private val nodeErrorsMap = mutableMapOf<String, Map<String, PortData>>()
     private var currentRunningWorkflow: ContinuumWorkflowModel? = null
 
     private val retryOptions: RetryOptions = RetryOptions {
@@ -74,6 +76,17 @@ class ContinuumWorkflow : IContinuumWorkflow {
             )
             sendUpdateEvent("FAILED")
         }
+        if (nodeErrorsMap.isNotEmpty()) {
+            throw ApplicationFailure
+                .newNonRetryableFailure(
+                    "Workflow execution failed",
+                    "WorkflowExecutionFailed",
+                    mapOf(
+                        "nodeErrors" to nodeErrorsMap,
+                        "nodeToOutputsMap" to nodeToOutputsMap
+                    )
+                )
+        }
         return nodeToOutputsMap
     }
 
@@ -98,11 +111,12 @@ class ContinuumWorkflow : IContinuumWorkflow {
             if (nodeExecutionPromises.isNotEmpty()) {
                 val nodeOutput = Promise.anyOf(nodeExecutionPromises.map { it.second }).get()
                 val completedNode = continuumWorkflow.nodes.first { it.id == nodeOutput.nodeId }
-                setNodeAnimationAndStatus(completedNode, ContinuumWorkflowModel.NodeStatus.SUCCESS)
-                if(!nodeOutput.outputs.containsKey("error")) {
+                if(!nodeOutput.outputs.containsKey("\$error")) {
+                    setNodeAnimationAndStatus(completedNode, ContinuumWorkflowModel.NodeStatus.SUCCESS)
                     nodeToOutputsMap[nodeOutput.nodeId] = nodeOutput.outputs
                 } else {
                     setNodeAnimationAndStatus(completedNode, ContinuumWorkflowModel.NodeStatus.FAILED)
+                    nodeErrorsMap[nodeOutput.nodeId] = nodeOutput.outputs
                 }
                 // remove the completed promises
                 nodeExecutionPromises.removeAll { it.first.id == nodeOutput.nodeId }
