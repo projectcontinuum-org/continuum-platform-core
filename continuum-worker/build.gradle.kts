@@ -16,6 +16,7 @@ java {
 
 repositories {
     mavenCentral()
+    maven("https://packages.confluent.io/maven/")
 }
 
 dependencies {
@@ -26,6 +27,8 @@ dependencies {
     implementation("org.springframework.boot:spring-boot-starter-actuator")
 
     // Spring Cloud stream dependencies
+    implementation("io.confluent:kafka-avro-serializer:7.6.1")
+    implementation("io.confluent:kafka-schema-registry-client:7.6.1")
     implementation("org.springframework.cloud:spring-cloud-starter-stream-kafka")
 
     // Project dependencies

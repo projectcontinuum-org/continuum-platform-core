@@ -8,7 +8,7 @@ import com.continuum.core.commons.model.ExecutionStatus
 import com.continuum.core.commons.model.PortData
 import com.continuum.core.commons.model.WorkflowSnapshot
 import com.continuum.core.commons.workflow.IContinuumWorkflow
-import com.continuum.core.worker.utils.MqttHelper
+import com.continuum.core.worker.utils.StatusHelper
 import com.fasterxml.jackson.databind.ObjectMapper
 import io.temporal.activity.ActivityOptions
 import io.temporal.common.RetryOptions
@@ -155,9 +155,9 @@ class ContinuumWorkflow : IContinuumWorkflow {
         // Check if the Workflow is being replayed
         if (!WorkflowUnsafe.isReplaying()) {
 
-            val eventMetadata = MqttHelper.WorkflowUpdateEvent(
+            val eventMetadata = StatusHelper.WorkflowUpdateEvent(
                 jobId = Workflow.getInfo().workflowId,
-                data = MqttHelper.WorkflowUpdate(
+                data = StatusHelper.WorkflowUpdate(
                     executionUUID = Workflow.getInfo().workflowId,
                     progressPercentage = 0,
                     status = status,
@@ -168,7 +168,7 @@ class ContinuumWorkflow : IContinuumWorkflow {
                 )
             )
 
-            MqttHelper.publishWorkflowSnapshot(
+            StatusHelper.publishWorkflowSnapshot(
                 Workflow.getInfo().workflowId,
                 eventMetadata
             )
