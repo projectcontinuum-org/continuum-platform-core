@@ -111,7 +111,7 @@ class ContinuumWorkflow : IContinuumWorkflow {
             if (nodeExecutionPromises.isNotEmpty()) {
                 val nodeOutput = Promise.anyOf(nodeExecutionPromises.map { it.second }).get()
                 val completedNode = continuumWorkflow.nodes.first { it.id == nodeOutput.nodeId }
-                if(!nodeOutput.outputs.containsKey("\$error")) {
+                if(!nodeOutput.outputs.containsKey(IContinuumNodeActivity.NodeOutputSystemPort.ERROR.key)) {
                     setNodeAnimationAndStatus(completedNode, ContinuumWorkflowModel.NodeStatus.SUCCESS)
                     nodeToOutputsMap[nodeOutput.nodeId] = nodeOutput.outputs
                 } else {
