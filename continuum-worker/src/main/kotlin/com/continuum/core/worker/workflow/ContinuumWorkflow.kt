@@ -8,10 +8,7 @@ import com.continuum.core.commons.model.ExecutionStatus
 import com.continuum.core.commons.model.PortData
 import com.continuum.core.commons.model.WorkflowSnapshot
 import com.continuum.core.commons.workflow.IContinuumWorkflow
-import com.continuum.core.worker.utils.EventStoreHelper
 import com.continuum.core.worker.utils.MqttHelper
-import com.eventstore.dbclient.EventStoreDBClient
-import com.eventstore.dbclient.EventStoreDBConnectionString
 import com.fasterxml.jackson.databind.ObjectMapper
 import io.temporal.activity.ActivityOptions
 import io.temporal.common.RetryOptions
@@ -136,7 +133,13 @@ class ContinuumWorkflow : IContinuumWorkflow {
             val allParentsProducedOutput = nodeParents.all { parent ->
                 nodeOutputMap.containsKey(parent.id)
             }
-            LOGGER.debug("Node: ${node.id} allParentsProducedOutput: $allParentsProducedOutput executed: ${nodeOutputMap.containsKey(node.id)} status: ${node.data.status}")
+            LOGGER.debug(
+                "Node: {} allParentsProducedOutput: {} executed: {} status: {}",
+                node.id,
+                allParentsProducedOutput,
+                nodeOutputMap.containsKey(node.id),
+                node.data.status
+            )
             if (allParentsProducedOutput &&
                 !nodeOutputMap.containsKey(node.id) &&
                 node.data.status == null) {
@@ -164,14 +167,6 @@ class ContinuumWorkflow : IContinuumWorkflow {
                     workflow = currentRunningWorkflow!!
                 )
             )
-
-//            EventStoreHelper.sendEvent(
-//                EventStoreHelper.WorkflowStatusUpdateEvent(
-//                    workflowId = Workflow.getInfo().workflowId,
-//                    runId = Workflow.getInfo().runId,
-//                    workflowUpdate = eventMetadata.data
-//                )
-//            )
 
             MqttHelper.publishWorkflowSnapshot(
                 Workflow.getInfo().workflowId,

@@ -62,20 +62,106 @@ services:
       - ./mosquitto/config:/mosquitto/config
       - mosquitto-log:/mosquitto/log
       - mosquitto-data:/mosquitto/data
-#  eventstore-db:
-#    image: docker.eventstore.com/eventstore/eventstore:24.10
-#    environment:
-#      - EVENTSTORE_CLUSTER_SIZE=1
-#      - EVENTSTORE_RUN_PROJECTIONS=All
-#      - EVENTSTORE_START_STANDARD_PROJECTIONS=true
-#      - EVENTSTORE_NODE_PORT=2113
-#      - EVENTSTORE_INSECURE=true
-#      - EVENTSTORE_ENABLE_ATOM_PUB_OVER_HTTP=true
+
+
+#  Kafka service
+#  kafka1:
+#    image: confluentinc/cp-kafka:latest
 #    ports:
-#      - 2113:2113
+#      - "39092:39092"
+#    user: root
+#    environment:
+#      KAFKA_LISTENERS: BROKER://:19092,EXTERNAL://:39092,CONTROLLER://:9093
+#      KAFKA_ADVERTISED_LISTENERS: BROKER://kafka1:19092,EXTERNAL://${DOCKER_HOST_IP:-127.0.0.1}:39092
+#      KAFKA_INTER_BROKER_LISTENER_NAME: BROKER
+#      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+#      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,BROKER:PLAINTEXT,EXTERNAL:PLAINTEXT
+#      KAFKA_PROCESS_ROLES: 'controller,broker'
+#      KAFKA_NODE_ID: 1
+#      KAFKA_CONTROLLER_QUORUM_VOTERS: '1@kafka1:9093,2@kafka2:9093,3@kafka3:9093'
+#      TOPIC_AUTO_CREATE: "true"
+#      KAFKA_CONFLUENT_SCHEMA_REGISTRY_URL: http://schema-registry:8081
+#      CLUSTER_ID: 'ILFgVkHSQceRTtSEDPN7cQ'
 #    volumes:
-#      - eventstore-data:/var/lib/eventstore
-#      - eventstore-logs:/var/log/eventstore
+#      - kafka-data-1:/var/lib/kafka/data
+#      # - ./clusterID:/tmp/clusterID
+#    restart: unless-stopped
+#
+#  kafka2:
+#    image: confluentinc/cp-kafka:latest
+#    ports:
+#      - "39093:39093"
+#    user: root
+#    environment:
+#      KAFKA_LISTENERS: BROKER://:19092,EXTERNAL://:39093,CONTROLLER://:9093
+#      KAFKA_ADVERTISED_LISTENERS: BROKER://kafka2:19092,EXTERNAL://${DOCKER_HOST_IP:-127.0.0.1}:39093
+#      KAFKA_INTER_BROKER_LISTENER_NAME: BROKER
+#      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+#      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,BROKER:PLAINTEXT,EXTERNAL:PLAINTEXT
+#      KAFKA_PROCESS_ROLES: 'controller,broker'
+#      KAFKA_NODE_ID: 2
+#      KAFKA_CONTROLLER_QUORUM_VOTERS: '1@kafka1:9093,2@kafka2:9093,3@kafka3:9093'
+#      TOPIC_AUTO_CREATE: "true"
+#      KAFKA_CONFLUENT_SCHEMA_REGISTRY_URL: http://schema-registry:8081
+#      CLUSTER_ID: 'ILFgVkHSQceRTtSEDPN7cQ'
+#    volumes:
+#      - kafka-data-2:/var/lib/kafka/data
+#      # - ./clusterID:/tmp/clusterID
+#    restart: unless-stopped
+#
+#  kafka3:
+#    image: confluentinc/cp-kafka:latest
+#    ports:
+#      - "39094:39094"
+#    user: root
+#    environment:
+#      KAFKA_LISTENERS: BROKER://:19092,EXTERNAL://:39094,CONTROLLER://:9093
+#      KAFKA_ADVERTISED_LISTENERS: BROKER://kafka3:19092,EXTERNAL://${DOCKER_HOST_IP:-127.0.0.1}:39094
+#      KAFKA_INTER_BROKER_LISTENER_NAME: BROKER
+#      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+#      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,BROKER:PLAINTEXT,EXTERNAL:PLAINTEXT
+#      KAFKA_PROCESS_ROLES: 'controller,broker'
+#      KAFKA_NODE_ID: 3
+#      TOPIC_AUTO_CREATE: "true"
+#      KAFKA_CONFLUENT_SCHEMA_REGISTRY_URL: http://schema-registry:8080
+#      KAFKA_CONTROLLER_QUORUM_VOTERS: '1@kafka1:9093,2@kafka2:9093,3@kafka3:9093'
+#      CLUSTER_ID: 'ILFgVkHSQceRTtSEDPN7cQ'
+#    volumes:
+#      - kafka-data-3:/var/lib/kafka/data
+#      # - ./clusterID:/tmp/clusterID
+#    restart: unless-stopped
+#
+#  schema-registry:
+#    image: confluentinc/cp-schema-registry:7.2.2
+#    hostname: schema-registry
+#    container_name: schema-registry
+#    ports:
+#      - "28080:8080"
+#    environment:
+#      SCHEMA_REGISTRY_HOST_NAME: schema-registry
+#      SCHEMA_REGISTRY_KAFKASTORE_BOOTSTRAP_SERVERS: PLAINTEXT://kafka1:19092,PLAINTEXT://kafka2:19092,PLAINTEXT://kafka3:19092
+#      SCHEMA_REGISTRY_LISTENERS: http://0.0.0.0:8080
+#    depends_on:
+#      - kafka1
+#      - kafka2
+#      - kafka3
+#    restart: unless-stopped
+#
+#  kafka-ui:
+#    image: provectuslabs/kafka-ui:latest
+#    ports:
+#      - "38181:8080"
+#    environment:
+#      KAFKA_CLUSTERS_0_NAME: LOCAL_SPRING_CLOUD
+#      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: PLAINTEXT://kafka1:19092,PLAINTEXT://kafka2:19092,PLAINTEXT://kafka3:19092
+#      KAFKA_CLUSTERS_0_PROPERTIES_SECURITY_PROTOCOL: PLAINTEXT
+#      KAFKA_CLUSTERS_0_SCHEMAREGISTRY: http://schema-registry:8080
+#    depends_on:
+#      - schema-registry
+#      - kafka1
+#      - kafka2
+#      - kafka3
+#    restart: unless-stopped
 networks:
   temporal-network:
     driver: bridge
@@ -86,5 +172,6 @@ volumes:
   mosquitto-log:
     driver: local
   mosquitto-data:
-  eventstore-data:
-  eventstore-logs:
+  kafka-data-1:
+  kafka-data-2:
+  kafka-data-3:

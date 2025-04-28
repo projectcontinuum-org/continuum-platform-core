@@ -25,6 +25,9 @@ dependencies {
     implementation("org.springframework.boot:spring-boot-starter-web")
     implementation("org.springframework.boot:spring-boot-starter-actuator")
 
+    // Spring Cloud stream dependencies
+    implementation("org.springframework.cloud:spring-cloud-starter-stream-kafka")
+
     // Project dependencies
     implementation(project(":continuum-commons"))
     implementation(project(":continuum-avro-schemas"))
@@ -49,7 +52,7 @@ dependencies {
     implementation("software.amazon.awssdk:s3-transfer-manager")
 
     // ESDB dependencies
-    implementation("com.eventstore:db-client-java:5.0.0")
+//    implementation("com.eventstore:db-client-java:5.0.0")
 
     // Test dependencies
     testImplementation("org.springframework.boot:spring-boot-starter-test")

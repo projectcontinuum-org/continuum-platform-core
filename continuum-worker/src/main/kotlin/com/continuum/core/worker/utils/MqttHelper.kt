@@ -1,15 +1,15 @@
 package com.continuum.core.worker.utils
 
 import com.continuum.core.commons.model.ContinuumWorkflowModel
-import com.continuum.core.commons.model.WorkflowSnapshot
-import com.continuum.core.worker.workflow.ContinuumWorkflow
 import com.fasterxml.jackson.databind.ObjectMapper
+import io.nexusrpc.Service
 import org.eclipse.paho.client.mqttv3.MqttClient
 import org.eclipse.paho.client.mqttv3.MqttConnectOptions
 import org.eclipse.paho.client.mqttv3.MqttMessage
 import org.slf4j.LoggerFactory
-import java.util.UUID
+import java.util.*
 
+@Service
 class MqttHelper {
     companion object {
         private val LOGGER = LoggerFactory.getLogger(MqttHelper::class.java)
@@ -30,9 +30,14 @@ class MqttHelper {
             workflowId: String,
             workflowSnapshot: WorkflowUpdateEvent
         ) {
-            if(!mqttClient.isConnected) {
-                LOGGER.error("MQTT client is not connected")
-                return
+            while(!mqttClient.isConnected) {
+                LOGGER.warn("MQTT client is not connected. Waiting for updates to continue...")
+//                try {
+//                    mqttClient.connect(options)
+//                } catch (e: MqttException) {
+//                    LOGGER.warn("Error connecting to MQTT", e)
+//                }
+                Thread.sleep(1000)
             }
             LOGGER.info("Publishing workflow snapshot for workflowId: $workflowId ...")
             mqttClient.publish(

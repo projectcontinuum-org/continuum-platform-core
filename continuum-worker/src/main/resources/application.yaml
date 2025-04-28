@@ -1,6 +1,43 @@
 spring.application.name: continuum-worker
 
 spring:
+  cloud:
+    function:
+      definition: upload-event-input
+    stream:
+      binders:
+        main-kafka-cluster:
+          type: kafka
+          default-candidate: false
+          environment:
+            spring.cloud.stream.kafka:
+              binder:
+                brokers: ${JARVIS_KAFKA_MAIN_BROKER_LIST}
+                consumer-properties:
+                  key.deserializer: org.apache.kafka.common.serialization.StringDeserializer
+                  value.deserializer: io.confluent.kafka.serializers.KafkaAvroDeserializer
+                  schema.registry.url: ${JARVIS_KAFKA_MAIN_SCHEMA_REGISTRY}
+                  specific.avro.reader: true
+                  auto.offset.reset: latest
+                  fetch.max.wait.ms: 40000
+                  request.timeout.ms: 60000
+                producer-properties:
+                  key.serializer: org.apache.kafka.common.serialization.StringSerializer
+                  value.serializer: io.confluent.kafka.serializers.KafkaAvroSerializer
+                  schema.registry.url: ${JARVIS_KAFKA_MAIN_SCHEMA_REGISTRY}
+                  max.request.size: 104857600
+                dlq-producer-properties:
+                  key.serializer: org.apache.kafka.common.serialization.StringSerializer
+                  value.serializer: io.confluent.kafka.serializers.KafkaAvroSerializer
+                  schema.registry.url: ${JARVIS_KAFKA_MAIN_SCHEMA_REGISTRY}
+                  max.request.size: 104857600
+      bindings:
+        continuum-core-event-WorkflowExecutionSnapshot-output:
+          binder: main-kafka-cluster
+          destination: jarvis-core-event-WorkflowExecutionSnapshot
+          content-type: application/json
+          producer:
+            use-native-encoding: true
   temporal:
     namespace: ${TEMPORAL_NAMESPACE:default}
     connection:
