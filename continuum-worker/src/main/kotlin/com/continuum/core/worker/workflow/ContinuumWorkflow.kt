@@ -99,7 +99,11 @@ class ContinuumWorkflow : IContinuumWorkflow {
                 val nodeOutput = Promise.anyOf(nodeExecutionPromises.map { it.second }).get()
                 val completedNode = continuumWorkflow.nodes.first { it.id == nodeOutput.nodeId }
                 setNodeAnimationAndStatus(completedNode, ContinuumWorkflowModel.NodeStatus.SUCCESS)
-                nodeToOutputsMap[nodeOutput.nodeId] = nodeOutput.outputs
+                if(!nodeOutput.outputs.containsKey("error")) {
+                    nodeToOutputsMap[nodeOutput.nodeId] = nodeOutput.outputs
+                } else {
+                    setNodeAnimationAndStatus(completedNode, ContinuumWorkflowModel.NodeStatus.FAILED)
+                }
                 // remove the completed promises
                 nodeExecutionPromises.removeAll { it.first.id == nodeOutput.nodeId }
             }

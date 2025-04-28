@@ -94,7 +94,17 @@ class ContinuumNodeActivity(
                 outputs = prepareNodeOutputs(node.id)
             )
         }
-        throw IllegalArgumentException("Node model not found: ${node.data.nodeModel}")
+
+        return IContinuumNodeActivity.NodeActivityOutput(
+            nodeId = node.id,
+            outputs = mapOf(
+                "error" to PortData(
+                    data = "Node model '${node.data.nodeModel}' not found",
+                    contentType = "text/plain",
+                    status = PortDataStatus.FAILED
+                )
+            )
+        )
     }
 
     fun prepareNodeInputs(
