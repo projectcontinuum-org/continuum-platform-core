@@ -20,7 +20,7 @@ export function TableOutputView({outputData}: TableOutputViewProps) {
     useEffect(()=>{
         dataService.getNodeData(outputData.data, page, pageSize).then((data) => {
             if(data.data.length > 0) {
-                console.log(`Page: ${JSON.stringify(data)}`)
+                // console.log(`Page: ${JSON.stringify(data)}`)
                 setRowsCount(data.totalElements);
                 setRows(data.data.map((row: Array<any>, idx: number) => {
                     let newRow: any = {id: idx};

@@ -1,7 +1,7 @@
 import * as React from 'react';
 import DialogTitle from '@mui/material/DialogTitle';
 import Dialog from '@mui/material/Dialog';
-import { DialogContent, IconButton, MenuItem, Select, SelectChangeEvent, styled } from '@mui/material';
+import {DialogContent, IconButton, MenuItem, Select, SelectChangeEvent, styled, Typography} from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
 import { INodeOutputs } from '@continuum/core';
 import { TableOutputView } from './table-output-view/TableOutputView';
@@ -79,10 +79,13 @@ export default function NodeOutputViewer({ onClose, open, nodeOutputs }: NodeOut
                         <MenuItem value={key} key={key}>{key}</MenuItem>
                     ))}
                 </Select>
-                {/* <Typography variant="h6" gutterBottom>
-                    {JSON.stringify(portData)}
-                </Typography> */}
-                <TableOutputView outputData={portData}/>
+              {portData.status == "SUCCESS" && <TableOutputView outputData={portData}/>}
+              {portData.status == "FAILED" && <Typography
+                  variant="h6"
+                  color="error"
+                  gutterBottom>
+                {portData.data}
+              </Typography>}
             </DialogContent>
         </StyledDialog>
     );

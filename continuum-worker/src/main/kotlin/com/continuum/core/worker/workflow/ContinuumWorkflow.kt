@@ -172,14 +172,16 @@ class ContinuumWorkflow : IContinuumWorkflow {
     ) {
         // Check if the Workflow is being replayed
         if (!WorkflowUnsafe.isReplaying()) {
-
+            val nodeToOutputsMapWithErr = mutableMapOf<String, Map<String, PortData>>()
+            nodeToOutputsMapWithErr.putAll(nodeToOutputsMap)
+            nodeToOutputsMapWithErr.putAll(nodeErrorsMap)
             val eventMetadata = StatusHelper.WorkflowUpdateEvent(
                 jobId = Workflow.getInfo().workflowId,
                 data = StatusHelper.WorkflowUpdate(
                     executionUUID = Workflow.getInfo().workflowId,
                     progressPercentage = 0,
                     status = status,
-                    nodeToOutputsMap = nodeToOutputsMap,
+                    nodeToOutputsMap = nodeToOutputsMapWithErr,
                     createdAtTimestampUtc = Workflow.getInfo().runStartedTimestampMillis,
                     updatesAtTimestampUtc = Instant.now().toEpochMilli(),
                     workflow = currentRunningWorkflow!!
