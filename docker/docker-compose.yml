@@ -26,7 +26,7 @@ services:
     networks:
       - temporal-network
     ports:
-      - 37233:7233
+      - 7233:7233
     volumes:
       - ./temporal/dynamicconfig:/etc/temporal/config/dynamicconfig
   temporal-admin-tools:
@@ -52,7 +52,7 @@ services:
     networks:
       - temporal-network
     ports:
-      - 38080:8080
+      - 38081:8080
   mosquitto:
     image: eclipse-mosquitto:latest
     ports:
@@ -150,7 +150,7 @@ services:
   kafka-ui:
     image: provectuslabs/kafka-ui:latest
     ports:
-      - "38181:8080"
+      - "38082:8080"
     environment:
       KAFKA_CLUSTERS_0_NAME: LOCAL_SPRING_CLOUD
       KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: PLAINTEXT://kafka1:19092,PLAINTEXT://kafka2:19092,PLAINTEXT://kafka3:19092

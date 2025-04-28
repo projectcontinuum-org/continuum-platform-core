@@ -20,11 +20,11 @@ class JointNodeModel: ProcessNodeModel() {
 
     final override val inputPorts = mapOf(
         "input-1" to ContinuumWorkflowModel.NodePort(
-            name = "input string",
+            name = "first input string",
             contentType = TEXT_PLAIN_VALUE
         ),
         "input-2" to ContinuumWorkflowModel.NodePort(
-            name = "input string",
+            name = "second input string",
             contentType = TEXT_PLAIN_VALUE
         )
     )

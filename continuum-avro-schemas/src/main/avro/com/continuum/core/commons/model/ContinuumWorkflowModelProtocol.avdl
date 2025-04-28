@@ -1,4 +1,4 @@
-@namespace("com.continuum.core.commons.model")
+@namespace("com.continuum.core.schema.commons.model")
 protocol ContinuumWorkflowModelProtocol {
 
   record Position {
