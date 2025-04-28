@@ -1,0 +1,70 @@
+@namespace("com.continuum.core.commons.model")
+protocol ContinuumWorkflowModelProtocol {
+
+  record Position {
+    double x;
+    double y;
+  }
+
+  record NodePort {
+    string name;
+    string contentType;
+  }
+
+  enum NodeStatus {
+    ACTIVE,
+    CONFIGURED,
+    BUSY,
+    SUCCESS,
+    FAILED,
+    WARNING,
+    PRE_PROCESSING,
+    POST_PROCESSING
+  }
+
+  record NodeData {
+    string id;
+    string description;
+    string title;
+    string? subTitle = null;
+    string? icon = null;
+    string nodeModel;
+    boolean? busy = null;
+    union { null, map<NodePort> } inputs = null;
+    union { null, map<NodePort> } outputs = null;
+    union { null, map<string> } properties = null;
+    union { null, map<string> } propertiesSchema = null;
+    union { null, map<string> } propertiesUISchema = null;
+    NodeStatus? status = null;
+  }
+
+  record Node {
+    string id;
+    string type;
+    Position position;
+    NodeData data;
+    int width;
+    int height;
+    boolean selected;
+    union { null, Position } positionAbsolute = null;
+    boolean dragging;
+  }
+
+  record Edge {
+    string id;
+    string? type = null;
+    boolean? animated = null;
+    string source;
+    string target;
+    string sourceHandle;
+    string targetHandle;
+  }
+
+  record ContinuumWorkflowModel {
+    string id;
+    string name;
+    boolean active = true;
+    array<Node> nodes;
+    array<Edge> edges;
+  }
+}
