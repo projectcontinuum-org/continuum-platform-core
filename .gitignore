@@ -45,6 +45,7 @@ out/
 **/.turbo/
 **/node_modules/
 **/continuum-workbench/lib/
+**/continuum-workbench-thin/lib/
 **/workflow-editor-extension/lib/
 **/continuum-core/dist/
 
