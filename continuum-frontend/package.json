@@ -11,7 +11,7 @@
     "start:workbench": "turbo start --filter=@continuum/workbench",
     "build:workbench": "turbo build --filter=@continuum/workbench",
     "start:workbench-thin": "turbo start --filter=@continuum/workbench-thin",
-    "build:workbench-thin": "turbo build --filter=@continuum/workbench-thin"
+    "build:workbench-thin": "turbo build --no-cache --filter=@continuum/workbench-thin"
   },
   "devDependencies": {
     "prettier": "^3.1.1",
@@ -25,6 +25,7 @@
   "workspaces": [
     "continuum-core",
     "continuum-workbench",
-    "workflow-editor-extension"
+    "workflow-editor-extension",
+    "continuum-workbench-thin"
   ]
 }

@@ -1,0 +1,40 @@
+{
+    "private": true,
+    "name": "@continuum/workbench-thin",
+    "version": "0.0.1",
+    "license": "",
+    "theia": {
+        "target": "browser-only",
+        "frontend": {
+            "config": {
+                "applicationName": "Continuum",
+                "preferences": {
+                    "files.enableTrash": false
+                }
+            }
+        }
+    },
+    "dependencies": {
+        "@theia/core": "latest",
+        "@theia/filesystem": "latest",
+        "@theia/markers": "latest",
+        "@theia/messages": "latest",
+        "@theia/monaco": "latest",
+        "@theia/navigator": "latest",
+        "@theia/preferences": "latest",
+        "@theia/process": "latest",
+        "@theia/workspace": "latest",
+        "@continuum/core": "*",
+        "@continuum/workflow-editor-extension": "*"
+    },
+    "scripts": {
+        "build": "yarn rebuild && theia build --mode development",
+        "rebuild": "theia rebuild:browser --cacheRoot ..",
+        "start": "theia start --plugins=local-dir:./plugins",
+        "watch": "yarn rebuild && theia build --watch --mode development",
+        "clean": "theia clean"
+    },
+    "devDependencies": {
+        "@theia/cli": "latest"
+    }
+}
