@@ -8,7 +8,7 @@ abstract class ProcessNodeModel: ContinuumNodeModel {
     abstract val inputPorts: Map<String, ContinuumWorkflowModel.NodePort>
     abstract val outputPorts: Map<String, ContinuumWorkflowModel.NodePort>
 
-    fun run(
+    open fun run(
         node: ContinuumWorkflowModel.Node,
         inputs: Map<String, NodeInputReader>,
         nodeOutputWriter: NodeOutputWriter

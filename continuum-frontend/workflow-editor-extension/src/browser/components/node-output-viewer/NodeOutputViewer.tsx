@@ -84,7 +84,7 @@ export default function NodeOutputViewer({ onClose, open, nodeOutputs }: NodeOut
                   variant="h6"
                   color="error"
                   gutterBottom>
-                {portData.data}
+                {portData.data + "\n ERROR"}
               </Typography>}
             </DialogContent>
         </StyledDialog>

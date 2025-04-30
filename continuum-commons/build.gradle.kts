@@ -17,6 +17,9 @@ repositories {
 }
 
 dependencies {
+    // Springboot dependencies
+    implementation("org.springframework.boot:spring-boot-starter")
+
     // Jackson dependencies
     implementation("com.fasterxml.jackson.module:jackson-module-kotlin:2.18.2")
 
@@ -32,10 +35,14 @@ dependencies {
     // Temporal dependencies
     implementation("io.temporal:temporal-sdk")
     implementation("io.temporal:temporal-kotlin")
+
+    // Freemarker dependencies
+    implementation("org.freemarker:freemarker:2.3.34")
 }
 
 dependencyManagement {
     imports {
+        mavenBom("org.springframework.boot:spring-boot-dependencies:3.4.0")
         mavenBom("org.springframework.cloud:spring-cloud-dependencies:2024.0.0")
         mavenBom("io.temporal:temporal-bom:1.28.0")
     }
