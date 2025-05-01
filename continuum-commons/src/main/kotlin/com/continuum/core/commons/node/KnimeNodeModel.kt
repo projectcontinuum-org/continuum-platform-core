@@ -4,13 +4,21 @@ import com.continuum.core.commons.model.ContinuumWorkflowModel
 import com.continuum.core.commons.utils.NodeInputReader
 import com.continuum.core.commons.utils.NodeOutputWriter
 import com.continuum.core.commons.utils.TemplateHelper
+import com.continuum.data.table.DataCell
+import com.fasterxml.jackson.databind.ObjectMapper
 import io.temporal.activity.Activity
 import org.slf4j.LoggerFactory
 import java.io.File
+import java.nio.ByteBuffer
 import java.nio.file.Path
+import java.util.concurrent.Executors
+import java.util.concurrent.Future
+import java.util.concurrent.ThreadFactory
+import java.util.concurrent.atomic.AtomicInteger
 import kotlin.io.path.absolutePathString
 
 abstract class KnimeNodeModel: ProcessNodeModel() {
+    abstract val knimeExecutablePath: String
     abstract val knimeWorkflowRootDir: String
     abstract val knimeNodeFactoryClass: String
     abstract val knimeNodeName: String
@@ -25,6 +33,16 @@ abstract class KnimeNodeModel: ProcessNodeModel() {
         private const val WORKFLOW_OUTPUT_NODE_SETTINGS_TEMPLATE_FILE_NAME = "output-node-template/settings.xml.template"
         private const val WORKFLOW_PROCESSING_NODE_SETTINGS_TEMPLATE_FILE_NAME = "processing-node-template/settings.xml.template"
         private val LOGGER = LoggerFactory.getLogger(KnimeNodeModel::class.java)
+        private val objectMapper = ObjectMapper()
+
+        // Create a new thread pool executor service
+        private val executor = Executors.newFixedThreadPool(
+            1,
+            ThreadFactory {
+                val threadNumber = AtomicInteger(1)
+                Thread(it, "knime-executor-${threadNumber.andIncrement}-")
+            }
+        )
     }
 
     override fun run(
@@ -47,6 +65,12 @@ abstract class KnimeNodeModel: ProcessNodeModel() {
                 workflowDir.toPath()
             )
 
+            // Execute the workflow
+            executeKnimeWorkflow(
+                workflowDir.toPath(),
+                inputs
+            ).get()
+
             execute(
                 node.data.properties,
                 inputs,
@@ -56,6 +80,122 @@ abstract class KnimeNodeModel: ProcessNodeModel() {
             LOGGER.error("Error while executing node ${node.id}", ex)
             throw ex
         }
+    }
+
+    // Starts knime as a process and attach to it stdio
+    fun executeKnimeWorkflow(
+        workflowPath: Path,
+        inputs: Map<String, NodeInputReader>,
+    ): Future<Int> {
+        val inputs = prepareWorkflowInputs(
+            workflowPath,
+            inputs
+        )
+
+        val command = """
+            "$knimeExecutablePath" \
+            -nosplash \
+            -debug \
+            --launcher.suppressErrors \
+            -application org.knime.product.KNIME_BATCH_APPLICATION \
+            -data "${File("./").absolutePath}${File.separator}.knime-workspace" \
+            -reset \
+            -consoleLog \
+            -workflowDir="${workflowPath.absolutePathString()}" \
+            $inputs
+        """.trimIndent()
+
+        val processBuilder = ProcessBuilder(
+            "/bin/bash",
+            "-c",
+            command
+        )
+        // read all the stdio of the process in a single thread
+        return executor.submit<Int> {
+            processBuilder.redirectErrorStream(true)
+            val process = processBuilder.start()
+            LOGGER.info("Starting KNIME process with command: $command")
+            process.inputStream.bufferedReader().use { reader ->
+                reader.lines().forEach { line ->
+                    LOGGER.debug("KNIME: $line")
+                }
+            }
+            process.waitFor()
+            LOGGER.info("KNIME process finished with exit code ${process.exitValue()}")
+            if (process.exitValue() != 0) {
+                throw RuntimeException("KNIME process failed with exit code ${process.exitValue()}")
+            }
+            LOGGER.info("KNIME process finished successfully")
+            process.exitValue()
+        }
+    }
+
+    fun prepareWorkflowInputs(
+        workflowPath: Path,
+        inputs: Map<String, NodeInputReader>
+    ): String {
+        // Prepare the inputs for the workflow
+
+        return inputPorts.keys.mapIndexed { index, portId ->
+            val inputFile = workflowPath.resolve("$portId.json")
+            val knimeInputsTable = mutableMapOf<String, Any>(
+                "table-spec" to mutableListOf<Map<String, String>>(),
+                "table-data" to mutableListOf<List<Any>>()
+            )
+            var isFirst = true
+            inputs[portId]!!.use { reader ->
+                var input = reader.read()
+                if (isFirst) {
+                    val columnNames: Map<String, String> = input.cells.associate { cell ->
+                        cell.name to mimeTypeToKnimeType(cell.contentType)
+                    }
+                    (knimeInputsTable["table-spec"] as MutableList<Any>).add(columnNames)
+                    isFirst = false
+                }
+                while (input != null) {
+                    val dataCells = input.cells.map { cell ->
+                        dataCellToKnimeType(cell)
+                    }
+                    (knimeInputsTable["table-data"] as MutableList<Any>).add(dataCells)
+                    input = reader.read()
+                }
+            }
+            val knimeInputsTableJson = objectMapper.writeValueAsString(knimeInputsTable)
+            inputFile.toFile().createNewFile()
+            inputFile.toFile().writeText(knimeInputsTableJson)
+
+            "-option=${index},inputPathOrUrl,${inputFile.toFile().absolutePath},String"
+        }.joinToString(" \\\\n")
+    }
+
+    fun mimeTypeToKnimeType(
+        mimeType: String
+    ): String {
+        return when (mimeType) {
+            "application/json" -> "String"
+            "text/plain" -> "String"
+            "application/x-number" -> "long"
+            else -> throw IllegalArgumentException("Unsupported mime type: $mimeType")
+        }
+    }
+
+    fun dataCellToKnimeType(
+        dataCell: DataCell
+    ): Any {
+        // convert bytebuffer to string
+        val bytes = getBytesFromByteBuffer(dataCell.value)
+        return when (dataCell.contentType) {
+            "application/json" -> String(bytes)
+            "text/plain" -> String(bytes)
+            "application/x-number" -> dataCell.value.toString().toLong()
+            else -> throw IllegalArgumentException("Unsupported mime type: ${dataCell.contentType}")
+        }
+    }
+
+    fun getBytesFromByteBuffer(buffer: ByteBuffer): ByteArray {
+        val bytes = ByteArray(buffer.remaining()) // Create a byte array of the remaining size
+        buffer.get(bytes) // Transfer the bytes from the buffer to the array
+        return bytes
     }
 
     fun renderKnimeWorkflow(

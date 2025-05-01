@@ -51,3 +51,4 @@ out/
 
 .continuum-cache/
 .knime-workflows/
+.knime-workspace/

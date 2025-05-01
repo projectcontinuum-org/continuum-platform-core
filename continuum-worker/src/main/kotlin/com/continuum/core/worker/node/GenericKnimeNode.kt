@@ -11,7 +11,9 @@ import org.springframework.stereotype.Component
 @Component
 class GenericKnimeNode(
     @Value("\${continuum.core.worker.knime.workflow-storage-path}")
-    override val knimeWorkflowRootDir: String
+    override val knimeWorkflowRootDir: String,
+    @Value("\${continuum.core.worker.knime.executable-path:/Applications/KNIME 5.1.2.app/Contents/MacOS/knime}")
+    override val knimeExecutablePath: String
 ): KnimeNodeModel() {
     override val knimeNodeFactoryClass: String = "org.knime.base.node.preproc.filter.row.RowFilterNodeFactory"
     override val knimeNodeName: String = "Row Filter"
@@ -20,11 +22,7 @@ class GenericKnimeNode(
         "input-1" to ContinuumWorkflowModel.NodePort(
             name = "first input string",
             contentType = TEXT_PLAIN_VALUE
-        ),
-//        "input-2" to ContinuumWorkflowModel.NodePort(
-//            name = "second input string",
-//            contentType = TEXT_PLAIN_VALUE
-//        )
+        )
     )
 
     final override val outputPorts = mapOf(
