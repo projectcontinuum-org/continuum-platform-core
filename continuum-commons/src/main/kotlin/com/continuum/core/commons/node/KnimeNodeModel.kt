@@ -62,7 +62,8 @@ abstract class KnimeNodeModel: ProcessNodeModel() {
 
             // Render the workflow
             renderKnimeWorkflow(
-                workflowDir.toPath()
+                workflowDir.toPath(),
+                node.data.properties!!
             )
 
             // Execute the workflow
@@ -199,7 +200,8 @@ abstract class KnimeNodeModel: ProcessNodeModel() {
     }
 
     fun renderKnimeWorkflow(
-        workflowDir: Path
+        workflowDir: Path,
+        nodeProperties: Map<String, Any>
     ) {
         // create all parent directories if not exists
         if(!workflowDir.toFile().exists()) {
@@ -250,6 +252,7 @@ abstract class KnimeNodeModel: ProcessNodeModel() {
                 "knimeNodeFactoryClass" to knimeNodeFactoryClass,
                 "knimeNodeName" to knimeNodeName,
                 "nodeDescription" to metadata.description,
+                "nodeProperties" to nodeProperties,
             )
         )
 
