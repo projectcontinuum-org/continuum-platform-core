@@ -1,4 +1,4 @@
-package com.continuum.core.worker.node.knime
+package com.continuum.knime.base.node
 
 import com.continuum.core.commons.model.ContinuumWorkflowModel
 import com.continuum.core.commons.node.KnimeNodeModel
@@ -7,7 +7,6 @@ import com.continuum.core.commons.utils.NodeOutputWriter
 import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
 import com.fasterxml.jackson.module.kotlin.readValue
 import org.springframework.beans.factory.annotation.Value
-import org.springframework.http.MediaType.TEXT_PLAIN_VALUE
 import org.springframework.stereotype.Component
 
 @Component
@@ -29,14 +28,14 @@ class RowFilterNodeModel(
     final override val inputPorts = mapOf(
         "input-1" to ContinuumWorkflowModel.NodePort(
             name = "first input string",
-            contentType = TEXT_PLAIN_VALUE
+            contentType = "text/plain"
         )
     )
 
     final override val outputPorts = mapOf(
         "output-1" to ContinuumWorkflowModel.NodePort(
             name = "part 1",
-            contentType = TEXT_PLAIN_VALUE
+            contentType = "text/plain"
         )
     )
 
