@@ -17,8 +17,9 @@ import java.util.concurrent.ThreadFactory
 import java.util.concurrent.atomic.AtomicInteger
 import kotlin.io.path.absolutePathString
 
-abstract class KnimeNodeModel: ProcessNodeModel() {
+abstract class KnimeNodeModel : ProcessNodeModel() {
     abstract val knimeExecutablePath: String
+    abstract val knimeWorkspacesRoot: String
     abstract val knimeWorkflowRootDir: String
     abstract val knimeNodeFactoryClass: String
     abstract val knimeNodeName: String
@@ -72,6 +73,9 @@ abstract class KnimeNodeModel: ProcessNodeModel() {
                 inputs
             ).get()
 
+            // clean up the workflow directory
+            workflowDir.deleteRecursively()
+
             execute(
                 node.data.properties,
                 inputs,
@@ -92,27 +96,28 @@ abstract class KnimeNodeModel: ProcessNodeModel() {
             workflowPath,
             inputs
         )
-
-        val command = """
-            "$knimeExecutablePath" \
-            -nosplash \
-            -debug \
-            --launcher.suppressErrors \
-            -application org.knime.product.KNIME_BATCH_APPLICATION \
-            -data "${File("./").absolutePath}${File.separator}.knime-workspace" \
-            -reset \
-            -consoleLog \
-            -workflowDir="${workflowPath.absolutePathString()}" \
-            $inputs
-        """.trimIndent()
-
-        val processBuilder = ProcessBuilder(
-            "/bin/bash",
-            "-c",
-            command
-        )
+        val workspaceDir = File(knimeWorkspacesRoot, "knime-workspace-${Thread.currentThread().threadId()}")
         // read all the stdio of the process in a single thread
         return executor.submit<Int> {
+            val command = """
+                "$knimeExecutablePath" \
+                -nosplash \
+                -debug \
+                --launcher.suppressErrors \
+                -application org.knime.product.KNIME_BATCH_APPLICATION \
+                -data "${workspaceDir.absolutePath}" \
+                -reset \
+                -consoleLog \
+                -workflowDir="${workflowPath.absolutePathString()}" \
+                $inputs
+            """.trimIndent()
+
+            val processBuilder = ProcessBuilder(
+                "/bin/bash",
+                "-c",
+                command
+            )
+
             processBuilder.redirectErrorStream(true)
             val process = processBuilder.start()
             LOGGER.info("Starting KNIME process with command: $command")
@@ -126,6 +131,9 @@ abstract class KnimeNodeModel: ProcessNodeModel() {
             if (process.exitValue() != 0) {
                 throw RuntimeException("KNIME process failed with exit code ${process.exitValue()}")
             }
+
+            workspaceDir.deleteRecursively()
+
             LOGGER.info("KNIME process finished successfully")
             process.exitValue()
         }
@@ -204,7 +212,7 @@ abstract class KnimeNodeModel: ProcessNodeModel() {
         nodeProperties: Map<String, Any>
     ) {
         // create all parent directories if not exists
-        if(!workflowDir.toFile().exists()) {
+        if (!workflowDir.toFile().exists()) {
             LOGGER.info("Creating workflow directory at ${workflowDir.absolutePathString()}")
             workflowDir.toFile().mkdirs()
         }
@@ -231,7 +239,7 @@ abstract class KnimeNodeModel: ProcessNodeModel() {
         // Render input node settings file
         inputPorts.keys.forEach {
             val inputNodeDir = workflowDir.resolve(it)
-            if(!inputNodeDir.toFile().exists()) {
+            if (!inputNodeDir.toFile().exists()) {
                 LOGGER.info("Creating input node directory at ${inputNodeDir.absolutePathString()}")
                 inputNodeDir.toFile().mkdirs()
             }
@@ -242,7 +250,7 @@ abstract class KnimeNodeModel: ProcessNodeModel() {
 
         // Render processing node settings file
         val processingNodeDir = workflowDir.resolve("processing-node")
-        if(!processingNodeDir.toFile().exists()) {
+        if (!processingNodeDir.toFile().exists()) {
             LOGGER.info("Creating processing node directory at ${processingNodeDir.absolutePathString()}")
             processingNodeDir.toFile().mkdirs()
         }
@@ -259,7 +267,7 @@ abstract class KnimeNodeModel: ProcessNodeModel() {
         // Render output node settings file
         outputPorts.keys.forEach {
             val outputNodeDir = workflowDir.resolve(it)
-            if(!outputNodeDir.toFile().exists()) {
+            if (!outputNodeDir.toFile().exists()) {
                 LOGGER.info("Creating output node directory at ${outputNodeDir.absolutePathString()}")
                 outputNodeDir.toFile().mkdirs()
             }
@@ -285,7 +293,7 @@ abstract class KnimeNodeModel: ProcessNodeModel() {
             ?: throw IllegalStateException("Workflow set template not found")
         templateHelper.loadTemplate(WORKFLOW_SET_TEMPLATE_FILE_NAME, workflowSetTemplate)
         val workflowSet = templateHelper.renderTemplate(WORKFLOW_SET_TEMPLATE_FILE_NAME, mapOf())
-        val workflowSetFileName =  WORKFLOW_SET_TEMPLATE_FILE_NAME
+        val workflowSetFileName = WORKFLOW_SET_TEMPLATE_FILE_NAME
             .split(".")
             .dropLast(1)
             .joinToString(".")
@@ -372,7 +380,7 @@ abstract class KnimeNodeModel: ProcessNodeModel() {
             ?: throw IllegalStateException("Input node settings template not found")
         templateHelper.loadTemplate(WORKFLOW_INPUT_NODE_SETTINGS_TEMPLATE_FILE_NAME, inputNodeSettingsTemplate)
         val inputNodeSettings = templateHelper.renderTemplate(WORKFLOW_INPUT_NODE_SETTINGS_TEMPLATE_FILE_NAME, mapOf())
-        val inputNodeSettingsFileName = WORKFLOW_INPUT_NODE_SETTINGS_TEMPLATE_FILE_NAME
+        WORKFLOW_INPUT_NODE_SETTINGS_TEMPLATE_FILE_NAME
             .split(".")
             .dropLast(1)
             .joinToString(".")
@@ -399,8 +407,9 @@ abstract class KnimeNodeModel: ProcessNodeModel() {
             ?.use { it.readText() }
             ?: throw IllegalStateException("Output node settings template not found")
         templateHelper.loadTemplate(WORKFLOW_OUTPUT_NODE_SETTINGS_TEMPLATE_FILE_NAME, outputNodeSettingsTemplate)
-        val outputNodeSettings = templateHelper.renderTemplate(WORKFLOW_OUTPUT_NODE_SETTINGS_TEMPLATE_FILE_NAME, mapOf())
-        val outputNodeSettingsFileName = WORKFLOW_OUTPUT_NODE_SETTINGS_TEMPLATE_FILE_NAME
+        val outputNodeSettings =
+            templateHelper.renderTemplate(WORKFLOW_OUTPUT_NODE_SETTINGS_TEMPLATE_FILE_NAME, mapOf())
+        WORKFLOW_OUTPUT_NODE_SETTINGS_TEMPLATE_FILE_NAME
             .split(".")
             .dropLast(1)
             .joinToString(".")
@@ -427,9 +436,13 @@ abstract class KnimeNodeModel: ProcessNodeModel() {
             ?.bufferedReader()
             ?.use { it.readText() }
             ?: throw IllegalStateException("Processing node settings template not found")
-        templateHelper.loadTemplate(WORKFLOW_PROCESSING_NODE_SETTINGS_TEMPLATE_FILE_NAME, processingNodeSettingsTemplate)
-        val processingNodeSettings = templateHelper.renderTemplate(WORKFLOW_PROCESSING_NODE_SETTINGS_TEMPLATE_FILE_NAME, model)
-        val processingNodeSettingsFileName = WORKFLOW_PROCESSING_NODE_SETTINGS_TEMPLATE_FILE_NAME
+        templateHelper.loadTemplate(
+            WORKFLOW_PROCESSING_NODE_SETTINGS_TEMPLATE_FILE_NAME,
+            processingNodeSettingsTemplate
+        )
+        val processingNodeSettings =
+            templateHelper.renderTemplate(WORKFLOW_PROCESSING_NODE_SETTINGS_TEMPLATE_FILE_NAME, model)
+        WORKFLOW_PROCESSING_NODE_SETTINGS_TEMPLATE_FILE_NAME
             .split(".")
             .dropLast(1)
             .joinToString(".")

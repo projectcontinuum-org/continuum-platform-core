@@ -50,9 +50,10 @@ continuum.core:
     aws-profile-name: ${CONTINUUM_AWS_PROFILE_NAME:continuum-worker }
     cache-bucket-name: ${CONTINUUM_CACHE_BUCKET_NAME:jarvis-dev-jarvis-stage-area-3a355f49}
     cache-bucket-base-path: ${CONTINUUM_CACHE_BUCKET_BASE_PATH:staging-data/test}
-    cache-storage-path: ${CONTINUUM_CACHE_STORAGE_PATH:./.continuum-cache}
+    cache-storage-path: ${CONTINUUM_CACHE_STORAGE_PATH:./.continuum-cache/workflow-data}
     knime:
-      workflow-storage-path: ${CONTINUUM_KNIME_WORKFLOW_STORAGE_PATH:./.knime-workflows}
+      workflow-storage-path: ${CONTINUUM_KNIME_WORKFLOW_STORAGE_PATH:./.continuum-cache/knime-workflows}
+      workspace-storage-path: ${CONTINUUM_KNIME_WORKSPACE_STORAGE_PATH:./.continuum-cache/knime-workspaces}
 logging:
   level:
     root: error

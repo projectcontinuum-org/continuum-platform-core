@@ -12,6 +12,8 @@ import org.springframework.stereotype.Component
 
 @Component
 class RowFilterNodeModel(
+    @Value("\${continuum.core.worker.knime.workspace-storage-path}")
+    override val knimeWorkspacesRoot: String,
     @Value("\${continuum.core.worker.knime.workflow-storage-path}")
     override val knimeWorkflowRootDir: String,
     @Value("\${continuum.core.worker.knime.executable-path:/Applications/KNIME 5.1.2.app/Contents/MacOS/knime}")
