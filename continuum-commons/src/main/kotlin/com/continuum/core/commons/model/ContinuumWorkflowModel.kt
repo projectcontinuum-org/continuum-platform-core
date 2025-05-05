@@ -71,10 +71,10 @@ data class ContinuumWorkflowModel @JsonCreator constructor(
         @JsonProperty("busy") val busy: Boolean? = null,
         @JsonProperty("inputs") val inputs: Map<String, NodePort>? = null,
         @JsonProperty("outputs") val outputs: Map<String, NodePort>? = null,
-        @JsonProperty("properties") val properties: Map<String, Any>? = null,
-        @JsonProperty("propertiesSchema") val propertiesSchema: Map<String, Any>? = null,
-        @JsonProperty("propertiesUISchema") val propertiesUISchema: Map<String, Any>? = null,
-        @JsonProperty("status") var status: NodeStatus? = null,
+        @JsonProperty("properties") val properties: Map<String, Any> = mapOf(),
+        @JsonProperty("propertiesSchema") val propertiesSchema: Map<String, Any> = mapOf(),
+        @JsonProperty("propertiesUISchema") val propertiesUISchema: Map<String, Any> = mapOf(),
+        @JsonProperty("status") var status: NodeStatus? = null
     )
 
     data class NodePort @JsonCreator constructor(
