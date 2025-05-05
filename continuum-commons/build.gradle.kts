@@ -35,6 +35,9 @@ dependencies {
 
     // Freemarker dependencies
     implementation("org.freemarker:freemarker:2.3.34")
+
+    // JSON schema validation
+    implementation("com.networknt:json-schema-validator:1.5.6")
 }
 
 dependencyManagement {

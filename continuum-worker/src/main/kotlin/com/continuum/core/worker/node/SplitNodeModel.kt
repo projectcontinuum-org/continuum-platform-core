@@ -57,7 +57,7 @@ class SplitNodeModel : ProcessNodeModel() {
             </svg>
         """.trimIndent(),
         inputs = inputPorts,
-        outputs = outputPorts,
+        outputs = outputPorts
     )
 
     override fun execute(

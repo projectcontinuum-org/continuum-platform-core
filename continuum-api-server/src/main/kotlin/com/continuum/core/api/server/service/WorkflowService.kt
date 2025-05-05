@@ -6,11 +6,11 @@ import com.continuum.core.commons.constant.TaskQueues
 import com.continuum.core.commons.model.ContinuumWorkflowModel
 import com.continuum.core.commons.model.ExecutionStatus
 import com.continuum.core.commons.model.PortData
+import com.continuum.core.commons.utils.ValidationHelper.Companion.validateJsonWithSchema
 import com.continuum.core.commons.workflow.IContinuumWorkflow
 import com.fasterxml.jackson.core.type.TypeReference
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.google.protobuf.ByteString
-import com.google.protobuf.MapEntry
 import io.temporal.api.common.v1.WorkflowExecution
 import io.temporal.api.enums.v1.EventType
 import io.temporal.api.workflowservice.v1.CountWorkflowExecutionsRequest
@@ -22,7 +22,6 @@ import io.temporal.client.WorkflowOptions
 import io.temporal.common.SearchAttributes
 import org.slf4j.LoggerFactory
 import org.springframework.scheduling.annotation.EnableScheduling
-import org.springframework.scheduling.annotation.Scheduled
 import org.springframework.stereotype.Service
 import java.time.Instant
 
@@ -40,6 +39,15 @@ class WorkflowService(
     fun startWorkflow(
         continuumWorkflowModel: ContinuumWorkflowModel
     ): String {
+
+        // Validate the workflow model
+        continuumWorkflowModel.nodes.forEach { node ->
+            validateJsonWithSchema(
+                node.data.properties,
+                node.data.propertiesSchema
+            )
+        }
+
         val continuumWorkflow = workflowClient.newWorkflowStub(
             IContinuumWorkflow::class.java,
             WorkflowOptions.newBuilder()
