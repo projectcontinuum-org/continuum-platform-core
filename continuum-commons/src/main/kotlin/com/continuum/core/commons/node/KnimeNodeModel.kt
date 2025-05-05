@@ -420,17 +420,5 @@ abstract class KnimeNodeModel : ProcessNodeModel() {
         processingNodeSettingsFile.writeText(processingNodeSettings)
     }
 
-    fun getProcessingNodeSettingsTemplate(): String {
-        return this::class.java.classLoader
-            .getResourceAsStream(
-                listOf(
-                    WORKFLOW_TEMPLATE_RESOURCE_ROOT,
-                    WORKFLOW_PROCESSING_NODE_SETTINGS_TEMPLATE_FILE_NAME
-                ).joinToString(File.separator)
-            )
-            ?.bufferedReader()
-            ?.use { it.readText() }
-            ?: throw IllegalStateException("Processing node settings template not found")
-    }
-
+    abstract fun getProcessingNodeSettingsTemplate(): String
 }

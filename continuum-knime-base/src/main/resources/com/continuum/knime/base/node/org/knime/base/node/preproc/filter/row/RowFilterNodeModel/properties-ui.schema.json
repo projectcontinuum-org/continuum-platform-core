@@ -1,0 +1,90 @@
+{
+    "type": "VerticalLayout",
+    "elements": [
+        {
+            "type": "Control",
+            "scope": "#/properties/rowFilter/properties/RowFilter_TypeID",
+            "label": "Row Filter Type"
+        },
+        {
+            "type": "Group",
+            "label": "String Comparison Row Filter",
+            "rule": {
+                "effect": "SHOW",
+                "condition": {
+                    "scope": "#/properties/rowFilter/properties/RowFilter_TypeID",
+                    "schema": {
+                        "const": "StringComp_RowFilter"
+                    }
+                }
+            },
+            "elements": [
+                {
+                    "type": "Control",
+                    "scope": "#/properties/rowFilter/properties/StringComp_RowFilter/properties/ColumnName",
+                    "label": "Column to match against"
+                },
+                {
+                    "type": "Control",
+                    "scope": "#/properties/rowFilter/properties/StringComp_RowFilter/properties/include",
+                    "label": "Include matching rows"
+                },
+                {
+                    "type": "Control",
+                    "scope": "#/properties/rowFilter/properties/StringComp_RowFilter/properties/deepFiltering",
+                    "label": "Perform deep filtering"
+                },
+                {
+                    "type": "Control",
+                    "scope": "#/properties/rowFilter/properties/StringComp_RowFilter/properties/CaseSensitive",
+                    "label": "Case sensitive matching"
+                },
+                {
+                    "type": "Control",
+                    "scope": "#/properties/rowFilter/properties/StringComp_RowFilter/properties/Pattern",
+                    "label": "Pattern to match against"
+                },
+                {
+                    "type": "Control",
+                    "scope": "#/properties/rowFilter/properties/StringComp_RowFilter/properties/hasWildCards",
+                    "label": "Pattern has wildcards"
+                },
+                {
+                    "type": "Control",
+                    "scope": "#/properties/rowFilter/properties/StringComp_RowFilter/properties/isRegExpr",
+                    "label": "Pattern is a regular expression"
+                }
+            ]
+        },
+        {
+            "type": "Group",
+            "label": "Row Number Row Filter",
+            "rule": {
+                "effect": "SHOW",
+                "condition": {
+                    "scope": "#/properties/rowFilter/properties/RowFilter_TypeID",
+                    "schema": {
+                        "const": "RowNumber_RowFilter"
+                    }
+                }
+            },
+            "elements": [
+                {
+                    "type": "Control",
+                    "scope": "#/properties/rowFilter/properties/RowNumber_RowFilter/properties/RowRangeStart",
+                    "label": "Row range start"
+                },
+                {
+                    "type": "Control",
+                    "scope": "#/properties/rowFilter/properties/RowNumber_RowFilter/properties/RowRangeEnd",
+                    "label": "Row range end"
+                },
+                {
+                    "type": "Control",
+                    "scope": "#/properties/rowFilter/properties/RowNumber_RowFilter/properties/RowRangeInclude",
+                    "label": "Include matching rows"
+                }
+            ]
+        }
+    ]
+}

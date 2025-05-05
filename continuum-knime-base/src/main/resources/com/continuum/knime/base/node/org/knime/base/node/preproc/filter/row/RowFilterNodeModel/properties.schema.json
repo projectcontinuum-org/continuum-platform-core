@@ -1,0 +1,89 @@
+{
+    "type": "object",
+    "properties": {
+        "rowFilter": {
+            "type": "object",
+            "properties": {
+                "RowFilter_TypeID": {
+                    "type": "string",
+                    "oneOf": [
+                        {
+                            "const": "StringComp_RowFilter",
+                            "description": "Filter rows by string comparison"
+                        },
+                        {
+                            "const": "RowNumber_RowFilter",
+                            "description": "Filter rows by their number"
+                        }
+                    ]
+                },
+                "StringComp_RowFilter": {
+                    "type": "object",
+                    "properties": {
+                        "ColumnName": {
+                            "type": "string"
+                        },
+                        "include": {
+                            "type": "boolean",
+                            "default": true
+                        },
+                        "deepFiltering": {
+                            "type": "boolean",
+                            "default": false
+                        },
+                        "CaseSensitive": {
+                            "type": "boolean",
+                            "default": false
+                        },
+                        "Pattern": {
+                            "type": "string",
+                            "default": ""
+                        },
+                        "hasWildCards": {
+                            "type": "boolean",
+                            "default": false
+                        },
+                        "isRegExpr": {
+                            "type": "boolean",
+                            "default": false
+                        }
+                    },
+                    "required": [
+                        "ColumnName",
+                        "include",
+                        "deepFiltering",
+                        "CaseSensitive",
+                        "Pattern",
+                        "hasWildCards",
+                        "isRegExpr"
+                    ]
+                },
+                "RowNumber_RowFilter": {
+                    "type": "object",
+                    "properties": {
+                        "RowRangeStart": {
+                            "type": "integer",
+                            "default": 0
+                        },
+                        "RowRangeEnd": {
+                            "type": "integer",
+                            "default": 0
+                        },
+                        "RowRangeInclude": {
+                            "type": "boolean",
+                            "default": true
+                        }
+                    },
+                    "required": [
+                        "RowRangeStart",
+                        "RowRangeEnd",
+                        "RowRangeInclude"
+                    ]
+                }
+            },
+            "required": [
+                "RowFilter_TypeID"
+            ]
+        }
+    }
+}

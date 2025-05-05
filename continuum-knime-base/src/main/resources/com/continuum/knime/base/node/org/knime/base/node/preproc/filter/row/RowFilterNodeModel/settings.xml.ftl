@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<config xmlns="http://www.knime.org/2008/09/XMLConfig" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.knime.org/2008/09/XMLConfig http://www.knime.org/XMLConfig_2008_09.xsd" key="settings.xml">
+    <entry key="node_file" type="xstring" value="settings.xml"/>
+    <config key="flow_stack"/>
+    <config key="internal_node_subsettings">
+        <entry key="memory_policy" type="xstring" value="CacheSmallInMemory"/>
+    </config>
+    <config key="model">
+        <config key="rowFilter">
+            <#if nodeProperties.rowFilter.RowFilter_TypeID == "StringComp_RowFilter">
+                <entry key="RowFilter_TypeID" type="xstring" value="StringComp_RowFilter"/>
+                <entry key="ColumnName" type="xstring" value="${nodeProperties.rowFilter.StringComp_RowFilter.ColumnName}"/>
+                <entry key="include" type="xboolean" value="${nodeProperties.rowFilter.StringComp_RowFilter.include?string}"/>
+                <entry key="deepFiltering" type="xboolean" value="${nodeProperties.rowFilter.StringComp_RowFilter.deepFiltering?string}"/>
+                <entry key="CaseSensitive" type="xboolean" value="${nodeProperties.rowFilter.StringComp_RowFilter.CaseSensitive?string}"/>
+                <entry key="Pattern" type="xstring" value="${nodeProperties.rowFilter.StringComp_RowFilter.Pattern}"/>
+                <entry key="hasWildCards" type="xboolean" value="${nodeProperties.rowFilter.StringComp_RowFilter.hasWildCards?string}"/>
+                <entry key="isRegExpr" type="xboolean" value="${nodeProperties.rowFilter.StringComp_RowFilter.isRegExpr?string}"/>
+            </#if>
+            <#if nodeProperties.rowFilter.RowFilter_TypeID == "RowNumber_RowFilter">
+                <entry key="RowFilter_TypeID" type="xstring" value="RowNumber_RowFilter"/>
+                <entry key="RowRangeStart" type="xint" value="${nodeProperties.rowFilter.RowNumber_RowFilter.RowRangeStart}"/>
+                <entry key="RowRangeEnd" type="xint" value="${nodeProperties.rowFilter.RowNumber_RowFilter.RowRangeEnd}"/>
+                <entry key="RowRangeInclude" type="xboolean" value="${nodeProperties.rowFilter.RowNumber_RowFilter.RowRangeInclude?string}"/>
+            </#if>
+        </config>
+    </config>
+    <entry key="customDescription" type="xstring" isnull="true" value="${nodeDescription}"/>
+    <entry key="state" type="xstring" value="CONFIGURED"/>
+    <entry key="factory" type="xstring" value="${knimeNodeFactoryClass}"/>
+    <entry key="node-name" type="xstring" value="${knimeNodeName}"/>
+    <entry key="node-bundle-name" type="xstring" value="KNIME Base Nodes"/>
+    <entry key="node-bundle-symbolic-name" type="xstring" value="org.knime.base"/>
+    <entry key="node-bundle-vendor" type="xstring" value="KNIME AG, Zurich, Switzerland"/>
+    <entry key="node-bundle-version" type="xstring" value="5.1.2.v202310111637"/>
+    <entry key="node-feature-name" type="xstring" value="KNIME Base nodes"/>
+    <entry key="node-feature-symbolic-name" type="xstring" value="org.knime.features.base.feature.group"/>
+    <entry key="node-feature-vendor" type="xstring" value="KNIME AG, Zurich, Switzerland"/>
+    <entry key="node-feature-version" type="xstring" value="5.1.2.v202310111637"/>
+    <config key="factory_settings"/>
+    <entry key="name" type="xstring" value="Row Filter"/>
+    <entry key="hasContent" type="xboolean" value="false"/>
+    <entry key="isInactive" type="xboolean" value="false"/>
+    <config key="ports">
+        <config key="port_1">
+            <entry key="index" type="xint" value="1"/>
+            <entry key="port_dir_location" type="xstring" isnull="true" value=""/>
+        </config>
+    </config>
+    <config key="filestores">
+        <entry key="file_store_location" type="xstring" isnull="true" value=""/>
+        <entry key="file_store_id" type="xstring" isnull="true" value=""/>
+    </config>
+</config>
