@@ -1,15 +1,15 @@
 package com.continuum.core.commons.node
 
 import com.continuum.core.commons.model.ContinuumWorkflowModel
+import com.continuum.core.commons.utils.KnimeHelper.Companion.continuumTableToKnimeContainerInputTable
+import com.continuum.core.commons.utils.KnimeHelper.Companion.knimeContainerOutputTableToPortOutput
 import com.continuum.core.commons.utils.NodeInputReader
 import com.continuum.core.commons.utils.NodeOutputWriter
 import com.continuum.core.commons.utils.TemplateHelper
-import com.continuum.data.table.DataCell
 import com.fasterxml.jackson.databind.ObjectMapper
 import io.temporal.activity.Activity
 import org.slf4j.LoggerFactory
 import java.io.File
-import java.nio.ByteBuffer
 import java.nio.file.Path
 import java.util.concurrent.Executors
 import java.util.concurrent.Future
@@ -70,11 +70,12 @@ abstract class KnimeNodeModel : ProcessNodeModel() {
             // Execute the workflow
             executeKnimeWorkflow(
                 workflowDir.toPath(),
-                inputs
+                inputs,
+                nodeOutputWriter
             ).get()
 
             // clean up the workflow directory
-            workflowDir.deleteRecursively()
+//            workflowDir.deleteRecursively()
 
             execute(
                 node.data.properties,
@@ -91,11 +92,17 @@ abstract class KnimeNodeModel : ProcessNodeModel() {
     fun executeKnimeWorkflow(
         workflowPath: Path,
         inputs: Map<String, NodeInputReader>,
+        nodeOutputWriter: NodeOutputWriter
     ): Future<Int> {
         val inputs = prepareWorkflowInputs(
             workflowPath,
             inputs
         )
+        val outputs = outputPorts.keys.mapIndexed { index, portId ->
+            val nodeId = inputPorts.size + index + 1
+            "-option=${nodeId},outputPathOrUrl,${workflowPath.resolve("$portId.json").toFile().absolutePath},String"
+        }.joinToString(" \\\\n")
+
         val workspaceDir = File(knimeWorkspacesRoot, "knime-workspace-${Thread.currentThread().threadId()}")
         // read all the stdio of the process in a single thread
         return executor.submit<Int> {
@@ -109,7 +116,8 @@ abstract class KnimeNodeModel : ProcessNodeModel() {
                 -reset \
                 -consoleLog \
                 -workflowDir="${workflowPath.absolutePathString()}" \
-                $inputs
+                $inputs \
+                $outputs
             """.trimIndent()
 
             val processBuilder = ProcessBuilder(
@@ -134,6 +142,21 @@ abstract class KnimeNodeModel : ProcessNodeModel() {
 
             workspaceDir.deleteRecursively()
 
+            // convert the KNIME container output table to Continuum table
+            outputPorts.keys.forEachIndexed { index, portId ->
+                val outputFile = workflowPath.resolve("$portId.json").toFile()
+                if (outputFile.exists()) {
+                    nodeOutputWriter.createOutputPortWriter(portId).use { writer ->
+                        knimeContainerOutputTableToPortOutput(
+                            outputFile,
+                            writer
+                        )
+                    }
+                } else {
+                    LOGGER.warn("Output file $portId.json not found")
+                }
+            }
+
             LOGGER.info("KNIME process finished successfully")
             process.exitValue()
         }
@@ -147,64 +170,15 @@ abstract class KnimeNodeModel : ProcessNodeModel() {
 
         return inputPorts.keys.mapIndexed { index, portId ->
             val inputFile = workflowPath.resolve("$portId.json")
-            val knimeInputsTable = mutableMapOf<String, Any>(
-                "table-spec" to mutableListOf<Map<String, String>>(),
-                "table-data" to mutableListOf<List<Any>>()
+            val knimeInputsTable = continuumTableToKnimeContainerInputTable(
+                inputs[portId]!!
             )
-            var isFirst = true
-            inputs[portId]!!.use { reader ->
-                var input = reader.read()
-                if (isFirst) {
-                    val columnNames: Map<String, String> = input.cells.associate { cell ->
-                        cell.name to mimeTypeToKnimeType(cell.contentType)
-                    }
-                    (knimeInputsTable["table-spec"] as MutableList<Any>).add(columnNames)
-                    isFirst = false
-                }
-                while (input != null) {
-                    val dataCells = input.cells.map { cell ->
-                        dataCellToKnimeType(cell)
-                    }
-                    (knimeInputsTable["table-data"] as MutableList<Any>).add(dataCells)
-                    input = reader.read()
-                }
-            }
             val knimeInputsTableJson = objectMapper.writeValueAsString(knimeInputsTable)
             inputFile.toFile().createNewFile()
             inputFile.toFile().writeText(knimeInputsTableJson)
 
             "-option=${index},inputPathOrUrl,${inputFile.toFile().absolutePath},String"
         }.joinToString(" \\\\n")
-    }
-
-    fun mimeTypeToKnimeType(
-        mimeType: String
-    ): String {
-        return when (mimeType) {
-            "application/json" -> "String"
-            "text/plain" -> "String"
-            "application/x-number" -> "long"
-            else -> throw IllegalArgumentException("Unsupported mime type: $mimeType")
-        }
-    }
-
-    fun dataCellToKnimeType(
-        dataCell: DataCell
-    ): Any {
-        // convert bytebuffer to string
-        val bytes = getBytesFromByteBuffer(dataCell.value)
-        return when (dataCell.contentType) {
-            "application/json" -> String(bytes)
-            "text/plain" -> String(bytes)
-            "application/x-number" -> dataCell.value.toString().toLong()
-            else -> throw IllegalArgumentException("Unsupported mime type: ${dataCell.contentType}")
-        }
-    }
-
-    fun getBytesFromByteBuffer(buffer: ByteBuffer): ByteArray {
-        val bytes = ByteArray(buffer.remaining()) // Create a byte array of the remaining size
-        buffer.get(bytes) // Transfer the bytes from the buffer to the array
-        return bytes
     }
 
     fun renderKnimeWorkflow(
@@ -426,16 +400,7 @@ abstract class KnimeNodeModel : ProcessNodeModel() {
         nodeDir: Path,
         model: Map<String, Any>
     ) {
-        val processingNodeSettingsTemplate = this::class.java.classLoader
-            .getResourceAsStream(
-                listOf(
-                    WORKFLOW_TEMPLATE_RESOURCE_ROOT,
-                    WORKFLOW_PROCESSING_NODE_SETTINGS_TEMPLATE_FILE_NAME
-                ).joinToString(File.separator)
-            )
-            ?.bufferedReader()
-            ?.use { it.readText() }
-            ?: throw IllegalStateException("Processing node settings template not found")
+        val processingNodeSettingsTemplate = getProcessingNodeSettingsTemplate()
         templateHelper.loadTemplate(
             WORKFLOW_PROCESSING_NODE_SETTINGS_TEMPLATE_FILE_NAME,
             processingNodeSettingsTemplate
@@ -454,4 +419,18 @@ abstract class KnimeNodeModel : ProcessNodeModel() {
         }
         processingNodeSettingsFile.writeText(processingNodeSettings)
     }
+
+    fun getProcessingNodeSettingsTemplate(): String {
+        return this::class.java.classLoader
+            .getResourceAsStream(
+                listOf(
+                    WORKFLOW_TEMPLATE_RESOURCE_ROOT,
+                    WORKFLOW_PROCESSING_NODE_SETTINGS_TEMPLATE_FILE_NAME
+                ).joinToString(File.separator)
+            )
+            ?.bufferedReader()
+            ?.use { it.readText() }
+            ?: throw IllegalStateException("Processing node settings template not found")
+    }
+
 }

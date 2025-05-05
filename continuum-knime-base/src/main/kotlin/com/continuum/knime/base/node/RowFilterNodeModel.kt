@@ -25,21 +25,21 @@ class RowFilterNodeModel(
         private val objectMapper = jacksonObjectMapper()
     }
 
-    final override val inputPorts = mapOf(
+    override val inputPorts = mapOf(
         "input-1" to ContinuumWorkflowModel.NodePort(
             name = "first input string",
             contentType = "text/plain"
         )
     )
 
-    final override val outputPorts = mapOf(
+    override val outputPorts = mapOf(
         "output-1" to ContinuumWorkflowModel.NodePort(
             name = "part 1",
             contentType = "text/plain"
         )
     )
 
-    final override val categories = listOf(
+    override val categories = listOf(
         "Processing/KNIME"
     )
 
@@ -297,6 +297,25 @@ class RowFilterNodeModel(
         """.trimIndent(),
         inputs = inputPorts,
         outputs = outputPorts,
+        properties = mapOf(
+            "RowFilter_TypeID" to "RowID_RowFilter",
+            "RegExprRowFilterInclude" to false,
+            "RegExprRowFilterStart" to false,
+            "RegExprRowFilterPattern" to "",
+            "RegExprRowFilterCaseSense" to false,
+            "ColumnName" to "",
+            "include" to false,
+            "deepFiltering" to false,
+            "lowerBound" to mapOf("StringCell" to ""),
+            "upperBound" to mapOf("StringCell" to ""),
+            "CaseSensitive" to false,
+            "Pattern" to "",
+            "hasWildCards" to false,
+            "isRegExpr" to false,
+            "RowRangeStart" to 0,
+            "RowRangeEnd" to 0,
+            "RowRangeInclude" to false
+        ),
         propertiesSchema = rowFilterSchema,
         propertiesUISchema = rowFilterUISchema
     )
