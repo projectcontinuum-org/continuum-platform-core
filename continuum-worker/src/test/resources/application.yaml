@@ -13,7 +13,7 @@ continuum.core:
     aws-profile-name: test-profile
     cache-bucket-name: test-bucket
     cache-bucket-base-path: test-base-path
-    cache-storage-path: tmp
+    cache-storage-path: /tmp/.continuum-test-cache
     knime:
       workflow-storage-path: tmp
       workspace-storage-path: tmp

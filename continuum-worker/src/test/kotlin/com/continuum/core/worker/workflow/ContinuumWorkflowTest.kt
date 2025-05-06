@@ -11,7 +11,6 @@ import io.temporal.api.workflowservice.v1.DescribeWorkflowExecutionRequest
 import io.temporal.client.WorkflowClient
 import io.temporal.client.WorkflowOptions
 import io.temporal.common.SearchAttributes
-import io.temporal.common.converter.DataConverter
 import io.temporal.testing.TestWorkflowEnvironment
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeEach
@@ -30,7 +29,6 @@ import java.io.File
 import java.nio.file.Files
 import java.nio.file.Path
 import java.util.concurrent.CompletableFuture
-import kotlin.io.path.absolutePathString
 
 @SpringBootTest
 class ContinuumWorkflowTest {
@@ -40,9 +38,6 @@ class ContinuumWorkflowTest {
 
     @Value("\${continuum.core.worker.cache-storage-path}")
     private lateinit var cacheStoragePath: Path
-
-    @Autowired
-    private lateinit var dataConverter: DataConverter
 
     @MockitoBean
     private lateinit var s3TransferManager: S3TransferManager
@@ -118,6 +113,7 @@ class ContinuumWorkflowTest {
     @AfterEach
     fun resetEnvironment() {
         testEnv.shutdown()
+        cacheStoragePath.toFile().deleteRecursively()
     }
 
     @Test
