@@ -33,7 +33,6 @@ import kotlin.system.measureTimeMillis
 class ContinuumNodeActivity(
     private val processNodesModelProvider: ObjectProvider<ProcessNodeModel>,
     private val triggerNodeModelProvider: ObjectProvider<TriggerNodeModel>,
-    private val s3AsyncClient: S3AsyncClient,
     private val s3TransferManager: S3TransferManager,
     @Value("\${continuum.core.worker.cache-bucket-name}")
     private val cacheBucketName: String,
@@ -114,28 +113,28 @@ class ContinuumNodeActivity(
         val workflowRunId = Activity.getExecutionContext().info.runId
         return inputs.mapValues {
             val filePath = cacheStoragePath.resolve("$workflowRunId/$nodeId/input.${it.key}.parquet")
-            Files.deleteIfExists(filePath)
-            val destinationKey = "$cacheBucketBasePath/${it.value.data.toString().removePrefix("{remote}")}"
-
-            val uploadTime = measureTimeMillis {
-                s3TransferManager.downloadFile(
-                    DownloadFileRequest.builder()
-                        .getObjectRequest(
-                            GetObjectRequest.builder()
-                                .bucket(cacheBucketName)
-                                .key(destinationKey)
-                                .build()
-                        )
-                        .destination(filePath)
-                        .addTransferListener(
-                            LoggingTransferListener.create()
-                        )
-                        .build()
-                ).completionFuture().get()
+            if (!Files.exists(filePath)) {
+                val destinationKey = "$cacheBucketBasePath/${it.value.data.toString().removePrefix("{remote}")}"
+                val uploadTime = measureTimeMillis {
+                    s3TransferManager.downloadFile(
+                        DownloadFileRequest.builder()
+                            .getObjectRequest(
+                                GetObjectRequest.builder()
+                                    .bucket(cacheBucketName)
+                                    .key(destinationKey)
+                                    .build()
+                            )
+                            .destination(filePath)
+                            .addTransferListener(
+                                LoggingTransferListener.create()
+                            )
+                            .build()
+                    ).completionFuture().get()
+                }
+                LOGGER.info("Download '$filePath' time: $uploadTime ms")
+            } else {
+                LOGGER.info("File '$filePath' already exists, skipping download")
             }
-
-            LOGGER.info("Download '$filePath' time: $uploadTime ms")
-
             NodeInputReader(filePath)
         }
     }

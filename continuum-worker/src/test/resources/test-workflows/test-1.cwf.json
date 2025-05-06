@@ -1,0 +1,122 @@
+{
+    "id": "b2c1f1db1fb766824f5d2ca4321a368d0d266c55fabad3acc2c30052d0326f1c",
+    "name": "/test-workflows/test-1.cwf",
+    "active": false,
+    "nodes": [
+        {
+            "id": "3",
+            "type": "BaseNode",
+            "position": {
+                "x": 491.6197567332877,
+                "y": 394.2214402819506
+            },
+            "data": {
+                "id": "com.continuum.core.worker.node.SplitNodeModel",
+                "description": "Split the input string into two parts",
+                "title": "Split Node",
+                "subTitle": "Split the input string into two parts",
+                "icon": "<svg xmlns=\"http://www.w3.org/2000/svg\" fill=\"none\" stroke=\"currentColor\" strokeWidth={1.5} viewBox=\"0 0 24 24\">\n    <path d=\"M7 7V1.414a1 1 0 0 1 2 0V2h5a1 1 0 0 1 .8.4l.975 1.3a.5.5 0 0 1 0 .6L14.8 5.6a1 1 0 0 1-.8.4H9v10H7v-5H2a1 1 0 0 1-.8-.4L.225 9.3a.5.5 0 0 1 0-.6L1.2 7.4A1 1 0 0 1 2 7zm1 3V8H2l-.75 1L2 10zm0-5h6l.75-1L14 3H8z\"/>\n</svg>",
+                "nodeModel": "com.continuum.core.worker.node.SplitNodeModel",
+                "busy": null,
+                "inputs": {
+                    "input-1": {
+                        "name": "input string",
+                        "contentType": "string"
+                    }
+                },
+                "outputs": {
+                    "output-1": {
+                        "name": "part 1",
+                        "contentType": "string"
+                    },
+                    "output-2": {
+                        "name": "part 2",
+                        "contentType": "string"
+                    }
+                },
+                "properties": {},
+                "propertiesSchema": {},
+                "propertiesUISchema": {},
+                "status": null
+            },
+            "width": 224,
+            "height": 100,
+            "selected": false,
+            "positionAbsolute": {
+                "x": 491.6197567332877,
+                "y": 394.2214402819506
+            },
+            "dragging": false
+        },
+        {
+            "id": "2",
+            "type": "BaseNode",
+            "position": {
+                "x": 183,
+                "y": 394
+            },
+            "data": {
+                "id": "com.continuum.core.worker.node.TimeTriggerNodeModel",
+                "description": "Starts the workflow execution with the current time as the output",
+                "title": "Start Node",
+                "subTitle": "Starts the workflow execution",
+                "icon": "mui/Bolt",
+                "nodeModel": "com.continuum.core.worker.node.TimeTriggerNodeModel",
+                "busy": null,
+                "inputs": null,
+                "outputs": {
+                    "output-1": {
+                        "name": "output-1",
+                        "contentType": "text/plain"
+                    }
+                },
+                "properties": {
+                    "message": "Logging at",
+                    "rowCount": 10
+                },
+                "propertiesSchema": {
+                    "type": "object",
+                    "properties": {
+                        "message": {
+                            "type": "string"
+                        },
+                        "rowCount": {
+                            "type": "number",
+                            "minimum": 1
+                        }
+                    },
+                    "required": [
+                        "message",
+                        "rowCount"
+                    ]
+                },
+                "propertiesUISchema": {
+                    "type": "VerticalLayout",
+                    "elements": [
+                        {
+                            "type": "Control",
+                            "scope": "#/properties/message"
+                        },
+                        {
+                            "type": "Control",
+                            "scope": "#/properties/rowCount"
+                        }
+                    ]
+                },
+                "status": null
+            },
+            "width": 224,
+            "height": 100
+        }
+    ],
+    "edges": [
+        {
+            "type": "BaseEdge",
+            "source": "2",
+            "sourceHandle": "output-1",
+            "target": "3",
+            "targetHandle": "input-1",
+            "id": "reactflow__edge-2output-1-3input-1"
+        }
+    ]
+}

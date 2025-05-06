@@ -1,15 +1,19 @@
+spring.application.name: continuum-worker
+
 spring:
-  cloud:
-    function:
-      definition: continuum-user-input
-    stream:
-      bindings:
-        continuum-user-input-in-0:
-          destination: continuum-core-User
-          content-type: application/*+avro
-          group: ${spring.application.name}
-          consumer:
-            use-native-decoding: true
+  temporal:
+    namespace: default
+    test-server:
+      enabled: true
+    workersAutoDiscovery:
+      packages: com.continuum.core.worker
+
 continuum.core:
   worker:
-    cache-storage-path: /tmp
+    aws-profile-name: test-profile
+    cache-bucket-name: test-bucket
+    cache-bucket-base-path: test-base-path
+    cache-storage-path: tmp
+    knime:
+      workflow-storage-path: tmp
+      workspace-storage-path: tmp
