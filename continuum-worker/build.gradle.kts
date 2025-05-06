@@ -56,14 +56,15 @@ dependencies {
     implementation("software.amazon.awssdk.crt:aws-crt:0.33.10")
     implementation("software.amazon.awssdk:s3-transfer-manager")
 
+    // Nodes
+    implementation(project(":continuum-knime-base"))
+
     // Test dependencies
     testImplementation("org.springframework.boot:spring-boot-starter-test")
     testImplementation("org.jetbrains.kotlin:kotlin-test-junit5")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
     testImplementation("io.temporal:temporal-testing")
-
-    // Nodes
-    implementation(project(":continuum-knime-base"))
+    testImplementation("org.mockito.kotlin:mockito-kotlin:5.3.1")
 }
 
 dependencyManagement {

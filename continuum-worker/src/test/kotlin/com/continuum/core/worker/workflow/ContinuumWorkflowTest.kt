@@ -3,25 +3,49 @@ package com.continuum.core.worker.workflow
 import com.continuum.core.commons.constant.TaskQueues
 import com.continuum.core.commons.model.ContinuumWorkflowModel
 import com.continuum.core.commons.model.ExecutionStatus
-import com.continuum.core.commons.node.TriggerNodeModel
 import com.continuum.core.commons.workflow.IContinuumWorkflow
-import com.continuum.core.worker.node.TimeTriggerNodeModel
 import com.fasterxml.jackson.databind.ObjectMapper
 import io.temporal.api.common.v1.WorkflowExecution
+import io.temporal.api.enums.v1.WorkflowExecutionStatus
+import io.temporal.api.workflowservice.v1.DescribeWorkflowExecutionRequest
 import io.temporal.client.WorkflowClient
 import io.temporal.client.WorkflowOptions
 import io.temporal.common.SearchAttributes
+import io.temporal.common.converter.DataConverter
 import io.temporal.testing.TestWorkflowEnvironment
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
+import org.mockito.Mockito.mock
+import org.mockito.kotlin.any
+import org.mockito.kotlin.doAnswer
+import org.mockito.kotlin.whenever
 import org.springframework.beans.factory.annotation.Autowired
+import org.springframework.beans.factory.annotation.Value
 import org.springframework.boot.test.context.SpringBootTest
+import org.springframework.test.context.bean.override.mockito.MockitoBean
+import software.amazon.awssdk.transfer.s3.S3TransferManager
+import software.amazon.awssdk.transfer.s3.model.*
 import java.io.File
-import java.time.Duration
+import java.nio.file.Files
+import java.nio.file.Path
+import java.util.concurrent.CompletableFuture
+import kotlin.io.path.absolutePathString
 
 @SpringBootTest
 class ContinuumWorkflowTest {
+
+    @Value("\${continuum.core.worker.cache-bucket-base-path}")
+    private lateinit var cacheBucketBasePath: String
+
+    @Value("\${continuum.core.worker.cache-storage-path}")
+    private lateinit var cacheStoragePath: Path
+
+    @Autowired
+    private lateinit var dataConverter: DataConverter
+
+    @MockitoBean
+    private lateinit var s3TransferManager: S3TransferManager
 
     @Autowired
     private lateinit var testEnv: TestWorkflowEnvironment
@@ -33,6 +57,53 @@ class ContinuumWorkflowTest {
 
     @BeforeEach
     fun setupEnvironment() {
+        // Mock the S3TransferManager downloadFile method
+        val fileDownloadMock = mock(FileDownload::class.java)
+        whenever(
+            fileDownloadMock.completionFuture()
+        ).thenReturn(
+            CompletableFuture
+                .completedFuture(
+                    mock(CompletedFileDownload::class.java)
+                )
+        )
+        whenever(
+            s3TransferManager.downloadFile(
+                any<DownloadFileRequest>()
+            )
+        ).doAnswer {
+            // We just copy file from original path to the destination path
+            val downloadFileRequest = it.arguments[0] as DownloadFileRequest
+            val sourcePath = downloadFileRequest.objectRequest.key()
+                .replace("$cacheBucketBasePath/", "$cacheStoragePath/")
+            val destinationPath = downloadFileRequest.destination()
+            Files.copy(
+                File(sourcePath).toPath(),
+                destinationPath,
+                java.nio.file.StandardCopyOption.REPLACE_EXISTING
+            )
+            fileDownloadMock
+        }
+
+        // Mock the S3TransferManager downloadFile method with
+        val fileUploadMock = mock(FileUpload::class.java)
+        whenever(
+            fileUploadMock.completionFuture()
+        ).thenReturn(
+            CompletableFuture
+                .completedFuture(
+                    mock(CompletedFileUpload::class.java)
+                )
+        )
+        whenever(
+            s3TransferManager.uploadFile (
+                any<UploadFileRequest>()
+            )
+        ).thenReturn(
+            fileUploadMock
+        )
+
+        // Register the workflow implementation
         testEnv.registerSearchAttribute(
             IContinuumWorkflow.WORKFLOW_FILE_PATH.name,
             IContinuumWorkflow.WORKFLOW_FILE_PATH.valueType
@@ -68,10 +139,14 @@ class ContinuumWorkflowTest {
             workflowModel
         )
 
-        testEnv.sleep(
-            Duration.ofMinutes(10)
-        )
         // Wait for the workflow to complete
+        do {
+            Thread.sleep(1000)
+            val status = getStatus(
+                workflowClient,
+                workflowExecution
+            )
+        } while (status == WorkflowExecutionStatus.WORKFLOW_EXECUTION_STATUS_RUNNING)
     }
 
     fun loadWorkflow(
@@ -85,5 +160,15 @@ class ContinuumWorkflowTest {
             workflowFile,
             ContinuumWorkflowModel::class.java
         )
+    }
+
+    fun getStatus(client: WorkflowClient, execution: WorkflowExecution): WorkflowExecutionStatus {
+        val resp = client.workflowServiceStubs.blockingStub().describeWorkflowExecution(
+            DescribeWorkflowExecutionRequest.newBuilder()
+                .setNamespace("default")
+                .setExecution(execution)
+                .build()
+        )
+        return resp.workflowExecutionInfo.status
     }
 }
