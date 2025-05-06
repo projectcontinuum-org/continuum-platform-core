@@ -142,14 +142,19 @@ class ContinuumWorkflow : IContinuumWorkflow {
 
     private fun getNextNodesToExecute(
         continuumWorkflow: ContinuumWorkflowModel,
-        nodeOutputMap: Map<String, Any>
+        nodeOutputMap: Map<String, Map<String, PortData>>
     ): List<ContinuumWorkflowModel.Node> {
         val nodesToExecute = mutableListOf<ContinuumWorkflowModel.Node>()
         for (node in continuumWorkflow.nodes) {
             val nodeParents = continuumWorkflow.getParentNodes(node)
+            val nodeParentEdges = continuumWorkflow.getParentEdges(node)
             // if all the parents has produced the output
             val allParentsProducedOutput = nodeParents.all { parent ->
-                nodeOutputMap.containsKey(parent.id)
+                val connectingEdgesToParent = nodeParentEdges.filter { it.source == parent.id }
+                nodeOutputMap.containsKey(parent.id) &&
+                        connectingEdgesToParent.all { edge ->
+                            nodeOutputMap[parent.id]?.containsKey(edge.sourceHandle) ?: false
+                        }
             }
             LOGGER.debug(
                 "Node: {} allParentsProducedOutput: {} executed: {} status: {}",
