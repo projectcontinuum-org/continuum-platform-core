@@ -2,9 +2,11 @@ package com.continuum.core.bridge.config
 
 import org.eclipse.paho.client.mqttv3.MqttClient
 import org.eclipse.paho.client.mqttv3.MqttConnectOptions
+import org.eclipse.paho.client.mqttv3.persist.MemoryPersistence
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
+
 
 @Configuration
 class MqttConfig {
@@ -23,7 +25,8 @@ class MqttConfig {
         }
         return MqttClient(
             serverURI,
-            mqttClientId
+            mqttClientId,
+            MemoryPersistence()
         ).also {
             it.connect(options)
         }
