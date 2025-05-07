@@ -1,6 +1,14 @@
 spring.application.name: continuum-worker
 
 spring:
+  cloud:
+    stream:
+      bindings:
+        continuum-core-event-WorkflowExecutionSnapshot-output:
+          destination: continuum-core-event-WorkflowExecutionSnapshot
+          content-type: application/json
+          producer:
+            use-native-encoding: true
   temporal:
     namespace: default
     test-server:
@@ -15,5 +23,6 @@ continuum.core:
     cache-bucket-base-path: test-base-path
     cache-storage-path: /tmp/.continuum-test-cache
     knime:
+      executable-path: /opt/continuum/knime
       workflow-storage-path: tmp
       workspace-storage-path: tmp

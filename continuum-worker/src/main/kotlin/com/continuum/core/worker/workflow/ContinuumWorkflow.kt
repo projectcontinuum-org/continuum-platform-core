@@ -58,6 +58,8 @@ class ContinuumWorkflow : IContinuumWorkflow {
         LOGGER.info("Starting ContinuumWorkflowImpl")
 
         try {
+            currentRunningWorkflow = continuumWorkflow
+            sendUpdateEvent("STARTED")
             Workflow.upsertTypedSearchAttributes(
                 IContinuumWorkflow.WORKFLOW_STATUS
                     .valueSet(ExecutionStatus.WORKFLOW_EXECUTION_STARTED.value)
@@ -93,7 +95,6 @@ class ContinuumWorkflow : IContinuumWorkflow {
     private fun run(
         continuumWorkflow: ContinuumWorkflowModel
     ) {
-        currentRunningWorkflow = continuumWorkflow
         val nodeExecutionPromises = mutableListOf<Pair<ContinuumWorkflowModel.Node, Promise<IContinuumNodeActivity.NodeActivityOutput>>>()
         do {
             val nodesToExecute = getNextNodesToExecute(

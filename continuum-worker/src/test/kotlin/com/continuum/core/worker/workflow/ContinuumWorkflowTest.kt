@@ -4,6 +4,8 @@ import com.continuum.core.commons.constant.TaskQueues
 import com.continuum.core.commons.model.ContinuumWorkflowModel
 import com.continuum.core.commons.model.ExecutionStatus
 import com.continuum.core.commons.workflow.IContinuumWorkflow
+import com.continuum.core.worker.Channels
+import com.continuum.core.worker.TestHelper
 import com.fasterxml.jackson.databind.ObjectMapper
 import io.temporal.api.common.v1.WorkflowExecution
 import io.temporal.api.enums.v1.WorkflowExecutionStatus
@@ -22,6 +24,8 @@ import org.mockito.kotlin.whenever
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.boot.test.context.SpringBootTest
+import org.springframework.messaging.Message
+import org.springframework.test.context.ActiveProfiles
 import org.springframework.test.context.bean.override.mockito.MockitoBean
 import software.amazon.awssdk.transfer.s3.S3TransferManager
 import software.amazon.awssdk.transfer.s3.model.*
@@ -29,7 +33,10 @@ import java.io.File
 import java.nio.file.Files
 import java.nio.file.Path
 import java.util.concurrent.CompletableFuture
+import kotlin.test.assertEquals
+import kotlin.time.Duration
 
+@ActiveProfiles("kafka_event")
 @SpringBootTest
 class ContinuumWorkflowTest {
 
@@ -47,6 +54,9 @@ class ContinuumWorkflowTest {
 
     @Autowired
     private lateinit var workflowClient: WorkflowClient
+
+    @Autowired
+    private lateinit var testHelper: TestHelper
 
     private val objectMapper = ObjectMapper()
 
@@ -143,6 +153,16 @@ class ContinuumWorkflowTest {
                 workflowExecution
             )
         } while (status == WorkflowExecutionStatus.WORKFLOW_EXECUTION_STATUS_RUNNING)
+
+        val messages = mutableListOf<Message<*>>()
+        testHelper.receiveAll(
+            Channels.CONTINUUM_WORKFLOW_STATE_CHANGE_EVENT.channelName,
+            messages
+        )
+        assertEquals(
+            expected = 4,
+            actual = messages.size
+        )
     }
 
     fun loadWorkflow(
