@@ -1,0 +1,34 @@
+@namespace("com.continuum.core.event")
+protocol WorkflowUpdateEventProtocol {
+
+	import idl "../commons/model/ContinuumWorkflowModelProtocol.avdl";
+
+	record WorkflowUpdateEvent {
+		string jobId;
+		WorkflowUpdate data;
+	}
+
+	record WorkflowUpdate {
+		string exexecutionUUID;
+		int progressPercentage;
+		string status;
+		map<map<PortData>> nodeToOutputsMap;
+		@logicalType("timestamp-millis")
+		long createdAtTimestampUtc;
+		@logicalType("timestamp-millis")
+		long updatesAtTimestampUtc;
+		com.continuum.core.schema.commons.model.ContinuumWorkflowModel workflow;
+	}
+
+	record PortData {
+		PortDataStatus status;
+		string contentType;
+		map<string> data;
+	}
+
+	enum PortDataStatus {
+		SUCCESS,
+		FAILED,
+		WARNING
+	}
+}

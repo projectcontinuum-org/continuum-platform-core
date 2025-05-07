@@ -1,10 +1,10 @@
 package com.continuum.core.worker.workflow
 
 import com.continuum.core.commons.constant.TaskQueues
+import com.continuum.core.commons.event.Channels
 import com.continuum.core.commons.model.ContinuumWorkflowModel
 import com.continuum.core.commons.model.ExecutionStatus
 import com.continuum.core.commons.workflow.IContinuumWorkflow
-import com.continuum.core.worker.Channels
 import com.continuum.core.worker.TestHelper
 import com.fasterxml.jackson.databind.ObjectMapper
 import io.temporal.api.common.v1.WorkflowExecution
@@ -34,7 +34,6 @@ import java.nio.file.Files
 import java.nio.file.Path
 import java.util.concurrent.CompletableFuture
 import kotlin.test.assertEquals
-import kotlin.time.Duration
 
 @ActiveProfiles("kafka_event")
 @SpringBootTest
@@ -156,7 +155,7 @@ class ContinuumWorkflowTest {
 
         val messages = mutableListOf<Message<*>>()
         testHelper.receiveAll(
-            Channels.CONTINUUM_WORKFLOW_STATE_CHANGE_EVENT.channelName,
+            Channels.CONTINUUM_WORKFLOW_STATE_CHANGE_EVENT,
             messages
         )
         assertEquals(

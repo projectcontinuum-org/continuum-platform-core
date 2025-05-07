@@ -7,6 +7,8 @@ import com.continuum.core.commons.model.ContinuumWorkflowModel
 import com.continuum.core.commons.model.ExecutionStatus
 import com.continuum.core.commons.model.PortData
 import com.continuum.core.commons.model.WorkflowSnapshot
+import com.continuum.core.commons.model.WorkflowUpdate
+import com.continuum.core.commons.model.WorkflowUpdateEvent
 import com.continuum.core.commons.workflow.IContinuumWorkflow
 import com.continuum.core.worker.utils.StatusHelper
 import com.fasterxml.jackson.databind.ObjectMapper
@@ -181,9 +183,9 @@ class ContinuumWorkflow : IContinuumWorkflow {
             val nodeToOutputsMapWithErr = mutableMapOf<String, Map<String, PortData>>()
             nodeToOutputsMapWithErr.putAll(nodeToOutputsMap)
             nodeToOutputsMapWithErr.putAll(nodeErrorsMap)
-            val eventMetadata = StatusHelper.WorkflowUpdateEvent(
+            val eventMetadata = WorkflowUpdateEvent(
                 jobId = Workflow.getInfo().workflowId,
-                data = StatusHelper.WorkflowUpdate(
+                data = WorkflowUpdate(
                     executionUUID = Workflow.getInfo().workflowId,
                     progressPercentage = 0,
                     status = status,

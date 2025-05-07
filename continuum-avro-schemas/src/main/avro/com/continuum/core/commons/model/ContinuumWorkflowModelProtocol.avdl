@@ -32,9 +32,9 @@ protocol ContinuumWorkflowModelProtocol {
     boolean? busy = null;
     union { null, map<NodePort> } inputs = null;
     union { null, map<NodePort> } outputs = null;
-    union { null, map<NestedJsonObject> } properties = null;
-    union { null, map<NestedJsonObject> } propertiesSchema = null;
-    union { null, map<NestedJsonObject> } propertiesUISchema = null;
+    string? properties = null;
+    string? propertiesSchema = null;
+    string? propertiesUISchema = null;
     NodeStatus? status = null;
   }
 
@@ -66,14 +66,5 @@ protocol ContinuumWorkflowModelProtocol {
     boolean active = true;
     array<Node> nodes;
     array<Edge> edges;
-  }
-
-  record NestedJsonObject {
-    string? stringValue = null;
-    int? intValue = null;
-    double? doubleValue = null;
-    boolean? booleanValue = null;
-    union { null, map<NestedJsonObject>, array<NestedJsonObject> } objectValue = null;
-    union { null, array<NestedJsonObject> } arrayValue = null;
   }
 }

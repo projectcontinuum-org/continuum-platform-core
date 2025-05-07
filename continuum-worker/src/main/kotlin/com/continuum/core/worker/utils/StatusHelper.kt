@@ -1,7 +1,7 @@
 package com.continuum.core.worker.utils
 
-import com.continuum.core.commons.model.ContinuumWorkflowModel
-import com.continuum.core.worker.Channels
+import com.continuum.core.commons.event.Channels
+import com.continuum.core.commons.model.WorkflowUpdateEvent
 import jakarta.annotation.PostConstruct
 import org.slf4j.LoggerFactory
 import org.springframework.cloud.stream.function.StreamBridge
@@ -52,7 +52,7 @@ class StatusHelper(
             if(streamBridge != null) {
                 try {
                     streamBridge!!.send(
-                        Channels.CONTINUUM_WORKFLOW_STATE_CHANGE_EVENT.channelName,
+                        Channels.CONTINUUM_WORKFLOW_STATE_CHANGE_EVENT,
                         MessageBuilder
                             .withPayload(workflowSnapshot)
                             .setHeader(KafkaHeaders.KEY, workflowId)
@@ -72,19 +72,4 @@ class StatusHelper(
     fun postConstruct() {
         StatusHelper.streamBridge = this.streamBridge
     }
-
-    data class WorkflowUpdateEvent(
-        val jobId: String,
-        val data: WorkflowUpdate
-    )
-
-    data class WorkflowUpdate(
-        val executionUUID: String,
-        val progressPercentage: Int,
-        val status: String,
-        val nodeToOutputsMap: Map<String, Any>,
-        val createdAtTimestampUtc: Long,
-        val updatesAtTimestampUtc: Long,
-        val workflow: ContinuumWorkflowModel
-    )
 }

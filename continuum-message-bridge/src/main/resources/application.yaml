@@ -1,0 +1,47 @@
+spring.application.name: continuum-message-bridge
+spring.kafka.consumer.properties.spring.json.trusted.packages: com.continuum.core.commons.model
+spring:
+  cloud:
+    stream:
+      binders:
+        main-kafka-cluster:
+          type: kafka
+          default-candidate: false
+          environment:
+            spring.cloud.stream.kafka:
+              binder:
+                brokers: ${CONTINUUM_KAFKA_MAIN_BROKER_LIST}
+                consumer-properties:
+                  key.deserializer: org.apache.kafka.common.serialization.StringDeserializer
+                  # value.deserializer: io.confluent.kafka.serializers.KafkaAvroDeserializer
+                  value.deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
+                  schema.registry.url: ${CONTINUUM_KAFKA_MAIN_SCHEMA_REGISTRY}
+                  specific.avro.reader: true
+                  auto.offset.reset: latest
+                  fetch.max.wait.ms: 40000
+                  request.timeout.ms: 60000
+                producer-properties:
+                  key.serializer: org.apache.kafka.common.serialization.StringSerializer
+                  # value.serializer: io.confluent.kafka.serializers.KafkaAvroSerializer
+                  value.serializer: org.springframework.kafka.support.serializer.JsonSerializer
+                  schema.registry.url: ${CONTINUUM_KAFKA_MAIN_SCHEMA_REGISTRY}
+                  max.request.size: 104857600
+                dlq-producer-properties:
+                  key.serializer: org.apache.kafka.common.serialization.StringSerializer
+                  # value.serializer: io.confluent.kafka.serializers.KafkaAvroSerializer
+                  value.serializer: org.springframework.kafka.support.serializer.JsonSerializer
+                  schema.registry.url: ${CONTINUUM_KAFKA_MAIN_SCHEMA_REGISTRY}
+                  max.request.size: 104857600
+      bindings:
+        continuum-core-event-WorkflowExecutionSnapshot-input-in-0:
+          binder: main-kafka-cluster
+          destination: continuum-core-event-WorkflowExecutionSnapshot
+          content-type: application/json
+          group: ${spring.application.name}
+          consumer:
+            use-native-decoding: true
+            properties:
+              spring:
+                json:
+                  trusted:
+                    packages: "com.continuum.core.commons.model"
