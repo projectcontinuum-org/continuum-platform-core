@@ -1,18 +1,15 @@
 package com.continuum.core.worker.node
 
 import com.continuum.core.commons.model.ContinuumWorkflowModel
-import com.continuum.core.commons.model.PortData
-import com.continuum.core.commons.model.PortDataStatus
 import com.continuum.core.commons.node.ProcessNodeModel
 import com.continuum.core.commons.utils.NodeInputReader
 import com.continuum.core.commons.utils.NodeOutputWriter
-import com.continuum.data.table.DataCell
-import com.continuum.data.table.DataRow
-import com.fasterxml.jackson.databind.ObjectMapper
+import com.continuum.knime.base.node.org.knime.base.node.preproc.filter.row.RowFilterNodeModel
+import com.fasterxml.jackson.core.type.TypeReference
+import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
 import org.slf4j.LoggerFactory
-import org.springframework.http.MediaType.TEXT_PLAIN_VALUE
 import org.springframework.stereotype.Component
-import java.nio.ByteBuffer
+import java.io.File
 import java.nio.charset.StandardCharsets
 
 @Component
@@ -20,7 +17,8 @@ class SplitNodeModel : ProcessNodeModel() {
 
     companion object {
         private val LOGGER = LoggerFactory.getLogger(SplitNodeModel::class.java)
-        private val objectMapper = ObjectMapper()
+        private val objectMapper = jacksonObjectMapper()
+        private val resourceRootPath = RowFilterNodeModel::class.java.name.split(".").joinToString(File.separator)
     }
 
     final override val inputPorts = mapOf(
@@ -45,6 +43,38 @@ class SplitNodeModel : ProcessNodeModel() {
         "Processing"
     )
 
+    val propertiesSchema: Map<String, Any> = objectMapper.readValue(
+        """
+        {
+          "type": "object",
+          "properties": {
+            "columnName": {
+              "type": "string",
+              "title": "Column Name",
+              "description": "The name of the column to split"
+            }
+          },
+          "required": ["columnName"]
+        }
+        """.trimIndent(),
+        object: TypeReference<Map<String, Any>>() {}
+    )
+
+    val propertiesUiSchema: Map<String, Any> = objectMapper.readValue(
+        """
+        {
+          "type": "VerticalLayout",
+          "elements": [
+            {
+              "type": "Control",
+              "scope": "#/properties/columnName"
+            }
+          ]
+        }
+        """.trimIndent(),
+        object: TypeReference<Map<String, Any>>() {}
+    )
+
     override val metadata = ContinuumWorkflowModel.NodeData(
         id = this.javaClass.name,
         description = "Split the input string into two parts",
@@ -57,7 +87,12 @@ class SplitNodeModel : ProcessNodeModel() {
             </svg>
         """.trimIndent(),
         inputs = inputPorts,
-        outputs = outputPorts
+        outputs = outputPorts,
+        properties = mapOf(
+            "columnName" to "message"
+        ),
+        propertiesSchema = propertiesSchema,
+        propertiesUISchema = propertiesUiSchema
     )
 
     override fun execute(

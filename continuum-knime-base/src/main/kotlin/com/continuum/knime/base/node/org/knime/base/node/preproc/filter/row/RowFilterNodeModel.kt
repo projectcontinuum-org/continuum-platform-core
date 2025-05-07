@@ -17,7 +17,7 @@ class RowFilterNodeModel(
     override val knimeWorkspacesRoot: String,
     @Value("\${continuum.core.worker.knime.workflow-storage-path}")
     override val knimeWorkflowRootDir: String,
-    @Value("\${continuum.core.worker.knime.executable-path:/Applications/KNIME 5.1.2.app/Contents/MacOS/knime}")
+    @Value("\${continuum.core.worker.knime.executable-path}")
     override val knimeExecutablePath: String
 ) : KnimeNodeModel() {
     override val knimeNodeFactoryClass: String = "org.knime.base.node.preproc.filter.row.RowFilterNodeFactory"
