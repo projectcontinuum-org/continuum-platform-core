@@ -71,26 +71,34 @@ class ContinuumNodeActivity(
             LOGGER.info("Downloading input files for node ${node.id} (${node.data.nodeModel})")
             val nodeInputs = prepareNodeInputs(node.id, inputs)
             LOGGER.info("Input files downloaded for node ${node.id} (${node.data.nodeModel})")
+            val nodeOutputWriter = NodeOutputWriter(cacheStoragePath.resolve("${Activity.getExecutionContext().info.runId}/${node.id}"))
             processNodeMap[node.data.nodeModel]!!.run(
                 node = node,
                 inputs = nodeInputs,
-                nodeOutputWriter = NodeOutputWriter(cacheStoragePath.resolve("${Activity.getExecutionContext().info.runId}/${node.id}"))
+                nodeOutputWriter = nodeOutputWriter
             )
             LOGGER.info("Uploading output files for node ${node.id} (${node.data.nodeModel})")
-            val nodeOutput = prepareNodeOutputs(node.id)
+            val nodeOutput = prepareNodeOutputs(
+                nodeId = node.id,
+                nodeOutputWriter = nodeOutputWriter
+            )
             LOGGER.info("Output files uploaded for node ${node.id} (${node.data.nodeModel})")
             return IContinuumNodeActivity.NodeActivityOutput(
                 nodeId = node.id,
                 outputs = nodeOutput
             )
         } else if (triggerNodeMap.containsKey(node.data.nodeModel)) {
-            triggerNodeMap[node.data.nodeModel]!!.run(
+            val nodeOutputWriter = NodeOutputWriter(cacheStoragePath.resolve("${Activity.getExecutionContext().info.runId}/${node.id}"))
+                triggerNodeMap[node.data.nodeModel]!!.run(
                 node,
-                nodeOutputWriter = NodeOutputWriter(cacheStoragePath.resolve("${Activity.getExecutionContext().info.runId}/${node.id}"))
+                nodeOutputWriter = nodeOutputWriter
             )
             return IContinuumNodeActivity.NodeActivityOutput(
                 nodeId = node.id,
-                outputs = prepareNodeOutputs(node.id)
+                outputs = prepareNodeOutputs(
+                    nodeId = node.id,
+                    nodeOutputWriter = nodeOutputWriter
+                )
             )
         }
 
@@ -98,6 +106,7 @@ class ContinuumNodeActivity(
             nodeId = node.id,
             outputs = mapOf(
                 "\$error" to PortData(
+                    tableSpec = emptyList(),
                     data = "Node model '${node.data.nodeModel}' not found",
                     contentType = "text/plain",
                     status = PortDataStatus.FAILED
@@ -140,7 +149,8 @@ class ContinuumNodeActivity(
     }
 
     fun prepareNodeOutputs(
-        nodeId: String
+        nodeId: String,
+        nodeOutputWriter: NodeOutputWriter
     ): Map<String, PortData> {
         val workflowRunId = Activity.getExecutionContext().info.runId
         val nodeOutputPath = cacheStoragePath.resolve("$workflowRunId/$nodeId")
@@ -149,7 +159,6 @@ class ContinuumNodeActivity(
             val portId = it.fileName.toString().substringAfter("output.").substringBefore(".parquet")
             val relativeFileKey = "$workflowRunId/$nodeId/output.$portId.parquet"
             val destinationKey = "$cacheBucketBasePath/$relativeFileKey"
-
             val uploadTime = measureTimeMillis {
                 s3TransferManager.uploadFile(
                     UploadFileRequest.builder()
@@ -168,6 +177,8 @@ class ContinuumNodeActivity(
             }
             LOGGER.info("Upload '$it' time: $uploadTime ms")
             val portData = PortData(
+                tableSpec = nodeOutputWriter
+                    .getTableSpec(portId),
                 data = "{remote}${relativeFileKey}",
                 contentType = "application/parquet",
                 status = PortDataStatus.SUCCESS

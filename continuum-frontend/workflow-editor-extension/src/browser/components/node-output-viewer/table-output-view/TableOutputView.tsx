@@ -25,7 +25,7 @@ export function TableOutputView({outputData}: TableOutputViewProps) {
                 setRows(data.data.map((row: Array<any>, idx: number) => {
                     let newRow: any = {id: idx};
                     row.forEach((cell: any) => {
-                        if(cell.contentType === "text/plain") {
+                        if(cell.contentType === "application/vnd.continuum.x-string") {
                             newRow[cell.name] = atob(cell.value);
                         } else {
                             newRow[cell.name] = cell.value;
