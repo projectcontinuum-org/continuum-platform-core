@@ -115,10 +115,9 @@ class SplitNodeModel : ProcessNodeModel() {
             val outputWriters = mutableListOf(
                 nodeOutputWriter.createOutputPortWriter("output-1")
             )
+            var rowNumber = 0L
             while (input != null) {
-                val rowNumber = input.rowNumber
-                val dataCell = input.cells.first()
-                val stringToSplit = StandardCharsets.UTF_8.decode(dataCell.value).toString()
+                val stringToSplit = input.entries.first().value as String
                 val parts = stringToSplit.split(" ", limit = 2)
                 if(parts.size > outputWriters.size) {
                     outputWriters.add(nodeOutputWriter.createOutputPortWriter("output-${outputWriters.size + 1}"))
@@ -129,6 +128,7 @@ class SplitNodeModel : ProcessNodeModel() {
                     ))
                 }
                 input = reader.read()
+                rowNumber++
             }
             outputWriters.forEach { it.close() }
         }

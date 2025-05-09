@@ -13,8 +13,14 @@ class NodeInputReader(
     private val parquetReader = AvroParquetReader.builder<DataRow>(LocalInputFile(inputFilePath))
         .withConf(Configuration())
         .build()
+    private val dataRowToMapConvertor = DataRowToMapConvertor()
 
-    fun read() = parquetReader.read()
+    fun read(): Map<String, Any>? {
+        val dataRow = parquetReader.read()
+        return dataRow?.let {
+            dataRowToMapConvertor.toMap(it)
+        }
+    }
 
     override fun close() {
         parquetReader.close()

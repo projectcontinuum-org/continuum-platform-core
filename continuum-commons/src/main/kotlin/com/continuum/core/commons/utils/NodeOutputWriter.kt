@@ -36,7 +36,8 @@ class NodeOutputWriter(
         outputFilePath: Path
     ): Closeable {
         private val spec = mutableSetOf<Map<String, String>>()
-        private val objectMapper = ObjectMapper()
+//        private val objectMapper = ObjectMapper()
+        private val dataRowToMapConvertor = DataRowToMapConvertor()
 
         private val parquetWriter: ParquetWriter<DataRow> = AvroParquetWriter.builder<DataRow>(LocalOutputFile(outputFilePath))
             .withSchema(DataRow.getClassSchema())
@@ -48,32 +49,33 @@ class NodeOutputWriter(
             .withRowGroupSize(1024 * 1024 * 128)
             .build()
 
-        fun write(data: DataRow) {
-            parquetWriter.write(data)
-        }
+//        private fun write(data: DataRow) {
+//            parquetWriter.write(data)
+//        }
 
         fun write(
             rowNumber: Long,
             row: Map<String, Any>
         ) {
-            val dataCells = row.entries.map {
-                val dataCell = createDataCell(
-                    cellName = it.key,
-                    cellValue = it.value
+            val dataRow = dataRowToMapConvertor
+                .toDataRow(
+                    rowNumber = rowNumber,
+                    data = row
                 )
+            dataRow.cells.forEach {
                 spec.add(
                     mapOf(
-                        "name" to it.key,
-                        "type" to dataCell.contentType.toString()
+                        "name" to it.name,
+                        "contentType" to it.contentType
                     )
                 )
-                dataCell
             }
             parquetWriter.write(
-                DataRow(
-                    rowNumber,
-                    dataCells
-                )
+                dataRowToMapConvertor
+                    .toDataRow(
+                        rowNumber = rowNumber,
+                        data = row
+                    )
             )
         }
 
@@ -83,43 +85,6 @@ class NodeOutputWriter(
 
         fun getTableSpec(): List<Map<String, String>> {
             return spec.toList()
-        }
-
-        fun createDataCell(
-            cellName: String,
-            cellValue: Any
-        ): DataCell {
-            val mimeType =  when (cellValue) {
-                is String -> "application/vnd.continuum.x-string"
-                is ByteArray -> "application/vnd.continuum.x-byte-array"
-                is ByteBuffer -> "application/vnd.continuum.x-byte-buffer"
-                is Int -> "application/vnd.continuum.x-int"
-                is Long -> "application/vnd.continuum.x-long"
-                is Float -> "application/vnd.continuum.x-float"
-                is Double -> "application/vnd.continuum.x-double"
-                is Boolean -> "application/vnd.continuum.x-boolean"
-                is List<*> -> "application/json"
-                is Map<*, *> -> "application/json"
-                else -> throw IllegalArgumentException("Unsupported type: ${cellValue::class.java.name}")
-            }
-            val value = when (cellValue) {
-                is String -> cellValue
-                is ByteArray -> cellValue
-                is ByteBuffer -> cellValue
-                is Int -> cellValue.toString()
-                is Long -> cellValue.toString()
-                is Float -> cellValue.toString()
-                is Double -> cellValue.toString()
-                is Boolean -> cellValue.toString()
-                is List<*> -> objectMapper.writeValueAsString(cellValue)
-                is Map<*, *> -> objectMapper.writeValueAsString(cellValue)
-                else -> throw IllegalArgumentException("Unsupported type: ${cellValue::class.java.name}")
-            }
-            return DataCell.newBuilder()
-                .setName(cellName)
-                .setValue(ByteBuffer.wrap(value.toString().toByteArray()))
-                .setContentType(mimeType)
-                .build()
         }
     }
 }

@@ -68,14 +68,15 @@ class JointNodeModel: ProcessNodeModel() {
                 inputs["input-2"]?.use { reader2 ->
                     var input1 = reader1.read()
                     var input2 = reader2.read()
+                    var rowNumber = 0L
                     while (input1 != null && input2 != null) {
-                        val rowNumber = input1.rowNumber
-                        val dataCells = "${StandardCharsets.UTF_8.decode(input1.cells.first().value)} ${StandardCharsets.UTF_8.decode(input2.cells.first().value)}"
+                        val dataCells = "${input1["part-1"] as String} ${input2["part-2"] as String}"
                         writer.write(rowNumber, mapOf(
                             "message" to dataCells
                         ))
                         input1 = reader1.read()
                         input2 = reader2.read()
+                        rowNumber++
                     }
                 }
             }

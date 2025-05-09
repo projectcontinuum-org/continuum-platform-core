@@ -21,26 +21,57 @@ class KnimeHelper {
             }
         }
 
-        fun mimeTypeToKnimeType(
-            mimeType: String,
+        fun javaTypeToKnimeType(
+            value: Any
         ): String {
-            return when (mimeType.lowercase()) {
-                "text/plain" -> "string"
-                "application/x-number" -> "long"
-                else -> throw IllegalArgumentException("Unsupported mime type: $mimeType")
+            return when (value) {
+                is String -> "string"
+                is Int -> "long"
+                is Long -> "long"
+                is Float -> "double"
+                is Double -> "double"
+                is Boolean -> "boolean"
+                is List<*> -> "string"
+                is Map<*, *> -> "string"
+                else -> throw IllegalArgumentException("Unsupported java type: ${value::class.java}")
+            }
+        }
+
+        fun knimeTypeToJavaType(
+            knimeType: String,
+            knimeValue: Any
+        ): Any {
+            val value = knimeValue.toString()
+            return when (knimeType.lowercase()) {
+                "string" -> {
+                    if (value.startsWith("{") && value.endsWith("}")) {
+                        objectMapper.readValue<Map<String, Any>>(value)
+                    } else if (value.startsWith("[") && value.endsWith("]")) {
+                        objectMapper.readValue<List<Any>>(value)
+                    } else {
+                        value
+                    }
+                }
+                "long" -> value.toLong()
+                "double" -> value.toDouble()
+                "boolean" -> value.toBoolean()
+                else -> throw IllegalArgumentException("Unsupported knime type: $knimeType")
             }
         }
 
         fun dataCellToKnimeType(
-            dataCell: DataCell
+            value: Any
         ): Any {
-            // convert bytebuffer to string
-            val bytes = getBytesFromByteBuffer(dataCell.value)
-            return when (dataCell.contentType) {
-                "application/json" -> String(bytes)
-                "text/plain" -> String(bytes)
-                "application/x-number" -> dataCell.value.toString().toLong()
-                else -> throw IllegalArgumentException("Unsupported mime type: ${dataCell.contentType}")
+            return when (value) {
+                is String -> value
+                is Int -> value
+                is Long -> value
+                is Float -> value
+                is Double -> value
+                is Boolean -> value
+                is List<*> -> objectMapper.writeValueAsString(value)
+                is Map<*, *> -> objectMapper.writeValueAsString(value)
+                else -> throw IllegalArgumentException("Unsupported data cell type: ${value::class.java}")
             }
         }
 
@@ -53,16 +84,16 @@ class KnimeHelper {
             )
             var isFirst = true
             var input = reader.read()
-            if (isFirst) {
-                val columnNames: Map<String, String> = input.cells.associate { cell ->
-                    cell.name to mimeTypeToKnimeType(cell.contentType)
-                }
-                (knimeTable["table-spec"] as MutableList<Any>).add(columnNames)
-                isFirst = false
-            }
             while (input != null) {
-                val dataCells = input.cells.map { cell ->
-                    dataCellToKnimeType(cell)
+                if (isFirst) {
+                    val columnNames: Map<String, String> = input.entries.associate { entry ->
+                        entry.key to javaTypeToKnimeType(entry.value)
+                    }
+                    (knimeTable["table-spec"] as MutableList<Any>).add(columnNames)
+                    isFirst = false
+                }
+                val dataCells = input.entries.map { entry ->
+                    dataCellToKnimeType(entry.value)
                 }
                 (knimeTable["table-data"] as MutableList<Any>).add(dataCells)
                 input = reader.read()
@@ -78,36 +109,22 @@ class KnimeHelper {
                 .readValue(outputFile)
             val knimeTableSpec = knimeContainerOutputTable["table-spec"] as List<Map<String, String>>
             val knimeTableData = knimeContainerOutputTable["table-data"] as List<List<Any>>
-            knimeTableData.forEachIndexed { index, row ->
+            knimeTableData.forEachIndexed { index, cells ->
+                val row = mutableMapOf<String, Any>()
+                knimeTableSpec.forEachIndexed { collIndex, coll ->
+                    val cellValue = cells[collIndex]
+                    val cellType = coll.values.first()
+                    val cellName = coll.keys.first()
+                    row[cellName] = knimeTypeToJavaType(
+                        knimeType = cellType,
+                        knimeValue = cellValue
+                    )
+                }
                 outputPortWriter.write(
-                    DataRow.newBuilder()
-                        .setRowNumber(index.toLong())
-                        .setCells(
-                            row.mapIndexed { cellIndex, cell ->
-                                DataCell.newBuilder()
-                                    .setName(knimeTableSpec[cellIndex].keys.first())
-                                    .setValue(
-                                        ByteBuffer.wrap(
-                                            cell.toString().toByteArray()
-                                        )
-                                    )
-                                    .setContentType(
-                                        knimeTypeToMimeType(
-                                            knimeTableSpec[cellIndex].values.first()
-                                        )
-                                    )
-                                    .build()
-                            }.toList()
-                        )
-                        .build()
+                    rowNumber = index.toLong(),
+                    row = row
                 )
             }
-        }
-
-        private fun getBytesFromByteBuffer(buffer: ByteBuffer): ByteArray {
-            val bytes = ByteArray(buffer.remaining()) // Create a byte array of the remaining size
-            buffer.get(bytes) // Transfer the bytes from the buffer to the array
-            return bytes
         }
     }
 }
