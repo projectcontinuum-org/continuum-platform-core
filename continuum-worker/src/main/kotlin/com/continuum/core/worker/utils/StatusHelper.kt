@@ -5,14 +5,10 @@ import com.continuum.core.commons.model.WorkflowUpdateEvent
 import jakarta.annotation.PostConstruct
 import org.slf4j.LoggerFactory
 import org.springframework.cloud.stream.function.StreamBridge
-import org.springframework.context.annotation.Profile
 import org.springframework.kafka.support.KafkaHeaders
 import org.springframework.messaging.support.MessageBuilder
 import org.springframework.stereotype.Component
-import org.apache.kafka.common.serialization.StringDeserializer
-import org.springframework.kafka.support.serializer.JsonSerializer
 
-@Profile("kafka_event")
 @Component
 class StatusHelper(
     val streamBridge: StreamBridge
