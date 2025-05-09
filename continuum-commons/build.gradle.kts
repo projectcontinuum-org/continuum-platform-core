@@ -38,6 +38,9 @@ dependencies {
 
     // JSON schema validation
     implementation("com.networknt:json-schema-validator:1.5.6")
+
+    // Test dependencies
+    testImplementation("org.junit.jupiter:junit-jupiter:5.10.0")
 }
 
 dependencyManagement {

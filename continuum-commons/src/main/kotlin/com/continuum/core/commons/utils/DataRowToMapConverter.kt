@@ -6,7 +6,7 @@ import com.fasterxml.jackson.databind.ObjectMapper
 import java.nio.ByteBuffer
 import java.nio.charset.StandardCharsets
 
-class DataRowToMapConvertor {
+class DataRowToMapConverter {
     private val objectMapper = ObjectMapper()
 
     fun toDataRow(
@@ -66,8 +66,8 @@ class DataRowToMapConvertor {
         val value = when (cellValue) {
             is String -> cellValue
             is Int -> cellValue.toString()
-            is Long -> cellValue.toString()
-            is Float -> cellValue.toString()
+            is Long -> "$cellValue"
+            is Float -> "$cellValue"
             is Double -> cellValue.toString()
             is Boolean -> cellValue.toString()
             is List<*> -> objectMapper.writeValueAsString(cellValue)

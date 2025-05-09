@@ -1,8 +1,6 @@
 package com.continuum.core.commons.utils
 
-import com.continuum.data.table.DataCell
 import com.continuum.data.table.DataRow
-import com.fasterxml.jackson.databind.ObjectMapper
 import org.apache.hadoop.conf.Configuration
 import org.apache.parquet.avro.AvroParquetWriter
 import org.apache.parquet.hadoop.ParquetFileWriter
@@ -10,7 +8,6 @@ import org.apache.parquet.hadoop.ParquetWriter
 import org.apache.parquet.hadoop.metadata.CompressionCodecName
 import org.apache.parquet.io.LocalOutputFile
 import java.io.Closeable
-import java.nio.ByteBuffer
 import java.nio.file.Path
 
 class NodeOutputWriter(
@@ -37,7 +34,7 @@ class NodeOutputWriter(
     ): Closeable {
         private val spec = mutableSetOf<Map<String, String>>()
 //        private val objectMapper = ObjectMapper()
-        private val dataRowToMapConvertor = DataRowToMapConvertor()
+        private val dataRowToMapConverter = DataRowToMapConverter()
 
         private val parquetWriter: ParquetWriter<DataRow> = AvroParquetWriter.builder<DataRow>(LocalOutputFile(outputFilePath))
             .withSchema(DataRow.getClassSchema())
@@ -57,7 +54,7 @@ class NodeOutputWriter(
             rowNumber: Long,
             row: Map<String, Any>
         ) {
-            val dataRow = dataRowToMapConvertor
+            val dataRow = dataRowToMapConverter
                 .toDataRow(
                     rowNumber = rowNumber,
                     data = row
@@ -71,7 +68,7 @@ class NodeOutputWriter(
                 )
             }
             parquetWriter.write(
-                dataRowToMapConvertor
+                dataRowToMapConverter
                     .toDataRow(
                         rowNumber = rowNumber,
                         data = row
