@@ -8,7 +8,7 @@
       <env name="TEMPORAL_SERVER_ADDRESS" value="localhost:7233" />
     </envs>
     <module name="continuum.continuum-api-server.main" />
-    <option name="SPRING_BOOT_MAIN_CLASS" value="com.continuum.core.api.server.Main" />
+    <option name="SPRING_BOOT_MAIN_CLASS" value="com.continuum.core.api.server.AppKt" />
     <extension name="net.ashald.envfile">
       <option name="IS_ENABLED" value="false" />
       <option name="IS_SUBST" value="false" />
