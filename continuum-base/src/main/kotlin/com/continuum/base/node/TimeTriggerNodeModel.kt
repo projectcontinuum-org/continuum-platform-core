@@ -1,15 +1,10 @@
-package com.continuum.core.worker.node
+package com.continuum.base.node
 
 import com.continuum.core.commons.model.ContinuumWorkflowModel
-import com.continuum.core.commons.model.PortData
-import com.continuum.core.commons.model.PortDataStatus
 import com.continuum.core.commons.node.TriggerNodeModel
 import com.continuum.core.commons.utils.NodeOutputWriter
-import com.continuum.data.table.DataCell
-import com.continuum.data.table.DataRow
 import org.springframework.http.MediaType.TEXT_PLAIN_VALUE
 import org.springframework.stereotype.Component
-import java.nio.ByteBuffer
 import java.time.Instant
 
 @Component

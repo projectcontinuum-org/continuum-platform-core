@@ -1,4 +1,4 @@
-package com.continuum.core.worker.node
+package com.continuum.base.node
 
 import com.continuum.core.commons.model.ContinuumWorkflowModel
 import com.continuum.core.commons.node.ProcessNodeModel
@@ -10,7 +10,6 @@ import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Component
 import java.io.File
-import java.nio.charset.StandardCharsets
 
 @Component
 class SplitNodeModel : ProcessNodeModel() {
@@ -77,9 +76,9 @@ class SplitNodeModel : ProcessNodeModel() {
 
     override val metadata = ContinuumWorkflowModel.NodeData(
         id = this.javaClass.name,
-        description = "Split the input string into two parts",
-        title = "Split Node",
-        subTitle = "Split the input string into two parts",
+        description = "Split a column into two parts",
+        title = "Column Splitter",
+        subTitle = "Split a column",
         nodeModel = this.javaClass.name,
         icon = """
             <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" strokeWidth={1.5} viewBox="0 0 24 24">

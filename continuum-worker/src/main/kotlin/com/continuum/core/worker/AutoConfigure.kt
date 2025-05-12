@@ -4,17 +4,16 @@ import com.fasterxml.jackson.module.kotlin.KotlinModule
 import io.temporal.common.converter.DefaultDataConverter
 import io.temporal.common.converter.GlobalDataConverter
 import io.temporal.common.converter.JacksonJsonPayloadConverter
-import org.springframework.boot.autoconfigure.SpringBootApplication
-import org.springframework.boot.runApplication
+import org.springframework.context.annotation.ComponentScan
+import org.springframework.context.annotation.Configuration
 
-@SpringBootApplication
-class App
-
-fun main(args: Array<String>) {
-    registerKotlinMapper()
-    runApplication<App>(*args)
+@Configuration
+@ComponentScan
+class AutoConfigure {
+    init {
+        registerKotlinMapper()
+    }
 }
-
 fun registerKotlinMapper() {
     val mapper = JacksonJsonPayloadConverter.newDefaultObjectMapper()
     val km = KotlinModule.Builder().build()

@@ -1,4 +1,4 @@
-package com.continuum.core.worker.node
+package com.continuum.base.node
 
 import com.continuum.core.commons.model.ContinuumWorkflowModel
 import com.continuum.core.commons.node.ProcessNodeModel
@@ -8,7 +8,6 @@ import com.fasterxml.jackson.databind.ObjectMapper
 import org.slf4j.LoggerFactory
 import org.springframework.http.MediaType.TEXT_PLAIN_VALUE
 import org.springframework.stereotype.Component
-import java.nio.charset.StandardCharsets
 
 @Component
 class JointNodeModel: ProcessNodeModel() {
