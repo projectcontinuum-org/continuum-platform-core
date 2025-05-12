@@ -107,7 +107,7 @@ class ContinuumNodeActivity(
             }
         } catch (e: NodeRuntimeException) {
             LOGGER.error("Error while executing node ${node.id} (${node.data.nodeModel})", e)
-            if (e.isRetriable) {
+            if (!e.isRetriable) {
                 return IContinuumNodeActivity.NodeActivityOutput(
                     nodeId = node.id,
                     outputs = mapOf(
