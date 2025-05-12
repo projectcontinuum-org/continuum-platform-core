@@ -27,5 +27,9 @@ abstract class ProcessNodeModel: ContinuumNodeModel {
         )
     }
 
-    abstract fun execute(properties: Map<String, Any>?, inputs: Map<String, NodeInputReader>, nodeOutputWriter: NodeOutputWriter)
+    abstract fun execute(
+        properties: Map<String, Any>?,
+        inputs: Map<String, NodeInputReader>,
+        nodeOutputWriter: NodeOutputWriter
+    )
 }

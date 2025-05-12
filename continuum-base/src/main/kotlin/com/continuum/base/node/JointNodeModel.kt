@@ -1,12 +1,12 @@
 package com.continuum.base.node
 
+import com.continuum.core.commons.exception.NodeRuntimeException
 import com.continuum.core.commons.model.ContinuumWorkflowModel
 import com.continuum.core.commons.node.ProcessNodeModel
 import com.continuum.core.commons.utils.NodeInputReader
 import com.continuum.core.commons.utils.NodeOutputWriter
 import com.fasterxml.jackson.core.type.TypeReference
 import com.fasterxml.jackson.databind.ObjectMapper
-import io.temporal.failure.ApplicationFailure
 import org.slf4j.LoggerFactory
 import org.springframework.http.MediaType.TEXT_PLAIN_VALUE
 import org.springframework.stereotype.Component
@@ -131,8 +131,16 @@ class JointNodeModel: ProcessNodeModel() {
         nodeOutputWriter: NodeOutputWriter
     ) {
         val inputColumnNames = (properties?.get("inputs") as List<Map<String, String>>)
-        val inputColumnName1 = inputColumnNames[0]["columnName"] ?: throw ApplicationFailure.newNonRetryableFailure("Input column name is not provided", "NodeConfigException")
-        val inputColumnName2 = inputColumnNames[1]["columnName"] ?: throw ApplicationFailure.newNonRetryableFailure("Input column name is not provided", "NodeConfigException")
+        val inputColumnName1 = inputColumnNames[0]["columnName"] ?: throw NodeRuntimeException(
+            workflowId = "",
+            nodeId = "",
+            message = "Input column name is not provided"
+        )
+        val inputColumnName2 = inputColumnNames[1]["columnName"] ?: throw NodeRuntimeException(
+            workflowId = "",
+            nodeId = "",
+            message = "Input column name is not provided"
+        )
         val outputColumnName = properties["outputsColumnName"] as String? ?: "message"
         // Wait for random seconds
 //        Thread.sleep((1..5).random() * 500L)

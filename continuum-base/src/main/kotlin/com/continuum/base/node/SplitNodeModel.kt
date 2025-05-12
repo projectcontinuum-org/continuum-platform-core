@@ -1,5 +1,6 @@
 package com.continuum.base.node
 
+import com.continuum.core.commons.exception.NodeRuntimeException
 import com.continuum.core.commons.model.ContinuumWorkflowModel
 import com.continuum.core.commons.node.ProcessNodeModel
 import com.continuum.core.commons.utils.NodeInputReader
@@ -91,7 +92,8 @@ class SplitNodeModel : ProcessNodeModel() {
                   "elements": [
                     {
                       "type": "Control",
-                      "scope": "#/properties/columnName"
+                      "scope": "#/properties/columnName",
+                      "title": "Output Column Name"
                     }
                   ]
                 }
@@ -155,8 +157,18 @@ class SplitNodeModel : ProcessNodeModel() {
             )
             var rowNumber = 0L
             while (input != null) {
-                val inputColumnName = properties?.get("columnName")?.toString() ?: throw ApplicationFailure.newNonRetryableFailure("Column name is not specified", "NodeConfigException")
-                val stringToSplit = input[inputColumnName]?.toString() ?: throw ApplicationFailure.newNonRetryableFailure("Input column $inputColumnName is not found", "NodeConfigException")
+                val inputColumnName = properties?.get("columnName")?.toString() ?: throw NodeRuntimeException(
+                    isRetriable = false,
+                    workflowId = "",
+                    nodeId = "",
+                    message = "Input column name is not provided"
+                )
+                val stringToSplit = input[inputColumnName]?.toString() ?: throw NodeRuntimeException(
+                    isRetriable = false,
+                    workflowId = "",
+                    nodeId = "",
+                    message = "Input column name is not provided"
+                )
                 val parts = stringToSplit.split(" ", limit = 2)
                 if(parts.size > outputWriters.size) {
                     outputWriters.add(nodeOutputWriter.createOutputPortWriter("output-${outputWriters.size + 1}"))

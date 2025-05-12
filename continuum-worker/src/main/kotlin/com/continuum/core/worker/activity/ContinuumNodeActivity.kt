@@ -2,6 +2,7 @@ package com.continuum.core.worker.activity
 
 import com.continuum.core.commons.activity.IContinuumNodeActivity
 import com.continuum.core.commons.constant.TaskQueues
+import com.continuum.core.commons.exception.NodeRuntimeException
 import com.continuum.core.commons.model.ContinuumWorkflowModel
 import com.continuum.core.commons.model.PortData
 import com.continuum.core.commons.model.PortDataStatus
@@ -104,9 +105,9 @@ class ContinuumNodeActivity(
                     )
                 )
             }
-        } catch (e: ApplicationFailure) {
+        } catch (e: NodeRuntimeException) {
             LOGGER.error("Error while executing node ${node.id} (${node.data.nodeModel})", e)
-            if (e.isNonRetryable) {
+            if (e.isRetriable) {
                 return IContinuumNodeActivity.NodeActivityOutput(
                     nodeId = node.id,
                     outputs = mapOf(
@@ -118,6 +119,8 @@ class ContinuumNodeActivity(
                         )
                     )
                 )
+            } else {
+                throw e
             }
         }
 
