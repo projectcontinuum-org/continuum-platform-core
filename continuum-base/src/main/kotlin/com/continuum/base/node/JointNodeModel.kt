@@ -4,7 +4,9 @@ import com.continuum.core.commons.model.ContinuumWorkflowModel
 import com.continuum.core.commons.node.ProcessNodeModel
 import com.continuum.core.commons.utils.NodeInputReader
 import com.continuum.core.commons.utils.NodeOutputWriter
+import com.fasterxml.jackson.core.type.TypeReference
 import com.fasterxml.jackson.databind.ObjectMapper
+import io.temporal.failure.ApplicationFailure
 import org.slf4j.LoggerFactory
 import org.springframework.http.MediaType.TEXT_PLAIN_VALUE
 import org.springframework.stereotype.Component
@@ -39,6 +41,66 @@ class JointNodeModel: ProcessNodeModel() {
         "Processing"
     )
 
+    val propertiesSchema: Map<String, Any> = objectMapper.readValue(
+        """
+        {
+          "type": "object",
+          "properties": {
+            "inputs": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "columnName": {
+                            "type": "string",
+                            "title": "Input column Name"
+                        }
+                    },
+                    "required": ["columnName"]
+                }
+            },
+            "outputsColumnName": {
+              "type": "string",
+              "title": "Output Column Name",
+              "description": "The name of the column to split"
+            }
+          },
+          "required": ["outputsColumnName", "inputs"]
+        }
+        """.trimIndent(),
+        object: TypeReference<Map<String, Any>>() {}
+    )
+
+    val propertiesUiSchema: Map<String, Any> = objectMapper.readValue(
+        """
+        {
+          "type": "VerticalLayout",
+          "elements": [
+            {
+              "type": "Control",
+              "scope": "#/properties/inputs",
+              "options": {
+                "detail": {
+                  "type": "VerticalLayout",
+                  "elements": [
+                    {
+                      "type": "Control",
+                      "scope": "#/properties/columnName"
+                    }
+                  ]
+                }
+              }
+            },
+            {
+              "type": "Control",
+              "scope": "#/properties/outputsColumnName"
+            }
+          ]
+        }
+        """.trimIndent(),
+        object: TypeReference<Map<String, Any>>() {}
+    )
+
     override val metadata = ContinuumWorkflowModel.NodeData(
         id = this.javaClass.name,
         description = "Joint the input strings into one",
@@ -52,6 +114,15 @@ class JointNodeModel: ProcessNodeModel() {
         """.trimIndent(),
         inputs = inputPorts,
         outputs = outputPorts,
+        properties = mapOf(
+            "inputs" to listOf(
+                mapOf("columnName" to "msg-1"),
+                mapOf("columnName" to "msg-2")
+            ),
+            "outputsColumnName" to "message"
+        ),
+        propertiesSchema = propertiesSchema,
+        propertiesUISchema = propertiesUiSchema
     )
 
     override fun execute(
@@ -59,6 +130,10 @@ class JointNodeModel: ProcessNodeModel() {
         inputs: Map<String, NodeInputReader>,
         nodeOutputWriter: NodeOutputWriter
     ) {
+        val inputColumnNames = (properties?.get("inputs") as List<Map<String, String>>)
+        val inputColumnName1 = inputColumnNames[0]["columnName"] ?: throw ApplicationFailure.newNonRetryableFailure("Input column name is not provided", "NodeConfigException")
+        val inputColumnName2 = inputColumnNames[1]["columnName"] ?: throw ApplicationFailure.newNonRetryableFailure("Input column name is not provided", "NodeConfigException")
+        val outputColumnName = properties["outputsColumnName"] as String? ?: "message"
         // Wait for random seconds
 //        Thread.sleep((1..5).random() * 500L)
         LOGGER.info("Jointing the input: ${objectMapper.writeValueAsString(inputs)}")
@@ -69,9 +144,9 @@ class JointNodeModel: ProcessNodeModel() {
                     var input2 = reader2.read()
                     var rowNumber = 0L
                     while (input1 != null && input2 != null) {
-                        val dataCells = "${input1["part-1"] as String} ${input2["part-2"] as String}"
+                        val dataCells = "${input1[inputColumnName1] as String} ${input2[inputColumnName2] as String}"
                         writer.write(rowNumber, mapOf(
-                            "message" to dataCells
+                            outputColumnName to dataCells
                         ))
                         input1 = reader1.read()
                         input2 = reader2.read()

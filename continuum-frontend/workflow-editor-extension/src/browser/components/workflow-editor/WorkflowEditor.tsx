@@ -111,7 +111,7 @@ function WorkflowEditor({ workflow, onChange }: WorkflowEditorProps)  {
         setNodeDialogProps(null);
         console.log("selectedNode ", selectedNode);
         if(selectedNode) {
-            console.log("Saving ", properties);
+            console.log("Saving ", properties, "to node ", selectedNode);
             selectedNode.data.properties = properties;
             setFlowNodes(flowNodes);
         }

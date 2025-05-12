@@ -7,6 +7,7 @@ import com.continuum.core.commons.utils.NodeOutputWriter
 import com.continuum.knime.base.node.org.knime.base.node.preproc.filter.row.RowFilterNodeModel
 import com.fasterxml.jackson.core.type.TypeReference
 import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
+import io.temporal.failure.ApplicationFailure
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Component
 import java.io.File
@@ -51,6 +52,19 @@ class SplitNodeModel : ProcessNodeModel() {
               "type": "string",
               "title": "Column Name",
               "description": "The name of the column to split"
+            },
+            "outputs": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "columnName": {
+                            "type": "string",
+                            "title": "Output Name"
+                        }
+                    },
+                    "required": ["columnName"]
+                }
             }
           },
           "required": ["columnName"]
@@ -67,6 +81,21 @@ class SplitNodeModel : ProcessNodeModel() {
             {
               "type": "Control",
               "scope": "#/properties/columnName"
+            },
+            {
+              "type": "Control",
+              "scope": "#/properties/outputs",
+              "options": {
+                "detail": {
+                  "type": "VerticalLayout",
+                  "elements": [
+                    {
+                      "type": "Control",
+                      "scope": "#/properties/columnName"
+                    }
+                  ]
+                }
+              }
             }
           ]
         }
@@ -88,7 +117,11 @@ class SplitNodeModel : ProcessNodeModel() {
         inputs = inputPorts,
         outputs = outputPorts,
         properties = mapOf(
-            "columnName" to "message"
+            "columnName" to "message",
+            "outputs" to listOf(
+                mapOf("columnName" to "message-1"),
+                mapOf("columnName" to "message-2")
+            )
         ),
         propertiesSchema = propertiesSchema,
         propertiesUISchema = propertiesUiSchema
@@ -102,28 +135,35 @@ class SplitNodeModel : ProcessNodeModel() {
         LOGGER.info("Splitting the input: ${objectMapper.writeValueAsString(inputs)}")
         // Wait for random seconds
 //        Thread.sleep((1..5).random() * 500L)
-        splitString(inputs["input-1"]!!, nodeOutputWriter)
+        splitString(
+            properties = properties,
+            nodeInputReader = inputs["input-1"]!!,
+            nodeOutputWriter = nodeOutputWriter
+        )
     }
 
     fun splitString(
+        properties: Map<String, Any>?,
         nodeInputReader: NodeInputReader,
         nodeOutputWriter: NodeOutputWriter
     ) {
         nodeInputReader.use { reader ->
             var input = reader.read()
+            val outputCols = (properties?.get("outputs") as List<Map<String, String>>)
             val outputWriters = mutableListOf(
                 nodeOutputWriter.createOutputPortWriter("output-1")
             )
             var rowNumber = 0L
             while (input != null) {
-                val stringToSplit = input.entries.first().value as String
+                val inputColumnName = properties?.get("columnName")?.toString() ?: throw ApplicationFailure.newNonRetryableFailure("Column name is not specified", "NodeConfigException")
+                val stringToSplit = input[inputColumnName]?.toString() ?: throw ApplicationFailure.newNonRetryableFailure("Input column $inputColumnName is not found", "NodeConfigException")
                 val parts = stringToSplit.split(" ", limit = 2)
                 if(parts.size > outputWriters.size) {
                     outputWriters.add(nodeOutputWriter.createOutputPortWriter("output-${outputWriters.size + 1}"))
                 }
                 parts.forEachIndexed { index, part ->
                     outputWriters[index].write(rowNumber, mapOf(
-                        "part-${index + 1}" to part
+                        outputCols[index]["columnName"] as String to part
                     ))
                 }
                 input = reader.read()

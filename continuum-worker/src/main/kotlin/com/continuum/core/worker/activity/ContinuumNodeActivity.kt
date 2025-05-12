@@ -10,6 +10,7 @@ import com.continuum.core.commons.node.TriggerNodeModel
 import com.continuum.core.commons.utils.NodeInputReader
 import com.continuum.core.commons.utils.NodeOutputWriter
 import io.temporal.activity.Activity
+import io.temporal.failure.ApplicationFailure
 import io.temporal.spring.boot.ActivityImpl
 import jakarta.annotation.PostConstruct
 import org.slf4j.LoggerFactory
@@ -65,40 +66,59 @@ class ContinuumNodeActivity(
         inputs: Map<String, PortData>
     ): IContinuumNodeActivity.NodeActivityOutput {
         Files.createDirectories(cacheStoragePath.resolve("${Activity.getExecutionContext().info.runId}/${node.id}"))
-        // Find the node to execute
-        if (processNodeMap.containsKey(node.data.nodeModel)) {
-            LOGGER.info("Downloading input files for node ${node.id} (${node.data.nodeModel})")
-            val nodeInputs = prepareNodeInputs(node.id, inputs)
-            LOGGER.info("Input files downloaded for node ${node.id} (${node.data.nodeModel})")
-            val nodeOutputWriter = NodeOutputWriter(cacheStoragePath.resolve("${Activity.getExecutionContext().info.runId}/${node.id}"))
-            processNodeMap[node.data.nodeModel]!!.run(
-                node = node,
-                inputs = nodeInputs,
-                nodeOutputWriter = nodeOutputWriter
-            )
-            LOGGER.info("Uploading output files for node ${node.id} (${node.data.nodeModel})")
-            val nodeOutput = prepareNodeOutputs(
-                nodeId = node.id,
-                nodeOutputWriter = nodeOutputWriter
-            )
-            LOGGER.info("Output files uploaded for node ${node.id} (${node.data.nodeModel})")
-            return IContinuumNodeActivity.NodeActivityOutput(
-                nodeId = node.id,
-                outputs = nodeOutput
-            )
-        } else if (triggerNodeMap.containsKey(node.data.nodeModel)) {
-            val nodeOutputWriter = NodeOutputWriter(cacheStoragePath.resolve("${Activity.getExecutionContext().info.runId}/${node.id}"))
-                triggerNodeMap[node.data.nodeModel]!!.run(
-                node,
-                nodeOutputWriter = nodeOutputWriter
-            )
-            return IContinuumNodeActivity.NodeActivityOutput(
-                nodeId = node.id,
-                outputs = prepareNodeOutputs(
+        try {
+            // Find the node to execute
+            if (processNodeMap.containsKey(node.data.nodeModel)) {
+                LOGGER.info("Downloading input files for node ${node.id} (${node.data.nodeModel})")
+                val nodeInputs = prepareNodeInputs(node.id, inputs)
+                LOGGER.info("Input files downloaded for node ${node.id} (${node.data.nodeModel})")
+                val nodeOutputWriter =
+                    NodeOutputWriter(cacheStoragePath.resolve("${Activity.getExecutionContext().info.runId}/${node.id}"))
+                processNodeMap[node.data.nodeModel]!!.run(
+                    node = node,
+                    inputs = nodeInputs,
+                    nodeOutputWriter = nodeOutputWriter
+                )
+                LOGGER.info("Uploading output files for node ${node.id} (${node.data.nodeModel})")
+                val nodeOutput = prepareNodeOutputs(
                     nodeId = node.id,
                     nodeOutputWriter = nodeOutputWriter
                 )
-            )
+                LOGGER.info("Output files uploaded for node ${node.id} (${node.data.nodeModel})")
+                return IContinuumNodeActivity.NodeActivityOutput(
+                    nodeId = node.id,
+                    outputs = nodeOutput
+                )
+            } else if (triggerNodeMap.containsKey(node.data.nodeModel)) {
+                val nodeOutputWriter =
+                    NodeOutputWriter(cacheStoragePath.resolve("${Activity.getExecutionContext().info.runId}/${node.id}"))
+                triggerNodeMap[node.data.nodeModel]!!.run(
+                    node,
+                    nodeOutputWriter = nodeOutputWriter
+                )
+                return IContinuumNodeActivity.NodeActivityOutput(
+                    nodeId = node.id,
+                    outputs = prepareNodeOutputs(
+                        nodeId = node.id,
+                        nodeOutputWriter = nodeOutputWriter
+                    )
+                )
+            }
+        } catch (e: ApplicationFailure) {
+            LOGGER.error("Error while executing node ${node.id} (${node.data.nodeModel})", e)
+            if (e.isNonRetryable) {
+                return IContinuumNodeActivity.NodeActivityOutput(
+                    nodeId = node.id,
+                    outputs = mapOf(
+                        "\$error" to PortData(
+                            tableSpec = emptyList(),
+                            data = e.message ?: "Unknown error",
+                            contentType = "text/plain",
+                            status = PortDataStatus.FAILED
+                        )
+                    )
+                )
+            }
         }
 
         return IContinuumNodeActivity.NodeActivityOutput(
