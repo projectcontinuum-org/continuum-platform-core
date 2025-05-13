@@ -11,7 +11,6 @@ import com.continuum.core.commons.node.TriggerNodeModel
 import com.continuum.core.commons.utils.NodeInputReader
 import com.continuum.core.commons.utils.NodeOutputWriter
 import io.temporal.activity.Activity
-import io.temporal.failure.ApplicationFailure
 import io.temporal.spring.boot.ActivityImpl
 import jakarta.annotation.PostConstruct
 import org.slf4j.LoggerFactory
@@ -30,7 +29,7 @@ import kotlin.io.path.listDirectoryEntries
 import kotlin.system.measureTimeMillis
 
 @Component
-@ActivityImpl(taskQueues = [TaskQueues.ACTIVITY_TASK_QUEUE])
+@ActivityImpl(taskQueues = ["\${continuum.core.worker.node-task-queue:${TaskQueues.ACTIVITY_TASK_QUEUE}}"])
 class ContinuumNodeActivity(
     private val processNodesModelProvider: ObjectProvider<ProcessNodeModel>,
     private val triggerNodeModelProvider: ObjectProvider<TriggerNodeModel>,

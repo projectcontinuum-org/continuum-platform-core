@@ -47,7 +47,7 @@ spring:
       packages: com.continuum.core.worker
 continuum.core:
   worker:
-
+#    node-task-queue: BASE_WORKER_ACTIVITY_TASK_QUEUE
     aws-profile-name: ${CONTINUUM_AWS_PROFILE_NAME:continuum-worker }
     cache-bucket-name: ${CONTINUUM_CACHE_BUCKET_NAME:jarvis-dev-jarvis-stage-area-3a355f49}
     cache-bucket-base-path: ${CONTINUUM_CACHE_BUCKET_BASE_PATH:staging-data/test}
