@@ -1,0 +1,311 @@
+{
+    "id": "6752a6881a4e117ca7d0623dfd3a95edc54b4871af78eb256013df64f04bcf2d",
+    "name": "/home/roushan/Desktop/Continuum-Worflow/Continuum/example-workflows/workflow.cwf",
+    "active": false,
+    "nodes": [
+        {
+            "id": "4",
+            "type": "BaseNode",
+            "position": {
+                "x": 113.03538109156864,
+                "y": 100.7196279023459
+            },
+            "data": {
+                "id": "com.continuum.base.node.SplitNodeModel",
+                "description": "Split a column into two parts",
+                "title": "Column Splitter",
+                "subTitle": "Split a column",
+                "icon": "<svg xmlns=\"http://www.w3.org/2000/svg\" fill=\"none\" stroke=\"currentColor\" strokeWidth={1.5} viewBox=\"0 0 24 24\">\n    <path d=\"M7 7V1.414a1 1 0 0 1 2 0V2h5a1 1 0 0 1 .8.4l.975 1.3a.5.5 0 0 1 0 .6L14.8 5.6a1 1 0 0 1-.8.4H9v10H7v-5H2a1 1 0 0 1-.8-.4L.225 9.3a.5.5 0 0 1 0-.6L1.2 7.4A1 1 0 0 1 2 7zm1 3V8H2l-.75 1L2 10zm0-5h6l.75-1L14 3H8z\"/>\n</svg>",
+                "nodeModel": "com.continuum.base.node.SplitNodeModel",
+                "busy": null,
+                "inputs": {
+                    "input-1": {
+                        "name": "input string",
+                        "contentType": "string"
+                    }
+                },
+                "outputs": {
+                    "output-1": {
+                        "name": "part 1",
+                        "contentType": "string"
+                    },
+                    "output-2": {
+                        "name": "part 2",
+                        "contentType": "string"
+                    }
+                },
+                "properties": {
+                    "columnName": "message",
+                    "outputs": [
+                        {
+                            "columnName": "message-1"
+                        },
+                        {
+                            "columnName": "message-2"
+                        }
+                    ]
+                },
+                "propertiesSchema": {
+                    "type": "object",
+                    "properties": {
+                        "columnName": {
+                            "type": "string",
+                            "title": "Column Name",
+                            "description": "The name of the column to split"
+                        },
+                        "outputs": {
+                            "type": "array",
+                            "items": {
+                                "type": "object",
+                                "properties": {
+                                    "columnName": {
+                                        "type": "string",
+                                        "title": "Output Name"
+                                    }
+                                },
+                                "required": [
+                                    "columnName"
+                                ]
+                            }
+                        }
+                    },
+                    "required": [
+                        "columnName"
+                    ]
+                },
+                "propertiesUISchema": {
+                    "type": "VerticalLayout",
+                    "elements": [
+                        {
+                            "type": "Control",
+                            "scope": "#/properties/columnName"
+                        },
+                        {
+                            "type": "Control",
+                            "scope": "#/properties/outputs",
+                            "options": {
+                                "detail": {
+                                    "type": "VerticalLayout",
+                                    "elements": [
+                                        {
+                                            "type": "Control",
+                                            "scope": "#/properties/columnName",
+                                            "title": "Output Column Name"
+                                        }
+                                    ]
+                                }
+                            }
+                        }
+                    ]
+                },
+                "status": null
+            },
+            "width": 224,
+            "height": 100,
+            "selected": false,
+            "dragging": false,
+            "positionAbsolute": {
+                "x": 113.03538109156864,
+                "y": 100.7196279023459
+            }
+        },
+        {
+            "id": "3",
+            "type": "BaseNode",
+            "position": {
+                "x": -178.75027012713508,
+                "y": 136.8594240237941
+            },
+            "data": {
+                "id": "com.continuum.base.node.TimeTriggerNodeModel",
+                "description": "Starts the workflow execution with the current time as the output",
+                "title": "Start Node",
+                "subTitle": "Starts the workflow execution",
+                "icon": "mui/Bolt",
+                "nodeModel": "com.continuum.base.node.TimeTriggerNodeModel",
+                "busy": null,
+                "inputs": null,
+                "outputs": {
+                    "output-1": {
+                        "name": "output-1",
+                        "contentType": "text/plain"
+                    }
+                },
+                "properties": {
+                    "message": "Logging at",
+                    "rowCount": 10
+                },
+                "propertiesSchema": {
+                    "type": "object",
+                    "properties": {
+                        "message": {
+                            "type": "string"
+                        },
+                        "rowCount": {
+                            "type": "number",
+                            "minimum": 1
+                        }
+                    },
+                    "required": [
+                        "message",
+                        "rowCount"
+                    ]
+                },
+                "propertiesUISchema": {
+                    "type": "VerticalLayout",
+                    "elements": [
+                        {
+                            "type": "Control",
+                            "scope": "#/properties/message"
+                        },
+                        {
+                            "type": "Control",
+                            "scope": "#/properties/rowCount"
+                        }
+                    ]
+                },
+                "status": null
+            },
+            "width": 224,
+            "height": 100,
+            "selected": false,
+            "positionAbsolute": {
+                "x": -178.75027012713508,
+                "y": 136.8594240237941
+            },
+            "dragging": false
+        },
+        {
+            "id": "2",
+            "type": "BaseNode",
+            "position": {
+                "x": 503.7368584282089,
+                "y": -49.58163169271586
+            },
+            "data": {
+                "id": "com.continuum.base.node.JointNodeModel",
+                "description": "Joint the input strings into one",
+                "title": "Joint Node",
+                "subTitle": "Joint the input strings",
+                "icon": "<svg xmlns=\"http://www.w3.org/2000/svg\" fill=\"none\" stroke=\"currentColor\" strokeWidth={1.5} viewBox=\"0 0 24 24\">\n    <path d=\"M7 7V1.414a1 1 0 0 1 2 0V2h5a1 1 0 0 1 .8.4l.975 1.3a.5.5 0 0 1 0 .6L14.8 5.6a1 1 0 0 1-.8.4H9v10H7v-5H2a1 1 0 0 1-.8-.4L.225 9.3a.5.5 0 0 1 0-.6L1.2 7.4A1 1 0 0 1 2 7zm1 3V8H2l-.75 1L2 10zm0-5h6l.75-1L14 3H8z\"/>\n</svg>",
+                "nodeModel": "com.continuum.base.node.JointNodeModel",
+                "busy": null,
+                "inputs": {
+                    "input-1": {
+                        "name": "first input string",
+                        "contentType": "text/plain"
+                    },
+                    "input-2": {
+                        "name": "second input string",
+                        "contentType": "text/plain"
+                    }
+                },
+                "outputs": {
+                    "output-1": {
+                        "name": "part 1",
+                        "contentType": "text/plain"
+                    }
+                },
+                "properties": {
+                    "inputs": [
+                        {
+                            "columnName": "msg-1"
+                        },
+                        {
+                            "columnName": "msg-2"
+                        }
+                    ],
+                    "outputsColumnName": "message"
+                },
+                "propertiesSchema": {
+                    "type": "object",
+                    "properties": {
+                        "inputs": {
+                            "type": "array",
+                            "items": {
+                                "type": "object",
+                                "properties": {
+                                    "columnName": {
+                                        "type": "string",
+                                        "title": "Input column Name"
+                                    }
+                                },
+                                "required": [
+                                    "columnName"
+                                ]
+                            }
+                        },
+                        "outputsColumnName": {
+                            "type": "string",
+                            "title": "Output Column Name",
+                            "description": "The name of the column to split"
+                        }
+                    },
+                    "required": [
+                        "outputsColumnName",
+                        "inputs"
+                    ]
+                },
+                "propertiesUISchema": {
+                    "type": "VerticalLayout",
+                    "elements": [
+                        {
+                            "type": "Control",
+                            "scope": "#/properties/inputs",
+                            "options": {
+                                "detail": {
+                                    "type": "VerticalLayout",
+                                    "elements": [
+                                        {
+                                            "type": "Control",
+                                            "scope": "#/properties/columnName"
+                                        }
+                                    ]
+                                }
+                            }
+                        },
+                        {
+                            "type": "Control",
+                            "scope": "#/properties/outputsColumnName"
+                        }
+                    ]
+                },
+                "status": null
+            },
+            "width": 224,
+            "height": 100,
+            "selected": false,
+            "positionAbsolute": {
+                "x": 503.7368584282089,
+                "y": -49.58163169271586
+            },
+            "dragging": false
+        }
+    ],
+    "edges": [
+        {
+            "type": "BaseEdge",
+            "source": "3",
+            "sourceHandle": "output-1",
+            "target": "4",
+            "targetHandle": "input-1",
+            "id": "reactflow__edge-3output-1-4input-1"
+        },
+        {
+            "type": "BaseEdge",
+            "source": "4",
+            "sourceHandle": "output-1",
+            "target": "2",
+            "targetHandle": "input-1",
+            "id": "reactflow__edge-4output-1-2input-1"
+        },
+        {
+            "type": "BaseEdge",
+            "source": "4",
+            "sourceHandle": "output-2",
+            "target": "2",
+            "targetHandle": "input-2",
+            "id": "reactflow__edge-4output-2-2input-2"
+        }
+    ]
+}

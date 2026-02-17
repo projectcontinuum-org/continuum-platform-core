@@ -1,0 +1,29 @@
+name: Build Module
+
+on:
+  workflow_dispatch:
+    inputs:
+      module:
+        description: 'Select a Gradle module to build.'
+        required: true
+        type: choice
+        options:
+          - continuum-api-server
+          - continuum-avro-schemas
+          - continuum-base
+          - continuum-commons
+          - continuum-frontend
+          - continuum-knime-base
+          - continuum-message-bridge
+          - continuum-springboot-starter-worker
+          - continuum-worker
+          - workers/continuum-base-worker
+
+jobs:
+  build-module:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Call reusable build-module workflow
+        uses: ./.github/workflows/generic-build-module.yml
+        with:
+          module-name: ${{ github.event.inputs.module }}

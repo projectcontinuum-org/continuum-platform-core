@@ -1,0 +1,22 @@
+<component name="ProjectRunConfigurationManager">
+  <configuration default="false" name="BaseWorker" type="SpringBootApplicationConfigurationType" factoryName="Spring Boot">
+    <envs>
+      <env name="CONTINUUM_AWS_PROFILE_NAME" value="jarvis-dev" />
+      <env name="CONTINUUM_CACHE_BUCKET_NAME" value="jarvis-replication-test-bucket" />
+      <env name="CONTINUUM_KAFKA_MAIN_BROKER_LIST" value="localhost:39092,localhost:39093,localhost:39094" />
+      <env name="TEMPORAL_SERVER_ADDRESS" value="localhost:7233" />
+    </envs>
+    <module name="continuum.workers.continuum-base-worker.main" />
+    <option name="SPRING_BOOT_MAIN_CLASS" value="com.comtinuum.app.worker.base.App" />
+    <option name="VM_PARAMETERS" value="-Dserver.port=8081" />
+    <extension name="coverage">
+      <pattern>
+        <option name="PATTERN" value="com.comtinuum.app.worker.base.*" />
+        <option name="ENABLED" value="true" />
+      </pattern>
+    </extension>
+    <method v="2">
+      <option name="Make" enabled="true" />
+    </method>
+  </configuration>
+</component>

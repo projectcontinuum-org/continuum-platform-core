@@ -1,0 +1,32 @@
+name: Build Module
+
+on:
+  workflow_call:
+    inputs:
+      module-name:
+        description: 'The Gradle module to build (e.g., continuum-api-server)'
+        required: true
+        type: string
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 12
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '21'
+
+      - name: Grant execute permission for gradlew
+        run: chmod +x ./gradlew
+
+      - name: Build Gradle module
+        run: ./gradlew :${{ inputs.module-name }}:build
+
+      - name: Publish Gradle module
+        run: ./gradlew :${{ inputs.module-name }}:publish
+        if: success()

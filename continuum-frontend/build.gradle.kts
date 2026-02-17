@@ -28,3 +28,6 @@ tasks.named("build") {
     dependsOn("clean")
 }
 
+tasks.register<YarnTask>("run") {
+    args.set(listOf("run", "start:workbench"))
+}

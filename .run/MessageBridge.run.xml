@@ -1,0 +1,23 @@
+<component name="ProjectRunConfigurationManager">
+  <configuration default="false" name="MessageBridge" type="SpringBootApplicationConfigurationType" factoryName="Spring Boot">
+    <envs>
+      <env name="CONTINUUM_AWS_PROFILE_NAME" value="jarvis-dev" />
+      <env name="CONTINUUM_CACHE_BUCKET_NAME" value="jarvis-replication-test-bucket" />
+      <env name="CONTINUUM_KAFKA_MAIN_BROKER_LIST" value="localhost:39092,localhost:39093,localhost:39094" />
+      <env name="TEMPORAL_SERVER_ADDRESS" value="localhost:7233" />
+    </envs>
+    <option name="FRAME_DEACTIVATION_UPDATE_POLICY" value="UnknownPolicyInFreeMode" />
+    <module name="continuum.continuum-message-bridge.main" />
+    <option name="SPRING_BOOT_MAIN_CLASS" value="com.continuum.core.bridge.App" />
+    <option name="VM_PARAMETERS" value="-Dserver.port=8082" />
+    <extension name="coverage">
+      <pattern>
+        <option name="PATTERN" value="com.continuum.core.bridge.*" />
+        <option name="ENABLED" value="true" />
+      </pattern>
+    </extension>
+    <method v="2">
+      <option name="Make" enabled="true" />
+    </method>
+  </configuration>
+</component>
