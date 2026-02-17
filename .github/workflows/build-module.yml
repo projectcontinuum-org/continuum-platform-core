@@ -1,4 +1,4 @@
-name: Build Module
+name: Build-Module
 
 on:
   workflow_dispatch:
@@ -23,7 +23,10 @@ jobs:
   build-module:
     runs-on: ubuntu-latest
     steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
       - name: Call reusable build-module workflow
-        uses: ./.github/workflows/generic-build-module.yml
+        uses: ./.github/workflows/generic-module-builder.yml
         with:
           module-name: ${{ github.event.inputs.module }}
