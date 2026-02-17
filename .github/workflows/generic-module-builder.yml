@@ -7,26 +7,54 @@ on:
         description: 'The Gradle module to build (e.g., continuum-api-server)'
         required: true
         type: string
-
 jobs:
   build:
+    permissions:
+      contents: read
+      packages: write
     runs-on: ubuntu-latest
+    outputs:
+      module-name: ${{ inputs.module-name }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Set up JDK 12
+      - name: Set up JDK 21
         uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
           java-version: '21'
 
+      - name: Cache Gradle dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: gradle-${{ runner.os }}-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
+          restore-keys: |
+            gradle-${{ runner.os }}-
+
       - name: Grant execute permission for gradlew
         run: chmod +x ./gradlew
 
-      - name: Build Gradle module
-        run: ./gradlew :${{ inputs.module-name }}:build
+      - name: Publish
+        run: |
+          ./gradlew :${{ inputs.module-name }}:publish --no-daemon
+        env:
+          MAVEN_REPO_USERNAME: ${{ github.actor }}
+          MAVEN_REPO_PASSWORD: ${{ secrets.GITHUB_TOKEN }}
+          DOCKER_REPO_USERNAME: ${{ github.actor }}
+          DOCKER_REPO_PASSWORD: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Publish Gradle module
-        run: ./gradlew :${{ inputs.module-name }}:publish
-        if: success()
+      - name: Containerize
+        if: always()
+        run: |
+          if ./gradlew :${{ inputs.module-name }}:tasks --all | grep -q "jib "; then
+            ./gradlew :${{ inputs.module-name }}:jib --no-daemon
+          else
+            echo "Jib task does not exist for module ${{ inputs.module-name }}, skipping."
+          fi
+        env:
+          DOCKER_REPO_USERNAME: ${{ github.actor }}
+          DOCKER_REPO_PASSWORD: ${{ secrets.GITHUB_TOKEN }}

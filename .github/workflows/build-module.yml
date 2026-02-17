@@ -1,4 +1,4 @@
-name: Build-Module
+name: Build Module
 
 on:
   workflow_dispatch:
@@ -8,6 +8,7 @@ on:
         required: true
         type: choice
         options:
+          - all
           - continuum-api-server
           - continuum-avro-schemas
           - continuum-base
@@ -15,18 +16,11 @@ on:
           - continuum-frontend
           - continuum-knime-base
           - continuum-message-bridge
-          - continuum-springboot-starter-worker
           - continuum-worker
-          - workers/continuum-base-worker
+          - workers:continuum-base-worker
 
 jobs:
   build-module:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Call reusable build-module workflow
-        uses: ./.github/workflows/generic-module-builder.yml
-        with:
-          module-name: ${{ github.event.inputs.module }}
+    uses: ./.github/workflows/generic-module-builder.yml
+    with:
+      module-name: ${{ github.event.inputs.module }}
