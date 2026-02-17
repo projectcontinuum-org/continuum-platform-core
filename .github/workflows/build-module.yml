@@ -1,4 +1,4 @@
-name: Build Module
+name: Build-Module
 
 on:
   workflow_dispatch:
@@ -24,6 +24,6 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Call reusable build-module workflow
-        uses: ./.github/workflows/generic-build-module.yml
+        uses: ./.github/workflows/generic-module-builder.yml
         with:
           module-name: ${{ github.event.inputs.module }}
