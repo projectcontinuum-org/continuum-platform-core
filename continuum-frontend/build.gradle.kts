@@ -31,3 +31,21 @@ tasks.named("build") {
 tasks.register<YarnTask>("run") {
     args.set(listOf("run", "start:workbench"))
 }
+
+tasks.register("publish") {
+  description = "Publish the built application to JFrog Artifactory"
+  group = "Publishing tasks"
+  // don't publish yet
+}
+
+tasks.register<Exec>("jib") {
+  description = "Docker build and push to GitHub Container Registry"
+  group = "Jib tasks"
+  val dockerRepoName = "ghcr.io/${(System.getenv("GITHUB_REPOSITORY") ?: "roushan65/continuum").lowercase()}"
+  val imageName = "$dockerRepoName/${project.name.lowercase()}:${project.version}"
+  commandLine("bash", "-c",
+    "docker build -t $imageName . --progress=plain && " +
+        "docker login ghcr.io --username ${System.getenv("DOCKER_REPO_USERNAME")} --password ${System.getenv("DOCKER_REPO_PASSWORD")} && " +
+        "docker push $imageName"
+  )
+}
