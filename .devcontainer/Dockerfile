@@ -1,5 +1,5 @@
 # Use the official image as a parent image
-FROM mcr.microsoft.com/vscode/devcontainers/java:21
+FROM mcr.microsoft.com/vscode/devcontainers/java:21-bookworm
 
 # Install Gradle
 RUN apt-get update && \
