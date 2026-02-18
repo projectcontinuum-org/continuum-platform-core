@@ -31,7 +31,7 @@ dependencies {
     implementation("org.jetbrains.kotlin:kotlin-reflect")
 
     // Worker dependencies
-    implementation(project(":continuum-worker"))
+    implementation(project(":continuum-worker-springboot-starter"))
 
     // Node dependencies
     implementation(project(":continuum-base"))
