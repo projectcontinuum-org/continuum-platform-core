@@ -8,9 +8,9 @@ RUN apt-get update && \
     unzip -d /opt/gradle /tmp/gradle-7.5.1-bin.zip && \
     ln -s /opt/gradle/gradle-7.5.1/bin/gradle /usr/bin/gradle
 
-# Install Node.js and Yarn
+# Install Node.js, Yarn, pkg-config, and libsecret-1-dev
 RUN curl -fsSL https://deb.nodesource.com/setup_22.x | bash - && \
-    apt-get install -y nodejs
+    apt-get install -y nodejs pkg-config libsecret-1-dev
 
 # Set the default shell to bash
 SHELL ["/bin/bash", "-c"]

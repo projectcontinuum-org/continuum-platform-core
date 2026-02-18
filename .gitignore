@@ -52,3 +52,6 @@ out/
 .continuum-cache/
 .knime-workflows/
 .knime-workspace/
+continuum-frontend/continuum-workbench/gen-webpack.config.js
+continuum-frontend/continuum-workbench/gen-webpack.node.config.js
+continuum-frontend/continuum-workbench-thin/gen-webpack.config.js
