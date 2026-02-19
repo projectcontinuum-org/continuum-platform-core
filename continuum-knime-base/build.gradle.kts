@@ -35,6 +35,7 @@ dependencies {
 dependencyManagement {
     imports {
         mavenBom("org.springframework.boot:spring-boot-dependencies:3.4.0")
+        mavenBom("io.temporal:temporal-bom:1.28.0")
     }
 }
 

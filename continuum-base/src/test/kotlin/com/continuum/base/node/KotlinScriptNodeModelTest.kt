@@ -40,7 +40,7 @@ class KotlinScriptNodeModelTest {
         assertEquals("Run a Kotlin script for each row, adding script_result column", metadata.description)
         assertEquals("Kotlin Script", metadata.title)
         assertEquals("Evaluate Kotlin script per row", metadata.subTitle)
-        assertEquals("Transform", metadata.categories[0])
+        assertEquals("Transform", nodeModel.categories[0])
     }
 
     @Test
@@ -213,9 +213,11 @@ class KotlinScriptNodeModelTest {
     @Test
     fun `test execute with null values in row`() {
         // Arrange
-        val inputRow = mapOf<String, Any?>("message" to null)
+        val inputRow: Map<String, Any?> = mapOf("message" to null)
+        @Suppress("UNCHECKED_CAST")
+        val castedRow = inputRow as Map<String, Any>
         whenever(mockInputReader.read())
-            .thenReturn(inputRow)
+            .thenReturn(castedRow)
             .thenReturn(null)
 
         whenever(mockOutputWriter.createOutputPortWriter("data")).thenReturn(mockPortWriter)
@@ -343,7 +345,8 @@ class KotlinScriptNodeModelTest {
     @Test
     fun `test execute throws exception when script property is null`() {
         // Arrange
-        val properties = mapOf<String, Any?>("script" to null)
+        @Suppress("UNCHECKED_CAST")
+        val properties: Map<String, Any>? = (mapOf("script" to null) as Map<String, Any>)
         val inputs = mapOf("data" to mockInputReader)
 
         // Act & Assert
@@ -370,7 +373,7 @@ class KotlinScriptNodeModelTest {
         val exception = assertThrows<NodeRuntimeException> {
             nodeModel.execute(properties, inputs, mockOutputWriter)
         }
-        assertEquals(true, exception.message?.contains("Script execution error at row 0"))
+        assertEquals(true, exception.message!!.contains("Script execution error at row 0"))
     }
 
     @Test
@@ -390,15 +393,17 @@ class KotlinScriptNodeModelTest {
         val exception = assertThrows<NodeRuntimeException> {
             nodeModel.execute(properties, inputs, mockOutputWriter)
         }
-        assertEquals(true, exception.message?.contains("Script execution error at row 0"))
+        assertEquals(true, exception.message!!.contains("Script execution error at row 0"))
     }
 
     @Test
     fun `test execute throws exception on null reference in script`() {
         // Arrange
-        val inputRow = mapOf("name" to null)
+        val inputRow: Map<String, Any?> = mapOf("name" to null)
+        @Suppress("UNCHECKED_CAST")
+        val castedRow = inputRow as Map<String, Any>
         whenever(mockInputReader.read())
-            .thenReturn(inputRow)
+            .thenReturn(castedRow)
             .thenReturn(null)
 
         whenever(mockOutputWriter.createOutputPortWriter("data")).thenReturn(mockPortWriter)
@@ -410,7 +415,7 @@ class KotlinScriptNodeModelTest {
         val exception = assertThrows<NodeRuntimeException> {
             nodeModel.execute(properties, inputs, mockOutputWriter)
         }
-        assertEquals(true, exception.message?.contains("Script execution error at row 0"))
+        assertEquals(true, exception.message!!.contains("Script execution error at row 0"))
     }
 
     // ===== Row Number Tracking Tests =====
