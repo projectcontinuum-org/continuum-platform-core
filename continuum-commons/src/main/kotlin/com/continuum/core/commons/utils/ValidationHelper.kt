@@ -6,27 +6,27 @@ import com.networknt.schema.JsonSchemaFactory
 import com.networknt.schema.SpecVersion
 
 class ValidationHelper {
-    companion object {
+  companion object {
 
-        val mapper = ObjectMapper()
+    val mapper = ObjectMapper()
 
-        fun validateJsonWithSchema(
-            properties: Map<String, Any>,
-            propertiesSchema: Map<String, Any>
-        ) {
+    fun validateJsonWithSchema(
+      properties: Map<String, Any>,
+      propertiesSchema: Map<String, Any>
+    ) {
 
-            val factory = JsonSchemaFactory.getInstance(
-                SpecVersion.VersionFlag.V4
-            )
-            val schema = factory.getSchema(
-                mapper.writeValueAsString(propertiesSchema)
-            )
+      val factory = JsonSchemaFactory.getInstance(
+        SpecVersion.VersionFlag.V4
+      )
+      val schema = factory.getSchema(
+        mapper.writeValueAsString(propertiesSchema)
+      )
 
-            val errorMessages = schema.validate(
-                mapper.writeValueAsString(properties),
-                InputFormat.JSON
-            )
-            assert(errorMessages.isEmpty()) { "Validation failed: $errorMessages" }
-        }
+      val errorMessages = schema.validate(
+        mapper.writeValueAsString(properties),
+        InputFormat.JSON
+      )
+      assert(errorMessages.isEmpty()) { "Validation failed: $errorMessages" }
     }
+  }
 }

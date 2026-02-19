@@ -13,39 +13,39 @@ import software.amazon.awssdk.transfer.s3.S3TransferManager
 
 @Configuration
 class CorsConfig {
-    @Bean
-    fun corsConfigurer(): WebMvcConfigurer {
-        return object : WebMvcConfigurer {
-            override fun addCorsMappings(registry: CorsRegistry) {
-                registry.addMapping("/**")
-                    .allowedOrigins("*")
-                    .allowedMethods("GET", "POST", "PUT", "DELETE", "OPTIONS")
-                    .allowedHeaders("*")
-            }
-        }
+  @Bean
+  fun corsConfigurer(): WebMvcConfigurer {
+    return object : WebMvcConfigurer {
+      override fun addCorsMappings(registry: CorsRegistry) {
+        registry.addMapping("/**")
+          .allowedOrigins("*")
+          .allowedMethods("GET", "POST", "PUT", "DELETE", "OPTIONS")
+          .allowedHeaders("*")
+      }
     }
+  }
 
-    @Bean
-    fun s3AsyncClient(
-        @Value("\${continuum.core.worker.aws-profile-name}")
-        awsProfileName: String
-    ): S3AsyncClient {
-        return S3CrtAsyncClient.builder()
-            .region(Region.US_EAST_2)
-            .credentialsProvider(
-                ProfileCredentialsProvider.builder()
-                    .profileName(awsProfileName)
-                    .build()
-            )
-            .build()
-    }
+  @Bean
+  fun s3AsyncClient(
+    @Value("\${continuum.core.worker.aws-profile-name}")
+    awsProfileName: String
+  ): S3AsyncClient {
+    return S3CrtAsyncClient.builder()
+      .region(Region.US_EAST_2)
+      .credentialsProvider(
+        ProfileCredentialsProvider.builder()
+          .profileName(awsProfileName)
+          .build()
+      )
+      .build()
+  }
 
-    @Bean
-    fun s3TransferManager(
-        s3AsyncClient: S3AsyncClient
-    ): S3TransferManager {
-        return S3TransferManager.builder()
-            .s3Client(s3AsyncClient)
-            .build()
-    }
+  @Bean
+  fun s3TransferManager(
+    s3AsyncClient: S3AsyncClient
+  ): S3TransferManager {
+    return S3TransferManager.builder()
+      .s3Client(s3AsyncClient)
+      .build()
+  }
 }

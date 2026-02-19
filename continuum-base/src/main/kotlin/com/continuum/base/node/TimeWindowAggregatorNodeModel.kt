@@ -15,33 +15,33 @@ import java.time.format.DateTimeFormatter
 import java.time.temporal.ChronoUnit
 
 @Component
-class TimeWindowAggregatorNodeModel: ProcessNodeModel() {
-    companion object {
-        private val LOGGER = LoggerFactory.getLogger(TimeWindowAggregatorNodeModel::class.java)
-        private val objectMapper = ObjectMapper()
-        private val dateTimeFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")
-    }
+class TimeWindowAggregatorNodeModel : ProcessNodeModel() {
+  companion object {
+    private val LOGGER = LoggerFactory.getLogger(TimeWindowAggregatorNodeModel::class.java)
+    private val objectMapper = ObjectMapper()
+    private val dateTimeFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")
+  }
 
-    final override val inputPorts = mapOf(
-        "data" to ContinuumWorkflowModel.NodePort(
-            name = "input table",
-            contentType = TEXT_PLAIN_VALUE
-        )
+  final override val inputPorts = mapOf(
+    "data" to ContinuumWorkflowModel.NodePort(
+      name = "input table",
+      contentType = TEXT_PLAIN_VALUE
     )
+  )
 
-    final override val outputPorts = mapOf(
-        "data" to ContinuumWorkflowModel.NodePort(
-            name = "aggregated table",
-            contentType = TEXT_PLAIN_VALUE
-        )
+  final override val outputPorts = mapOf(
+    "data" to ContinuumWorkflowModel.NodePort(
+      name = "aggregated table",
+      contentType = TEXT_PLAIN_VALUE
     )
+  )
 
-    override val categories = listOf(
-        "Aggregation & Time Series"
-    )
+  override val categories = listOf(
+    "Aggregation & Time Series"
+  )
 
-    val propertiesSchema: Map<String, Any> = objectMapper.readValue(
-        """
+  val propertiesSchema: Map<String, Any> = objectMapper.readValue(
+    """
         {
           "type": "object",
           "properties": {
@@ -65,11 +65,11 @@ class TimeWindowAggregatorNodeModel: ProcessNodeModel() {
           "required": ["timeCol", "valueCol", "windowSize"]
         }
         """.trimIndent(),
-        object: TypeReference<Map<String, Any>>() {}
-    )
+    object : TypeReference<Map<String, Any>>() {}
+  )
 
-    val propertiesUiSchema: Map<String, Any> = objectMapper.readValue(
-        """
+  val propertiesUiSchema: Map<String, Any> = objectMapper.readValue(
+    """
         {
           "type": "VerticalLayout",
           "elements": [
@@ -88,103 +88,105 @@ class TimeWindowAggregatorNodeModel: ProcessNodeModel() {
           ]
         }
         """.trimIndent(),
-        object: TypeReference<Map<String, Any>>() {}
-    )
+    object : TypeReference<Map<String, Any>>() {}
+  )
 
-    override val metadata = ContinuumWorkflowModel.NodeData(
-        id = this.javaClass.name,
-        description = "Aggregates values into time windows, summing by window buckets",
-        title = "Time Window Aggregator",
-        subTitle = "Group and sum by time windows",
-        nodeModel = this.javaClass.name,
-        icon = """
+  override val metadata = ContinuumWorkflowModel.NodeData(
+    id = this.javaClass.name,
+    description = "Aggregates values into time windows, summing by window buckets",
+    title = "Time Window Aggregator",
+    subTitle = "Group and sum by time windows",
+    nodeModel = this.javaClass.name,
+    icon = """
             <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" strokeWidth={1.5} viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" />
             </svg>
         """.trimIndent(),
-        inputs = inputPorts,
-        outputs = outputPorts,
-        properties = mapOf(
-            "timeCol" to "time",
-            "valueCol" to "value",
-            "windowSize" to 5
-        ),
-        propertiesSchema = propertiesSchema,
-        propertiesUISchema = propertiesUiSchema
+    inputs = inputPorts,
+    outputs = outputPorts,
+    properties = mapOf(
+      "timeCol" to "time",
+      "valueCol" to "value",
+      "windowSize" to 5
+    ),
+    propertiesSchema = propertiesSchema,
+    propertiesUISchema = propertiesUiSchema
+  )
+
+  private fun floorToWindow(dateTime: LocalDateTime, windowMinutes: Long): LocalDateTime {
+    val minutesSinceEpoch = dateTime.until(LocalDateTime.of(1970, 1, 1, 0, 0), ChronoUnit.MINUTES)
+    val bucketMinutes = (minutesSinceEpoch / windowMinutes) * windowMinutes
+    return LocalDateTime.of(1970, 1, 1, 0, 0).plusMinutes(-bucketMinutes)
+  }
+
+  override fun execute(
+    properties: Map<String, Any>?,
+    inputs: Map<String, NodeInputReader>,
+    nodeOutputWriter: NodeOutputWriter
+  ) {
+    val timeCol = properties?.get("timeCol") as String? ?: throw NodeRuntimeException(
+      workflowId = "",
+      nodeId = "",
+      message = "timeCol is not provided"
+    )
+    val valueCol = properties["valueCol"] as String? ?: throw NodeRuntimeException(
+      workflowId = "",
+      nodeId = "",
+      message = "valueCol is not provided"
+    )
+    val windowSize = (properties["windowSize"] as? Number)?.toLong() ?: throw NodeRuntimeException(
+      workflowId = "",
+      nodeId = "",
+      message = "windowSize is not provided"
     )
 
-    private fun floorToWindow(dateTime: LocalDateTime, windowMinutes: Long): LocalDateTime {
-        val minutesSinceEpoch = dateTime.until(LocalDateTime.of(1970, 1, 1, 0, 0), ChronoUnit.MINUTES)
-        val bucketMinutes = (minutesSinceEpoch / windowMinutes) * windowMinutes
-        return LocalDateTime.of(1970, 1, 1, 0, 0).plusMinutes(-bucketMinutes)
+    LOGGER.info("Aggregating time windows: timeCol=$timeCol, valueCol=$valueCol, windowSize=$windowSize minutes")
+
+    // Read all rows and aggregate by window
+    val buckets = mutableMapOf<String, Double>()
+    var rowCount = 0
+
+    inputs["data"]?.use { reader ->
+      var row = reader.read()
+
+      while (row != null) {
+        try {
+          val timeStr = row[timeCol]?.toString() ?: ""
+          val value = (row[valueCol] as? Number)?.toDouble() ?: 0.0
+
+          if (timeStr.isNotEmpty()) {
+            val dateTime = LocalDateTime.parse(timeStr, dateTimeFormatter)
+            val windowStart = floorToWindow(dateTime, windowSize)
+            val windowKey = windowStart.format(dateTimeFormatter)
+
+            buckets[windowKey] = buckets.getOrDefault(windowKey, 0.0) + value
+            rowCount++
+          }
+        } catch (e: Exception) {
+          LOGGER.warn("Failed to parse row: ${e.message}")
+        }
+
+        row = reader.read()
+      }
     }
 
-    override fun execute(
-        properties: Map<String, Any>?,
-        inputs: Map<String, NodeInputReader>,
-        nodeOutputWriter: NodeOutputWriter
-    ) {
-        val timeCol = properties?.get("timeCol") as String? ?: throw NodeRuntimeException(
-            workflowId = "",
-            nodeId = "",
-            message = "timeCol is not provided"
+    LOGGER.info("Processed $rowCount rows into ${buckets.size} time windows")
+
+    // Write aggregated results
+    nodeOutputWriter.createOutputPortWriter("data").use { writer ->
+      var rowNumber = 0L
+
+      buckets.entries.sortedBy { it.key }.forEach { (windowStart, sumValue) ->
+        writer.write(
+          rowNumber, mapOf(
+            "window_start" to windowStart,
+            "sum_value" to sumValue
+          )
         )
-        val valueCol = properties["valueCol"] as String? ?: throw NodeRuntimeException(
-            workflowId = "",
-            nodeId = "",
-            message = "valueCol is not provided"
-        )
-        val windowSize = (properties["windowSize"] as? Number)?.toLong() ?: throw NodeRuntimeException(
-            workflowId = "",
-            nodeId = "",
-            message = "windowSize is not provided"
-        )
-        
-        LOGGER.info("Aggregating time windows: timeCol=$timeCol, valueCol=$valueCol, windowSize=$windowSize minutes")
-        
-        // Read all rows and aggregate by window
-        val buckets = mutableMapOf<String, Double>()
-        var rowCount = 0
-        
-        inputs["data"]?.use { reader ->
-            var row = reader.read()
-            
-            while (row != null) {
-                try {
-                    val timeStr = row[timeCol]?.toString() ?: ""
-                    val value = (row[valueCol] as? Number)?.toDouble() ?: 0.0
-                    
-                    if (timeStr.isNotEmpty()) {
-                        val dateTime = LocalDateTime.parse(timeStr, dateTimeFormatter)
-                        val windowStart = floorToWindow(dateTime, windowSize)
-                        val windowKey = windowStart.format(dateTimeFormatter)
-                        
-                        buckets[windowKey] = buckets.getOrDefault(windowKey, 0.0) + value
-                        rowCount++
-                    }
-                } catch (e: Exception) {
-                    LOGGER.warn("Failed to parse row: ${e.message}")
-                }
-                
-                row = reader.read()
-            }
-        }
-        
-        LOGGER.info("Processed $rowCount rows into ${buckets.size} time windows")
-        
-        // Write aggregated results
-        nodeOutputWriter.createOutputPortWriter("data").use { writer ->
-            var rowNumber = 0L
-            
-            buckets.entries.sortedBy { it.key }.forEach { (windowStart, sumValue) ->
-                writer.write(rowNumber, mapOf(
-                    "window_start" to windowStart,
-                    "sum_value" to sumValue
-                ))
-                rowNumber++
-            }
-            
-            LOGGER.info("Output $rowNumber aggregated windows")
-        }
+        rowNumber++
+      }
+
+      LOGGER.info("Output $rowNumber aggregated windows")
     }
+  }
 }

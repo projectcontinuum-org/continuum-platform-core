@@ -7,12 +7,12 @@ import com.continuum.core.commons.utils.NodeInputReader
 import com.continuum.core.commons.utils.NodeOutputWriter
 import com.fasterxml.jackson.core.type.TypeReference
 import com.fasterxml.jackson.databind.ObjectMapper
-import org.slf4j.LoggerFactory
-import org.springframework.http.MediaType.TEXT_PLAIN_VALUE
-import org.springframework.stereotype.Component
 import freemarker.template.Configuration
 import freemarker.template.Template
 import freemarker.template.TemplateExceptionHandler
+import org.slf4j.LoggerFactory
+import org.springframework.http.MediaType.TEXT_PLAIN_VALUE
+import org.springframework.stereotype.Component
 import java.io.StringReader
 import java.io.StringWriter
 import java.net.URI
@@ -21,44 +21,44 @@ import java.net.http.HttpRequest
 import java.net.http.HttpResponse
 
 @Component
-class RestNodeModel: ProcessNodeModel() {
-    companion object {
-        private val LOGGER = LoggerFactory.getLogger(RestNodeModel::class.java)
-        private val objectMapper = ObjectMapper()
-        private val httpClient = HttpClient.newBuilder()
-            .followRedirects(HttpClient.Redirect.NORMAL)
-            .build()
-        
-        private val freemarkerConfig = Configuration(Configuration.VERSION_2_3_32).apply {
-            defaultEncoding = "UTF-8"
-            templateExceptionHandler = TemplateExceptionHandler.RETHROW_HANDLER
-            logTemplateExceptions = false
-            wrapUncheckedExceptions = true
-            fallbackOnNullLoopVariable = false
-            numberFormat = "computer"  // Outputs: 1000, 100, not 1,000, 1,00
-        }
+class RestNodeModel : ProcessNodeModel() {
+  companion object {
+    private val LOGGER = LoggerFactory.getLogger(RestNodeModel::class.java)
+    private val objectMapper = ObjectMapper()
+    private val httpClient = HttpClient.newBuilder()
+      .followRedirects(HttpClient.Redirect.NORMAL)
+      .build()
+
+    private val freemarkerConfig = Configuration(Configuration.VERSION_2_3_32).apply {
+      defaultEncoding = "UTF-8"
+      templateExceptionHandler = TemplateExceptionHandler.RETHROW_HANDLER
+      logTemplateExceptions = false
+      wrapUncheckedExceptions = true
+      fallbackOnNullLoopVariable = false
+      numberFormat = "computer"  // Outputs: 1000, 100, not 1,000, 1,00
     }
+  }
 
-    final override val inputPorts = mapOf(
-        "data" to ContinuumWorkflowModel.NodePort(
-            name = "input table",
-            contentType = TEXT_PLAIN_VALUE
-        )
+  final override val inputPorts = mapOf(
+    "data" to ContinuumWorkflowModel.NodePort(
+      name = "input table",
+      contentType = TEXT_PLAIN_VALUE
     )
+  )
 
-    final override val outputPorts = mapOf(
-        "data" to ContinuumWorkflowModel.NodePort(
-            name = "table with responses",
-            contentType = TEXT_PLAIN_VALUE
-        )
+  final override val outputPorts = mapOf(
+    "data" to ContinuumWorkflowModel.NodePort(
+      name = "table with responses",
+      contentType = TEXT_PLAIN_VALUE
     )
+  )
 
-    override val categories = listOf(
-        "Integration & API"
-    )
+  override val categories = listOf(
+    "Integration & API"
+  )
 
-    val propertiesSchema: Map<String, Any> = objectMapper.readValue(
-        """
+  val propertiesSchema: Map<String, Any> = objectMapper.readValue(
+    """
         {
           "type": "object",
           "properties": {
@@ -83,11 +83,11 @@ class RestNodeModel: ProcessNodeModel() {
           "required": ["method", "url"]
         }
         """.trimIndent(),
-        object: TypeReference<Map<String, Any>>() {}
-    )
+    object : TypeReference<Map<String, Any>>() {}
+  )
 
-    val propertiesUiSchema: Map<String, Any> = objectMapper.readValue(
-        """
+  val propertiesUiSchema: Map<String, Any> = objectMapper.readValue(
+    """
         {
           "type": "VerticalLayout",
           "elements": [
@@ -125,131 +125,131 @@ class RestNodeModel: ProcessNodeModel() {
           ]
         }
         """.trimIndent(),
-        object: TypeReference<Map<String, Any>>() {}
-    )
+    object : TypeReference<Map<String, Any>>() {}
+  )
 
-    override val metadata = ContinuumWorkflowModel.NodeData(
-        id = this.javaClass.name,
-        description = "Makes HTTP requests for each row using FreeMarker templated URLs and payloads",
-        title = "REST Node",
-        subTitle = "HTTP client with FreeMarker templates",
-        nodeModel = this.javaClass.name,
-        icon = """
+  override val metadata = ContinuumWorkflowModel.NodeData(
+    id = this.javaClass.name,
+    description = "Makes HTTP requests for each row using FreeMarker templated URLs and payloads",
+    title = "REST Node",
+    subTitle = "HTTP client with FreeMarker templates",
+    nodeModel = this.javaClass.name,
+    icon = """
             <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" strokeWidth={1.5} viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" d="M12 21a9.004 9.004 0 008.716-6.747M12 21a9.004 9.004 0 01-8.716-6.747M12 21c2.485 0 4.5-4.03 4.5-9S14.485 3 12 3m0 18c-2.485 0-4.5-4.03-4.5-9S9.515 3 12 3m0 0a8.997 8.997 0 017.843 4.582M12 3a8.997 8.997 0 00-7.843 4.582m15.686 0A11.953 11.953 0 0112 10.5c-2.998 0-5.74-1.1-7.843-2.918m15.686 0A8.959 8.959 0 0121 12c0 .778-.099 1.533-.284 2.253m0 0A17.919 17.919 0 0112 16.5c-3.162 0-6.133-.815-8.716-2.247m0 0A9.015 9.015 0 013 12c0-1.605.42-3.113 1.157-4.418" />
             </svg>
         """.trimIndent(),
-        inputs = inputPorts,
-        outputs = outputPorts,
-        properties = mapOf(
-            "method" to "GET",
-            "url" to "https://api.example.com/data?id=${'$'}{row.id}",
-            "payload" to ""
-        ),
-        propertiesSchema = propertiesSchema,
-        propertiesUISchema = propertiesUiSchema
-    )
+    inputs = inputPorts,
+    outputs = outputPorts,
+    properties = mapOf(
+      "method" to "GET",
+      "url" to "https://api.example.com/data?id=${'$'}{row.id}",
+      "payload" to ""
+    ),
+    propertiesSchema = propertiesSchema,
+    propertiesUISchema = propertiesUiSchema
+  )
 
-    private fun renderTemplate(templateString: String, row: Map<String, Any>): String {
-        return try {
-            val template = Template("template", StringReader(templateString), freemarkerConfig)
-            val dataModel = mapOf("row" to row)
-            val writer = StringWriter()
-            template.process(dataModel, writer)
-            writer.toString()
-        } catch (e: Exception) {
-            LOGGER.error("Failed to render template: ${e.message}")
-            throw NodeRuntimeException(
+  private fun renderTemplate(templateString: String, row: Map<String, Any>): String {
+    return try {
+      val template = Template("template", StringReader(templateString), freemarkerConfig)
+      val dataModel = mapOf("row" to row)
+      val writer = StringWriter()
+      template.process(dataModel, writer)
+      writer.toString()
+    } catch (e: Exception) {
+      LOGGER.error("Failed to render template: ${e.message}")
+      throw NodeRuntimeException(
+        workflowId = "",
+        nodeId = "",
+        message = "Template rendering failed: ${e.message}"
+      )
+    }
+  }
+
+  override fun execute(
+    properties: Map<String, Any>?,
+    inputs: Map<String, NodeInputReader>,
+    nodeOutputWriter: NodeOutputWriter
+  ) {
+    val method = properties?.get("method") as String? ?: throw NodeRuntimeException(
+      workflowId = "",
+      nodeId = "",
+      message = "method is not provided"
+    )
+    val urlTemplate = properties["url"] as String? ?: throw NodeRuntimeException(
+      workflowId = "",
+      nodeId = "",
+      message = "url is not provided"
+    )
+    val payloadTemplate = properties["payload"] as String? ?: ""
+
+    LOGGER.info("REST Node: method=$method, urlTemplate=$urlTemplate")
+
+    nodeOutputWriter.createOutputPortWriter("data").use { writer ->
+      inputs["data"]?.use { reader ->
+        var row = reader.read()
+        var rowNumber = 0L
+
+        while (row != null) {
+          try {
+            // Render templates
+            val url = renderTemplate(urlTemplate, row)
+            val payload = renderTemplate(payloadTemplate, row)
+
+            LOGGER.debug("Making $method request to: $url")
+
+            // Build request
+            val requestBuilder = HttpRequest.newBuilder()
+              .uri(URI.create(url))
+              .header("Content-Type", "application/json")
+
+            val request = when (method.uppercase()) {
+              "GET" -> requestBuilder.GET().build()
+              "POST" -> requestBuilder.POST(HttpRequest.BodyPublishers.ofString(payload)).build()
+              "PUT" -> requestBuilder.PUT(HttpRequest.BodyPublishers.ofString(payload)).build()
+              "DELETE" -> requestBuilder.DELETE().build()
+              else -> throw NodeRuntimeException(
                 workflowId = "",
                 nodeId = "",
-                message = "Template rendering failed: ${e.message}"
-            )
-        }
-    }
-
-    override fun execute(
-        properties: Map<String, Any>?,
-        inputs: Map<String, NodeInputReader>,
-        nodeOutputWriter: NodeOutputWriter
-    ) {
-        val method = properties?.get("method") as String? ?: throw NodeRuntimeException(
-            workflowId = "",
-            nodeId = "",
-            message = "method is not provided"
-        )
-        val urlTemplate = properties["url"] as String? ?: throw NodeRuntimeException(
-            workflowId = "",
-            nodeId = "",
-            message = "url is not provided"
-        )
-        val payloadTemplate = properties["payload"] as String? ?: ""
-        
-        LOGGER.info("REST Node: method=$method, urlTemplate=$urlTemplate")
-        
-        nodeOutputWriter.createOutputPortWriter("data").use { writer ->
-            inputs["data"]?.use { reader ->
-                var row = reader.read()
-                var rowNumber = 0L
-                
-                while (row != null) {
-                    try {
-                        // Render templates
-                        val url = renderTemplate(urlTemplate, row)
-                        val payload = renderTemplate(payloadTemplate, row)
-                        
-                        LOGGER.debug("Making $method request to: $url")
-                        
-                        // Build request
-                        val requestBuilder = HttpRequest.newBuilder()
-                            .uri(URI.create(url))
-                            .header("Content-Type", "application/json")
-                        
-                        val request = when (method.uppercase()) {
-                            "GET" -> requestBuilder.GET().build()
-                            "POST" -> requestBuilder.POST(HttpRequest.BodyPublishers.ofString(payload)).build()
-                            "PUT" -> requestBuilder.PUT(HttpRequest.BodyPublishers.ofString(payload)).build()
-                            "DELETE" -> requestBuilder.DELETE().build()
-                            else -> throw NodeRuntimeException(
-                                workflowId = "",
-                                nodeId = "",
-                                message = "Unsupported HTTP method: $method"
-                            )
-                        }
-                        
-                        // Execute request
-                        val response = httpClient.send(request, HttpResponse.BodyHandlers.ofString())
-                        
-                        // Add response to row
-                        val newRow = row.toMutableMap().apply {
-                            this["response"] = mapOf(
-                                "status" to response.statusCode(),
-                                "body" to response.body()
-                            )
-                        }
-                        
-                        writer.write(rowNumber, newRow)
-                        rowNumber++
-                        
-                    } catch (e: Exception) {
-                        LOGGER.error("Failed to make HTTP request for row $rowNumber: ${e.message}")
-                        
-                        // Add error response to row
-                        val newRow = row.toMutableMap().apply {
-                            this["response"] = mapOf(
-                                "status" to -1,
-                                "body" to "Error: ${e.message}"
-                            )
-                        }
-                        
-                        writer.write(rowNumber, newRow)
-                        rowNumber++
-                    }
-                    
-                    row = reader.read()
-                }
-                
-                LOGGER.info("Processed $rowNumber HTTP requests")
+                message = "Unsupported HTTP method: $method"
+              )
             }
+
+            // Execute request
+            val response = httpClient.send(request, HttpResponse.BodyHandlers.ofString())
+
+            // Add response to row
+            val newRow = row.toMutableMap().apply {
+              this["response"] = mapOf(
+                "status" to response.statusCode(),
+                "body" to response.body()
+              )
+            }
+
+            writer.write(rowNumber, newRow)
+            rowNumber++
+
+          } catch (e: Exception) {
+            LOGGER.error("Failed to make HTTP request for row $rowNumber: ${e.message}")
+
+            // Add error response to row
+            val newRow = row.toMutableMap().apply {
+              this["response"] = mapOf(
+                "status" to -1,
+                "body" to "Error: ${e.message}"
+              )
+            }
+
+            writer.write(rowNumber, newRow)
+            rowNumber++
+          }
+
+          row = reader.read()
         }
+
+        LOGGER.info("Processed $rowNumber HTTP requests")
+      }
     }
+  }
 }

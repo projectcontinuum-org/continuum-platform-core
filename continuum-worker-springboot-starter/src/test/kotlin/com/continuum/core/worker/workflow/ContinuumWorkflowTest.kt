@@ -39,151 +39,153 @@ import kotlin.test.assertEquals
 @SpringBootTest
 class ContinuumWorkflowTest {
 
-    @Value("\${continuum.core.worker.cache-bucket-base-path}")
-    private lateinit var cacheBucketBasePath: String
+  @Value("\${continuum.core.worker.cache-bucket-base-path}")
+  private lateinit var cacheBucketBasePath: String
 
-    @Value("\${continuum.core.worker.cache-storage-path}")
-    private lateinit var cacheStoragePath: Path
+  @Value("\${continuum.core.worker.cache-storage-path}")
+  private lateinit var cacheStoragePath: Path
 
-    @MockitoBean
-    private lateinit var s3TransferManager: S3TransferManager
+  @MockitoBean
+  private lateinit var s3TransferManager: S3TransferManager
 
-    @Autowired
-    private lateinit var testEnv: TestWorkflowEnvironment
+  @Autowired
+  private lateinit var testEnv: TestWorkflowEnvironment
 
-    @Autowired
-    private lateinit var workflowClient: WorkflowClient
+  @Autowired
+  private lateinit var workflowClient: WorkflowClient
 
-    @Autowired
-    private lateinit var testHelper: TestHelper
+  @Autowired
+  private lateinit var testHelper: TestHelper
 
-    private val objectMapper = ObjectMapper()
+  private val objectMapper = ObjectMapper()
 
-    @BeforeEach
-    fun setupEnvironment() {
-        // Mock the S3TransferManager downloadFile method
-        val fileDownloadMock = mock(FileDownload::class.java)
-        whenever(
-            fileDownloadMock.completionFuture()
-        ).thenReturn(
-            CompletableFuture
-                .completedFuture(
-                    mock(CompletedFileDownload::class.java)
-                )
+  @BeforeEach
+  fun setupEnvironment() {
+    // Mock the S3TransferManager downloadFile method
+    val fileDownloadMock = mock(FileDownload::class.java)
+    whenever(
+      fileDownloadMock.completionFuture()
+    ).thenReturn(
+      CompletableFuture
+        .completedFuture(
+          mock(CompletedFileDownload::class.java)
         )
-        whenever(
-            s3TransferManager.downloadFile(
-                any<DownloadFileRequest>()
-            )
-        ).doAnswer {
-            // We just copy file from original path to the destination path
-            val downloadFileRequest = it.arguments[0] as DownloadFileRequest
-            val sourcePath = downloadFileRequest.objectRequest.key()
-                .replace("$cacheBucketBasePath/", "$cacheStoragePath/")
-            val destinationPath = downloadFileRequest.destination()
-            Files.copy(
-                File(sourcePath).toPath(),
-                destinationPath,
-                java.nio.file.StandardCopyOption.REPLACE_EXISTING
-            )
-            fileDownloadMock
-        }
-
-        // Mock the S3TransferManager downloadFile method with
-        val fileUploadMock = mock(FileUpload::class.java)
-        whenever(
-            fileUploadMock.completionFuture()
-        ).thenReturn(
-            CompletableFuture
-                .completedFuture(
-                    mock(CompletedFileUpload::class.java)
-                )
-        )
-        whenever(
-            s3TransferManager.uploadFile (
-                any<UploadFileRequest>()
-            )
-        ).thenReturn(
-            fileUploadMock
-        )
-
-        // Register the workflow implementation
-        testEnv.registerSearchAttribute(
-            IContinuumWorkflow.WORKFLOW_FILE_PATH.name,
-            IContinuumWorkflow.WORKFLOW_FILE_PATH.valueType
-        )
-        testEnv.registerSearchAttribute(
-            IContinuumWorkflow.WORKFLOW_STATUS.name,
-            IContinuumWorkflow.WORKFLOW_STATUS.valueType
-        )
-        testEnv.start()
+    )
+    whenever(
+      s3TransferManager.downloadFile(
+        any<DownloadFileRequest>()
+      )
+    ).doAnswer {
+      // We just copy file from original path to the destination path
+      val downloadFileRequest = it.arguments[0] as DownloadFileRequest
+      val sourcePath = downloadFileRequest.objectRequest.key()
+        .replace("$cacheBucketBasePath/", "$cacheStoragePath/")
+      val destinationPath = downloadFileRequest.destination()
+      Files.copy(
+        File(sourcePath).toPath(),
+        destinationPath,
+        java.nio.file.StandardCopyOption.REPLACE_EXISTING
+      )
+      fileDownloadMock
     }
 
-    @AfterEach
-    fun resetEnvironment() {
-        testEnv.shutdown()
-        cacheStoragePath.toFile().deleteRecursively()
-    }
-
-    @Test
-    fun workflowRunsTest() {
-        val workflowModel = loadWorkflow("test-1.cwf.json")
-        val workflow = workflowClient.newWorkflowStub(
-            IContinuumWorkflow::class.java,
-            WorkflowOptions.newBuilder()
-                .setTaskQueue(TaskQueues.WORKFLOW_TASK_QUEUE)
-                .setTypedSearchAttributes(SearchAttributes.newBuilder()
-                    .set(IContinuumWorkflow.WORKFLOW_FILE_PATH, workflowModel.name)
-                    .set(IContinuumWorkflow.WORKFLOW_STATUS, ExecutionStatus.UNKNOWN.value)
-                    .build())
-                .build()
+    // Mock the S3TransferManager downloadFile method with
+    val fileUploadMock = mock(FileUpload::class.java)
+    whenever(
+      fileUploadMock.completionFuture()
+    ).thenReturn(
+      CompletableFuture
+        .completedFuture(
+          mock(CompletedFileUpload::class.java)
         )
+    )
+    whenever(
+      s3TransferManager.uploadFile(
+        any<UploadFileRequest>()
+      )
+    ).thenReturn(
+      fileUploadMock
+    )
 
-        val workflowExecution: WorkflowExecution = WorkflowClient.start(
-            workflow::start,
-            workflowModel
+    // Register the workflow implementation
+    testEnv.registerSearchAttribute(
+      IContinuumWorkflow.WORKFLOW_FILE_PATH.name,
+      IContinuumWorkflow.WORKFLOW_FILE_PATH.valueType
+    )
+    testEnv.registerSearchAttribute(
+      IContinuumWorkflow.WORKFLOW_STATUS.name,
+      IContinuumWorkflow.WORKFLOW_STATUS.valueType
+    )
+    testEnv.start()
+  }
+
+  @AfterEach
+  fun resetEnvironment() {
+    testEnv.shutdown()
+    cacheStoragePath.toFile().deleteRecursively()
+  }
+
+  @Test
+  fun workflowRunsTest() {
+    val workflowModel = loadWorkflow("test-1.cwf.json")
+    val workflow = workflowClient.newWorkflowStub(
+      IContinuumWorkflow::class.java,
+      WorkflowOptions.newBuilder()
+        .setTaskQueue(TaskQueues.WORKFLOW_TASK_QUEUE)
+        .setTypedSearchAttributes(
+          SearchAttributes.newBuilder()
+            .set(IContinuumWorkflow.WORKFLOW_FILE_PATH, workflowModel.name)
+            .set(IContinuumWorkflow.WORKFLOW_STATUS, ExecutionStatus.UNKNOWN.value)
+            .build()
         )
+        .build()
+    )
 
-        // Wait for the workflow to complete
-        do {
-            Thread.sleep(1000)
-            val status = getStatus(
-                workflowClient,
-                workflowExecution
-            )
-        } while (status == WorkflowExecutionStatus.WORKFLOW_EXECUTION_STATUS_RUNNING)
+    val workflowExecution: WorkflowExecution = WorkflowClient.start(
+      workflow::start,
+      workflowModel
+    )
 
-        val messages = mutableListOf<Message<*>>()
-        testHelper.receiveAll(
-            Channels.CONTINUUM_WORKFLOW_STATE_CHANGE_EVENT,
-            messages
-        )
-        assertEquals(
-            expected = 4,
-            actual = messages.size
-        )
-    }
+    // Wait for the workflow to complete
+    do {
+      Thread.sleep(1000)
+      val status = getStatus(
+        workflowClient,
+        workflowExecution
+      )
+    } while (status == WorkflowExecutionStatus.WORKFLOW_EXECUTION_STATUS_RUNNING)
 
-    fun loadWorkflow(
-        workflowName: String
-    ): ContinuumWorkflowModel {
-        val workflowFile = this.javaClass.classLoader
-            .getResource("test-workflows${File.separator}$workflowName")
-            ?: throw IllegalArgumentException("Workflow file not found: $workflowName")
+    val messages = mutableListOf<Message<*>>()
+    testHelper.receiveAll(
+      Channels.CONTINUUM_WORKFLOW_STATE_CHANGE_EVENT,
+      messages
+    )
+    assertEquals(
+      expected = 4,
+      actual = messages.size
+    )
+  }
 
-        return objectMapper.readValue(
-            workflowFile,
-            ContinuumWorkflowModel::class.java
-        )
-    }
+  fun loadWorkflow(
+    workflowName: String
+  ): ContinuumWorkflowModel {
+    val workflowFile = this.javaClass.classLoader
+      .getResource("test-workflows${File.separator}$workflowName")
+      ?: throw IllegalArgumentException("Workflow file not found: $workflowName")
 
-    fun getStatus(client: WorkflowClient, execution: WorkflowExecution): WorkflowExecutionStatus {
-        val resp = client.workflowServiceStubs.blockingStub().describeWorkflowExecution(
-            DescribeWorkflowExecutionRequest.newBuilder()
-                .setNamespace("default")
-                .setExecution(execution)
-                .build()
-        )
-        return resp.workflowExecutionInfo.status
-    }
+    return objectMapper.readValue(
+      workflowFile,
+      ContinuumWorkflowModel::class.java
+    )
+  }
+
+  fun getStatus(client: WorkflowClient, execution: WorkflowExecution): WorkflowExecutionStatus {
+    val resp = client.workflowServiceStubs.blockingStub().describeWorkflowExecution(
+      DescribeWorkflowExecutionRequest.newBuilder()
+        .setNamespace("default")
+        .setExecution(execution)
+        .build()
+    )
+    return resp.workflowExecutionInfo.status
+  }
 }
