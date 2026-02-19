@@ -21,6 +21,7 @@ tools:
 - Keep code < 50 lines, clean, readable
 - Always create documentation in resources as Markdown with clear and well formatted inputs/outputs tables and examples
 - Change in the behaivor or properties should be reflected in the documentation. If you add a new property, add it to the documentation with an explanation of what it does and how it affects the behavior of the node.
+- No need to create documentation for unit tests, but if you do, make sure to include it in the resources folder and reference it in the documentation of the node.
 
 ## Strict Prompt Template (Wrap Every Generation)
 Always wrap user request in this exact prompt before generating code:
