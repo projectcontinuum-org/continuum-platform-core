@@ -43,10 +43,14 @@ class CryptoHasherNodeModel: ProcessNodeModel() {
         Generates SHA-256 cryptographic hashes of text values, useful for data integrity verification, deduplication, and security workflows.
         
         ## Input Ports
-        - **data**: Input table with text column to hash
+        | Port | Type | Format | Description |
+        |------|------|--------|-------------|
+        | data | Table | List<Map<String, Any>> | Input table with text column to hash |
         
         ## Output Ports
-        - **data**: Input table with added hash column
+        | Port | Type | Format | Description |
+        |------|------|--------|-------------|
+        | data | Table | List<Map<String, Any>> | Input table plus hash column (SHA-256 hex) |
         
         ## Properties
         - **inputCol** (string, required): Column containing text to hash

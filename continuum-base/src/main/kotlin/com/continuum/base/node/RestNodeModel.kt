@@ -63,10 +63,14 @@ class RestNodeModel: ProcessNodeModel() {
         Makes HTTP requests for each row using FreeMarker templates to dynamically construct URLs and payloads from row data.
         
         ## Input Ports
-        - **data**: Input table where each row triggers an HTTP request
+        | Port | Type | Format | Description |
+        |------|------|--------|-------------|
+        | data | Table | List<Map<String, Any>> | Input table where each row triggers an HTTP request |
         
         ## Output Ports
-        - **data**: Input table with added `response` column containing status and body
+        | Port | Type | Format | Description |
+        |------|------|--------|-------------|
+        | data | Table | List<Map<String, Any>> | Input table plus response column with {status, body} |
         
         ## Properties
         - **method** (string, required): HTTP method - GET, POST, PUT, or DELETE

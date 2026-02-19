@@ -46,10 +46,14 @@ class TimeWindowAggregatorNodeModel: ProcessNodeModel() {
         Groups time-series data into fixed-size time windows and aggregates values by summing within each window.
         
         ## Input Ports
-        - **data**: Input table with timestamp column and numeric values
+        | Port | Type | Format | Description |
+        |------|------|--------|-------------|
+        | data | Table | List<Map<String, Any>> | Input table with timestamp and numeric value columns |
         
         ## Output Ports
-        - **data**: Aggregated table with window start times and summed values
+        | Port | Type | Format | Description |
+        |------|------|--------|-------------|
+        | data | Table | List<Map<String, Any>> | Aggregated table with window_start and sum_value columns |
         
         ## Properties
         - **timeCol** (string, required): Column containing timestamps (format: "yyyy-MM-dd HH:mm:ss")

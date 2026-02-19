@@ -131,3 +131,7 @@ Time Window Aggregator
 - Example Properties: { "jsonArrayString": "[{ \"id\": 1, \"name\": \"Alice\" }, { \"id\": 2, \"name\": \"Bob\" }]" }
 - Detailed Example Input: N/A (no input ports).  
 - Detailed Example Output: Table with rows [{ "id": 1, "name": "Alice" }, { "id": 2, "name": "Bob" }].
+
+
+## Table Diff Checker
+- two input ports: "tableA" and "tableB", both Table.

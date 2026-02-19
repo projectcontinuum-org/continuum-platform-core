@@ -46,11 +46,15 @@ class ColumnJoinNodeModel: ProcessNodeModel() {
         Joins two columns from separate left and right tables into a single output column by concatenating values with a space.
         
         ## Input Ports
-        - **left**: Left input table
-        - **right**: Right input table
+        | Port | Type | Format | Description |
+        |------|------|--------|-------------|
+        | left | Table | List<Map<String, Any>> | Left input table with rows to join |
+        | right | Table | List<Map<String, Any>> | Right input table with rows to join |
         
         ## Output Ports
-        - **output**: Table containing a single column with joined values
+        | Port | Type | Format | Description |
+        |------|------|--------|-------------|
+        | output | Table | List<Map<String, Any>> | Table containing the joined column from both inputs |
         
         ## Properties
         - **columnNameLeft** (string, required): The column name from the left table to join

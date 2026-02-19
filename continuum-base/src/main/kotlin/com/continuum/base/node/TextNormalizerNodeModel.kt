@@ -43,10 +43,14 @@ class TextNormalizerNodeModel: ProcessNodeModel() {
         Normalizes text by applying standard cleaning operations: trimming whitespace, converting to lowercase, and removing non-alphanumeric characters (except spaces).
         
         ## Input Ports
-        - **data**: Input table with text column to normalize
+        | Port | Type | Format | Description |
+        |------|------|--------|-------------|
+        | data | Table | List<Map<String, Any>> | Input table with text column to normalize |
         
         ## Output Ports
-        - **data**: Input table with added normalized text column
+        | Port | Type | Format | Description |
+        |------|------|--------|-------------|
+        | data | Table | List<Map<String, Any>> | Input table plus normalized text column |
         
         ## Properties
         - **inputCol** (string, required): Column containing text to normalize

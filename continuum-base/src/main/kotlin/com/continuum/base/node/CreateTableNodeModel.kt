@@ -47,10 +47,14 @@ class CreateTableNodeModel: TriggerNodeModel() {
         Generates a structured table from a FreeMarker template. Supports dynamic row generation through template variables and loops.
         
         ## Input Ports
-        None - this node sources data from properties
+        | Port | Type | Format | Description |
+        |------|------|--------|-------------|
+        | (none) | - | - | This is a trigger node - sources data from properties only |
         
         ## Output Ports
-        - **data**: Table with rows created from generated JSON array objects
+        | Port | Type | Format | Description |
+        |------|------|--------|-------------|
+        | data | Table | List<Map<String, Any>> | Table with rows created from generated JSON array objects |
         
         ## Properties
         - **jsonArrayString** (string format: code, language: freemarker, required): FreeMarker template that generates a JSON array

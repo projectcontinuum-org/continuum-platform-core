@@ -42,10 +42,14 @@ class PivotColumnsNodeModel: ProcessNodeModel() {
         Transforms a table by pivoting: unique values from a pivot column become new column headers, with values from a value column filling the cells, grouped by an index column.
         
         ## Input Ports
-        - **data**: Input table in long format
+        | Port | Type | Format | Description |
+        |------|------|--------|-------------|
+        | data | Table | List<Map<String, Any>> | Input table in long format with rows to pivot |
         
         ## Output Ports
-        - **data**: Pivoted table in wide format
+        | Port | Type | Format | Description |
+        |------|------|--------|-------------|
+        | data | Table | List<Map<String, Any>> | Pivoted table in wide format with unique column values as headers |
         
         ## Properties
         - **indexCol** (string, required): Column to use as row identifier/index

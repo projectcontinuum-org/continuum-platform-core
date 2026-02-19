@@ -46,11 +46,15 @@ class JoinOnMultipleKeysNodeModel: ProcessNodeModel() {
         Performs an inner join between two tables using composite keys (two key columns from each table), combining rows where both key pairs match.
         
         ## Input Ports
-        - **left**: Left table for the join
-        - **right**: Right table for the join
+        | Port | Type | Format | Description |
+        |------|------|--------|-------------|
+        | left | Table | List<Map<String, Any>> | Left table with rows to join |
+        | right | Table | List<Map<String, Any>> | Right table with rows to join |
         
         ## Output Ports
-        - **data**: Joined table containing merged rows from both tables
+        | Port | Type | Format | Description |
+        |------|------|--------|-------------|
+        | data | Table | List<Map<String, Any>> | Joined table containing merged rows where composite keys match |
         
         ## Properties
         - **leftKey1** (string, required): First key column from the left table

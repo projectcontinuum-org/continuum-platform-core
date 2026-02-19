@@ -42,10 +42,14 @@ class BatchAccumulatorNodeModel: ProcessNodeModel() {
         Groups consecutive rows into fixed-size batches and adds batch metadata (batch ID and row count) to each row.
         
         ## Input Ports
-        - **data**: Input table to batch
+        | Port | Type | Format | Description |
+        |------|------|--------|-------------|
+        | data | Table | List<Map<String, Any>> | Input table with rows to batch |
         
         ## Output Ports
-        - **data**: Input table with added batch metadata columns
+        | Port | Type | Format | Description |
+        |------|------|--------|-------------|
+        | data | Table | List<Map<String, Any>> | Input table plus batch_id and row_count columns |
         
         ## Properties
         - **batchSize** (number, required): Number of rows per batch (minimum: 1)

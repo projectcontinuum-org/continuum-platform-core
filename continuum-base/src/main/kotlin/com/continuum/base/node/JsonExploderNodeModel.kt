@@ -42,10 +42,14 @@ class JsonExploderNodeModel: ProcessNodeModel() {
         Parses JSON strings from a column and flattens the top-level keys into separate columns, expanding the table structure.
         
         ## Input Ports
-        - **data**: Input table with a column containing JSON strings
+        | Port | Type | Format | Description |
+        |------|------|--------|-------------|
+        | data | Table | List<Map<String, Any>> | Input table with column containing JSON strings |
         
         ## Output Ports
-        - **data**: Table with JSON keys expanded into individual columns
+        | Port | Type | Format | Description |
+        |------|------|--------|-------------|
+        | data | Table | List<Map<String, Any>> | Table with JSON keys expanded into separate columns |
         
         ## Properties
         - **jsonCol** (string, required): Column containing JSON strings to parse and explode

@@ -46,11 +46,15 @@ class ConditionalSplitterNodeModel: ProcessNodeModel() {
         Splits input rows into two separate output streams based on a numeric threshold comparison, enabling conditional workflow branching.
         
         ## Input Ports
-        - **data**: Input table to split
+        | Port | Type | Format | Description |
+        |------|------|--------|-------------|
+        | data | Table | List<Map<String, Any>> | Input table with rows to split |
         
         ## Output Ports
-        - **high**: Rows where `column >= threshold`
-        - **low**: Rows where `column < threshold`
+        | Port | Type | Format | Description |
+        |------|------|--------|-------------|
+        | high | Table | List<Map<String, Any>> | Rows where column >= threshold |
+        | low | Table | List<Map<String, Any>> | Rows where column < threshold |
         
         ## Properties
         - **column** (string, required): Column name to compare against threshold

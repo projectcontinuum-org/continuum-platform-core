@@ -42,10 +42,14 @@ class DynamicRowFilterNodeModel: ProcessNodeModel() {
         Filters table rows based on a numeric threshold comparison, keeping only rows where the specified column value is greater than the threshold.
         
         ## Input Ports
-        - **data**: Input table to filter
+        | Port | Type | Format | Description |
+        |------|------|--------|-------------|
+        | data | Table | List<Map<String, Any>> | Input table with rows to filter |
         
         ## Output Ports
-        - **data**: Filtered table containing only rows that meet the criteria
+        | Port | Type | Format | Description |
+        |------|------|--------|-------------|
+        | data | Table | List<Map<String, Any>> | Filtered table containing only rows where value > threshold |
         
         ## Properties
         - **columnName** (string, required): The column name to compare against the threshold

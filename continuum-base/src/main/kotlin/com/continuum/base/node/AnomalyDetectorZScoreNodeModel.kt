@@ -45,10 +45,14 @@ class AnomalyDetectorZScoreNodeModel: ProcessNodeModel() {
         Detects statistical outliers in numeric data using the Z-score method, flagging values that deviate significantly from the mean.
         
         ## Input Ports
-        - **data**: Input table with numeric column to analyze
+        | Port | Type | Format | Description |
+        |------|------|--------|-------------|
+        | data | Table | List<Map<String, Any>> | Input table with numeric column to analyze |
         
         ## Output Ports
-        - **data**: Input table with added `is_outlier` boolean column
+        | Port | Type | Format | Description |
+        |------|------|--------|-------------|
+        | data | Table | List<Map<String, Any>> | Input table plus is_outlier boolean column |
         
         ## Properties
         - **valueCol** (string, required): The numeric column to analyze for outliers
