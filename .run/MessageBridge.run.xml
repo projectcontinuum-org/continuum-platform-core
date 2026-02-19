@@ -6,7 +6,6 @@
       <env name="CONTINUUM_KAFKA_MAIN_BROKER_LIST" value="localhost:39092,localhost:39093,localhost:39094" />
       <env name="TEMPORAL_SERVER_ADDRESS" value="localhost:7233" />
     </envs>
-    <option name="FRAME_DEACTIVATION_UPDATE_POLICY" value="UnknownPolicyInFreeMode" />
     <module name="continuum.continuum-message-bridge.main" />
     <option name="SPRING_BOOT_MAIN_CLASS" value="com.continuum.core.bridge.App" />
     <option name="VM_PARAMETERS" value="-Dserver.port=8082" />

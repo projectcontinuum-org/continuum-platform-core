@@ -6,6 +6,7 @@ import CloseIcon from '@mui/icons-material/Close';
 import { JsonForms } from '@jsonforms/react';
 import { materialCells, materialRenderers } from '@jsonforms/material-renderers';
 import { JsonFormsCore, JsonSchema, UISchemaElement } from '@jsonforms/core';
+import CodeEditorControl, { codeEditorTester } from './CodeEditorRenderer';
 
 const StyledDialog = styled(Dialog)(({ theme }) => ({
     '& .MuiDialogContent-root': {
@@ -15,6 +16,11 @@ const StyledDialog = styled(Dialog)(({ theme }) => ({
       padding: theme.spacing(1),
     },
 }));
+
+const customRenderers = [
+  { tester: codeEditorTester, renderer: CodeEditorControl },
+  ...materialRenderers,
+];
 
 export interface NodeDialogProps {
     open: boolean;
@@ -72,7 +78,7 @@ export default function NodeDialog({ onClose, onSave, readOnly=false, open, init
                         schema={dataSchema}
                         uischema={uiSchema}
                         data={data}
-                        renderers={materialRenderers}
+                        renderers={customRenderers}
                         cells={materialCells}
                         onChange={onDataChange}/>
                 </Box>

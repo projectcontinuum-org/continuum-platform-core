@@ -59,6 +59,10 @@ dependencies {
     // Nodes
     implementation(project(":continuum-knime-base"))
 
+    // Kotlin scripting dependencies
+    implementation("org.jetbrains.kotlin:kotlin-script-runtime:2.1.0")
+    implementation("org.jetbrains.kotlin:kotlin-scripting-jsr223:2.1.0")
+
     // Test dependencies
     testImplementation("org.springframework.boot:spring-boot-starter-test")
     testImplementation("org.jetbrains.kotlin:kotlin-test-junit5")

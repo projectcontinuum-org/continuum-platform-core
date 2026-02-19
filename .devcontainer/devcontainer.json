@@ -21,5 +21,6 @@
     "dbaeumer.vscode-eslint"
   ],
   "postCreateCommand": "gradle build",
+  "postStartCommand": "cd docker && docker compose up",
   "remoteUser": "vscode"
 }

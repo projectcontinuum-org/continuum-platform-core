@@ -19,7 +19,8 @@
     "@continuum/workflow-editor-extension": "*"
   },
   "devDependencies": {
-    "@theia/cli": "latest"
+    "@theia/cli": "latest",
+    "monaco-editor-webpack-plugin": "^7.1.0"
   },
   "scripts": {
     "build": "theia build --mode=development",
