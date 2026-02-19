@@ -20,6 +20,7 @@ const CodeEditorRenderer: React.FC<CodeEditorRendererProps> = (props) => {
     label,
     errors,
     options = {},
+    visible,
   } = props;
 
   const muiTheme = useTheme();
@@ -32,6 +33,11 @@ const CodeEditorRenderer: React.FC<CodeEditorRendererProps> = (props) => {
 
   const [value, setValue] = React.useState<string>(data || '');
 
+  // Sync local state with prop changes
+  React.useEffect(() => {
+    setValue(data || '');
+  }, [data]);
+
   const handleEditorChange = (newValue: string | undefined) => {
     if (newValue !== undefined) {
       setValue(newValue);
@@ -39,11 +45,18 @@ const CodeEditorRenderer: React.FC<CodeEditorRendererProps> = (props) => {
     }
   };
 
-  const editorHeight = `${rows * 20}px`;
+  // Calculate dynamic height based on content or use rows option
+  const lineCount = value ? value.split('\n').length : 1;
+  const dynamicRows = Math.max(Math.min(lineCount, rows), 1);
+  const editorHeight = `${dynamicRows * 20}px`;
   const hasError = errors && errors.length > 0;
   const errorMessage = errors && errors.length > 0 ? errors[0] : undefined;
 
   if (format !== 'code') {
+    return null;
+  }
+
+  if (!visible) {
     return null;
   }
 
