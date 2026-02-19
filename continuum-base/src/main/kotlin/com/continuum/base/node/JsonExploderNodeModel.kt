@@ -194,6 +194,7 @@ class JsonExploderNodeModel: ProcessNodeModel() {
                     } catch (e: Exception) {
                         LOGGER.error("Failed to parse JSON in row $rowNumber: ${e.message}")
                         throw NodeRuntimeException(
+                            isRetriable = !(e is com.fasterxml.jackson.core.JsonParseException || e is com.fasterxml.jackson.databind.JsonMappingException),
                             workflowId = "",
                             nodeId = "",
                             message = "Failed to parse JSON in row $rowNumber: ${e.message}"
