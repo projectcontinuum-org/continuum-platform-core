@@ -35,6 +35,7 @@ class RestNodeModel: ProcessNodeModel() {
             logTemplateExceptions = false
             wrapUncheckedExceptions = true
             fallbackOnNullLoopVariable = false
+            numberFormat = "computer"  // Outputs: 1000, 100, not 1,000, 1,00
         }
     }
 

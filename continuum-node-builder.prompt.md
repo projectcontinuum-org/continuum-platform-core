@@ -120,3 +120,14 @@ Time Window Aggregator
 - Example Properties: { "method": "GET", "payload": "mapOf('url' to 'https://api.example.com/data?query=${row[\"data\"]}', 'headers' to mapOf('Authorization
 - Detailed Example Input: Table with rows [{ "id": 1, "data": "query=hello" }, { "id": 2, "data": "query=world" }], method="GET", script: "mapOf('url' to 'https://api.example.com/search?${row['data']}', 'headers' to mapOf('Content-Type' to 'application/json'))".  
 - Detailed Example Output: [{ "id": 1, "data": "query=hello", "response": { "status": 200, "body": "{results: [... ]}" } }, { "id": 2, "data": "query=world", "response": { "status": 200, "body": "{results: [... ]}" } }].
+
+## JSON to Table Node
+- no input ports.  
+- Properties: "jsonArrayString" (string, format 'code' language 'json').
+- Output ports: 1, named "data".  
+- Behavior: parse jsonArrayString into a Table format, where each object in the JSON array becomes a row in the Table, and keys become column names. This allows users to easily convert raw JSON data into a structured format for further processing in the workflow. The node should handle parsing errors gracefully, returning an empty table or an error message if the input is not valid JSON. The node should also ensure that all rows have the same columns, filling in nulls for missing keys in any given object to maintain a consistent table structure. any kind of error happenig because of users input should be thrown as NodeRuntimeException with isRetriable as false.
+- Thinking: Use a JSON parsing library to convert the input string into a list of maps, then create a Table object from that list. Code snippet: `val jsonArray = JacksonMapper.readValue(jsonArrayString, List::class.java) as List<Map<String, Any>>; Table(jsonArray)`.  
+- Category: Table & Data Structures  
+- Example Properties: { "jsonArrayString": "[{ \"id\": 1, \"name\": \"Alice\" }, { \"id\": 2, \"name\": \"Bob\" }]" }
+- Detailed Example Input: N/A (no input ports).  
+- Detailed Example Output: Table with rows [{ "id": 1, "name": "Alice" }, { "id": 2, "name": "Bob" }].

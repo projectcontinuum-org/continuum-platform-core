@@ -6,14 +6,16 @@ import com.continuum.core.commons.utils.NodeOutputWriter
 import com.continuum.core.commons.utils.ValidationHelper
 
 abstract class ProcessNodeModel: ContinuumNodeModel {
+    /**
+       * Optional markdown documentation describing the node's functionality, inputs, outputs, and examples.
+       * Should include usage examples and detailed explanations of behavior.
+       */
+      override val documentationMarkdown: String? = """
+          ## ToDo: Add documentation for this node.
+        """.trimIndent()
+
     abstract val inputPorts: Map<String, ContinuumWorkflowModel.NodePort>
     abstract val outputPorts: Map<String, ContinuumWorkflowModel.NodePort>
-    
-    /**
-     * Optional markdown documentation describing the node's functionality, inputs, outputs, and examples.
-     * Should include usage examples and detailed explanations of behavior.
-     */
-    open val documentationMarkdown: String? = null
 
     open fun run(
         node: ContinuumWorkflowModel.Node,

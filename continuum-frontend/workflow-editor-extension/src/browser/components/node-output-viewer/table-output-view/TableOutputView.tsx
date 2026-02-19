@@ -16,7 +16,32 @@ export function TableOutputView({outputData}: TableOutputViewProps) {
     const [page, setPage] = React.useState<number>(0);
     const [pageSize, setPageSize] = React.useState<number>(25);
     const [loading, setLoading] = React.useState<boolean>(true);
-    
+
+    const deserializeCell = (cell: any): any => {
+        // Decode base64 value to string
+        const valueString = atob(cell.value);
+
+        switch(cell.contentType) {
+            case "application/vnd.continuum.x-string":
+                return valueString;
+            case "application/vnd.continuum.x-int":
+                return parseInt(valueString, 10);
+            case "application/vnd.continuum.x-long":
+                return BigInt(valueString);
+            case "application/vnd.continuum.x-float":
+                return parseFloat(valueString);
+            case "application/vnd.continuum.x-double":
+                return parseFloat(valueString);
+            case "application/vnd.continuum.x-boolean":
+                return valueString.toLowerCase() === "true";
+            case "application/json":
+                return JSON.parse(valueString);
+            default:
+                console.warn(`Unsupported content type: ${cell.contentType}`);
+                return valueString;
+        }
+    };
+
     useEffect(()=>{
         dataService.getNodeData(outputData.data, page, pageSize).then((data) => {
             if(data.data.length > 0) {
@@ -25,11 +50,7 @@ export function TableOutputView({outputData}: TableOutputViewProps) {
                 setRows(data.data.map((row: Array<any>, idx: number) => {
                     let newRow: any = {id: idx};
                     row.forEach((cell: any) => {
-                        if(cell.contentType === "application/vnd.continuum.x-string") {
-                            newRow[cell.name] = atob(cell.value);
-                        } else {
-                            newRow[cell.name] = cell.value;
-                        }
+                        newRow[cell.name] = deserializeCell(cell);
                     });
                     return newRow;
                 }));

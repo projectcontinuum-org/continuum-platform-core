@@ -13,7 +13,7 @@ class TimeTriggerNodeModel : TriggerNodeModel() {
         "Trigger"
     )
 
-    private final val outputPorts = mapOf(
+    final override val outputPorts = mapOf(
         "output-1" to ContinuumWorkflowModel.NodePort(
             name = "output-1",
             contentType = TEXT_PLAIN_VALUE
