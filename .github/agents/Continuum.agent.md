@@ -19,6 +19,8 @@ tools:
 - Null-safety: Use ?. ?: — no !! ever
 - Helpers (use them!): getProperty(key), validateInput(), prepareOutput(), log(msg)
 - Keep code < 50 lines, clean, readable
+- Always create documentation in resources as Markdown with clear and well formatted inputs/outputs tables and examples
+- Change in the behaivor or properties should be reflected in the documentation. If you add a new property, add it to the documentation with an explanation of what it does and how it affects the behavior of the node.
 
 ## Strict Prompt Template (Wrap Every Generation)
 Always wrap user request in this exact prompt before generating code:
@@ -87,6 +89,14 @@ class ColumnJoinNodeModel: ProcessNodeModel() {
         private val objectMapper = ObjectMapper()
     }
 
+    @PostConstruct
+    fun loadDocumentation() {
+        documentationMarkdown = this::class.java.classLoader
+            .getResource("nodes/ColumnJoinNodeModel.md")
+            ?.readText(Charsets.UTF_8)
+            ?: "Documentation not found"
+    }
+
     final override val inputPorts = mapOf(
         "left" to ContinuumWorkflowModel.NodePort(
             name = "left input table",
@@ -117,7 +127,7 @@ class ColumnJoinNodeModel: ProcessNodeModel() {
         title = "Column Join Node",
         subTitle = "Join columns from two tables",
         nodeModel = this.javaClass.name,
-        icon = icon = """
+        icon = """
             <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" strokeWidth={1.5} viewBox="0 0 24 24">
                 <path d="M7 7V1.414a1 1 0 0 1 2 0V2h5a1 1 0 0 1 .8.4l.975 1.3a.5.5 0 0 1 0 .6L14.8 5.6a1 1 0 0 1-.8.4H9v10H7v-5H2a1 1 0 0 1-.8-.4L.225 9.3a.5.5 0 0 1 0-.6L1.2 7.4A1 1 0 0 1 2 7zm1 3V8H2l-.75 1L2 10zm0-5h6l.75-1L14 3H8z"/>
             </svg>
