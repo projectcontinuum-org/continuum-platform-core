@@ -20,12 +20,18 @@ if (configs.length > 0 && configs[0].plugins) {
     const pluginsArray = configs[0].plugins;
     pluginsArray.push(
         new MonacoPlugin({
-            languages: ['json', 'typescript', 'javascript', 'kotlin'],
+            // Specify languages explicitly to avoid conflicts with Theia's Monaco core
+            languages: [
+                'json', 'typescript', 'javascript', 'kotlin',
+                'python', 'java', 'sql', 'html', 'css', 'xml',
+                'yaml', 'markdown', 'shell', 'dockerfile', 'php',
+                'ruby', 'go', 'rust', 'cpp', 'csharp', 'freemarker2'
+            ],
             customLanguages: [],
             filename: '[name].monaco-worker.js'
         })
     );
-}
+}ˀ
 
 module.exports = [
     ...configs,
