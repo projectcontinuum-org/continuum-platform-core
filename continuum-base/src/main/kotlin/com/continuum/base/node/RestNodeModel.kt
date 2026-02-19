@@ -213,13 +213,29 @@ class RestNodeModel: ProcessNodeModel() {
             },
             {
               "type": "Control",
-              "scope": "#/properties/url"
+              "scope": "#/properties/url",
+              "options": {
+                "format": "code",
+                "language": "freemarker2",
+                "rows": 1
+              }
             },
             {
               "type": "Control",
               "scope": "#/properties/payload",
               "options": {
-                "multi": true
+                "format": "code",
+                "language": "freemarker2",
+                "rows": 10
+              },
+              "rule": {
+                "effect": "HIDE",
+                "condition": {
+                  "scope": "#/properties/method",
+                  "schema": {
+                    "enum": ["GET", "DELETE"]
+                  }
+                }
               }
             }
           ]

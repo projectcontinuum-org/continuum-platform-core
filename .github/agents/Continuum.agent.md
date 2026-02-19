@@ -190,3 +190,4 @@ class ColumnJoinNodeModel: ProcessNodeModel() {
 - If user wants batching/security: Add chunked(100) or SecurityManager notes.
 - The propertiesUISchema only has following JSONFrom Renderer sets:
   1. React Material https://jsonforms.io/docs/renderer-sets
+  1. A custom monano-editor renderer wrapping react-monaco-editor for code properties (e.g., kotlin, freemarker templates, etc.). supported options: format (code), language (kotlin, javascript, json, etc.), rows (number of lines to show)
