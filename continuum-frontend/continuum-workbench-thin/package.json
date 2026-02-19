@@ -35,6 +35,7 @@
         "clean": "theia clean"
     },
     "devDependencies": {
-        "@theia/cli": "latest"
+        "@theia/cli": "latest",
+        "monaco-editor-webpack-plugin": "^7.1.0"
     }
 }
