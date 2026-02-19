@@ -5,7 +5,6 @@
 // @ts-check
 const configs = require('./gen-webpack.config.js');
 const nodeConfig = require('./gen-webpack.node.config.js');
-const MonacoPlugin = require('monaco-editor-webpack-plugin');
 
 /**
  * Expose bundled modules on window.theia.moduleName namespace, e.g.
@@ -15,23 +14,10 @@ const MonacoPlugin = require('monaco-editor-webpack-plugin');
  test: /\.js$/,
  loader: require.resolve('@theia/application-manager/lib/expose-loader')
  }); */
-if (configs.length > 0 && configs[0].plugins) {
-    /** @type {any} */
-    const pluginsArray = configs[0].plugins;
-    pluginsArray.push(
-        new MonacoPlugin({
-            // Specify languages explicitly to avoid conflicts with Theia's Monaco core
-            languages: [
-                'json', 'typescript', 'javascript', 'kotlin',
-                'python', 'java', 'sql', 'html', 'css', 'xml',
-                'yaml', 'markdown', 'shell', 'dockerfile', 'php',
-                'ruby', 'go', 'rust', 'cpp', 'csharp', 'freemarker2'
-            ],
-            customLanguages: [],
-            filename: '[name].monaco-worker.js'
-        })
-    );
-}ˀ
+
+// Note: MonacoPlugin removed - Theia already provides Monaco Editor with language support
+// through @theia/monaco-editor-core. All standard languages (Python, Java, SQL, etc.)
+// are already available without additional webpack configuration.
 
 module.exports = [
     ...configs,
