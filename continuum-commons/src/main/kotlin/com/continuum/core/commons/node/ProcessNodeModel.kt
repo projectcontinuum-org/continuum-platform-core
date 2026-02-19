@@ -17,8 +17,9 @@ abstract class ProcessNodeModel: ContinuumNodeModel {
       @PostConstruct
       fun loadDocumentationFromResources() {
           if (documentationMarkdown == null) {
+              val resourcePath = this::class.java.`package`.name.replace(".", "/") + "/${this::class.java.simpleName}.doc.md"
               documentationMarkdown = this::class.java.classLoader
-                  .getResource("com/continuum/base/node/${this::class.java.simpleName}.md")
+                  .getResource(resourcePath)
                   ?.readText(Charsets.UTF_8)
                   ?: "Documentation not found for ${this::class.java.simpleName}"
           }
