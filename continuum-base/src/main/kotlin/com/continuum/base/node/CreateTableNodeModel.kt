@@ -16,9 +16,9 @@ import java.io.StringReader
 import java.io.StringWriter
 
 @Component
-class JsonToTableNodeModel: TriggerNodeModel() {
+class CreateTableNodeModel: TriggerNodeModel() {
     companion object {
-        private val LOGGER = LoggerFactory.getLogger(JsonToTableNodeModel::class.java)
+        private val LOGGER = LoggerFactory.getLogger(CreateTableNodeModel::class.java)
         private val objectMapper = ObjectMapper()
         private val freemarkerConfig = Configuration(Configuration.VERSION_2_3_32).apply {
             defaultEncoding = "UTF-8"
@@ -42,10 +42,9 @@ class JsonToTableNodeModel: TriggerNodeModel() {
     )
 
     override val documentationMarkdown = """
-        # JSON to Table Node
+        # Create Table Node
         
-        Converts a FreeMarker-templated JSON array string into a structured table format for workflow processing.
-        Supports dynamic row generation through template variables and loops.
+        Generates a structured table from a FreeMarker template. Supports dynamic row generation through template variables and loops.
         
         ## Input Ports
         None - this node sources data from properties
@@ -198,9 +197,9 @@ class JsonToTableNodeModel: TriggerNodeModel() {
 
     override val metadata = ContinuumWorkflowModel.NodeData(
         id = this.javaClass.name,
-        description = "Converts JSON array string into a structured table with consistent columns",
-        title = "JSON to Table",
-        subTitle = "Parse JSON array into table rows",
+        description = "Creates a structured table from FreeMarker template configuration",
+        title = "Create Table",
+        subTitle = "Generate table rows from template",
         nodeModel = this.javaClass.name,
         icon = """
             <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" strokeWidth={1.5} viewBox="0 0 24 24">
