@@ -7,6 +7,7 @@ import { createTheme } from "@mui/material";
 import { ThemeType } from "@theia/core/lib/common/theme";
 import { ContinuumDarkTheme } from "./ContinuumDarkTheme";
 import { ContinuumLightTheme } from "./ContinuumLightTheme";
+import * as monaco from '@theia/monaco-editor-core';
 
 @injectable()
 export default class ContinuumThemeService {
@@ -23,6 +24,10 @@ export default class ContinuumThemeService {
     registerAllThemes() {
         this.monacoThemeService.registerParsedTheme(ContinuumLightTheme);
         this.monacoThemeService.registerParsedTheme(ContinuumDarkTheme);
+
+        // Initialize Monaco instance in the store so React components can use Theia's Monaco
+        useMUIThemeStore.setState({ monaco: monaco });
+
         this.updateMUITheme(this.themeService);
         this.themeService.onDidColorThemeChange(()=>{
             this.updateMUITheme(this.themeService);
@@ -30,16 +35,23 @@ export default class ContinuumThemeService {
     }
 
     updateMUITheme(themeService: ThemeService) {
-        useMUIThemeStore.setState((state)=>({theme: createTheme({
-            ...state.theme,
-            palette: {
-                mode: this.toMUIMode(themeService.getCurrentTheme().type),
-                background: {
-                    default: this.colorRegistry.getCurrentColor("panel.background"),
-                    paper: this.colorRegistry.getCurrentColor("panel.background")
+        const currentTheme = themeService.getCurrentTheme();
+        const themeType = currentTheme.type;
+        const monacoThemeName = currentTheme.editorTheme || this.toMonacoThemeName(themeType);
+
+        useMUIThemeStore.setState((state)=>({
+            theme: createTheme({
+                ...state.theme,
+                palette: {
+                    mode: this.toMUIMode(themeType),
+                    background: {
+                        default: this.colorRegistry.getCurrentColor("panel.background"),
+                        paper: this.colorRegistry.getCurrentColor("panel.background")
+                    }
                 }
-            }
-        })}));
+            }),
+            monacoTheme: monacoThemeName
+        }));
     }
 
     toMUIMode(themeType: ThemeType): "light" | "dark" {
@@ -50,8 +62,19 @@ export default class ContinuumThemeService {
                 return "light";
             case "hc":
                 return "dark";
-            case "hcLight": 
+            case "hcLight":
                 return "light";
+        }
+    }
+
+    toMonacoThemeName(themeType: ThemeType): string {
+        switch(themeType) {
+            case "dark":
+            case "hc":
+                return "continuum-dark";
+            case "light":
+            case "hcLight":
+                return "continuum-light";
         }
     }
 }

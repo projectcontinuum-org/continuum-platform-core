@@ -2,7 +2,7 @@
   "name": "continuum-frontend",
   "private": true,
   "scripts": {
-    "build": "turbo build --no-cache",
+    "build": "turbo build",
     "rebuild": "turbo build --no-cache --force",
     "dev": "turbo dev",
     "lint": "turbo lint",

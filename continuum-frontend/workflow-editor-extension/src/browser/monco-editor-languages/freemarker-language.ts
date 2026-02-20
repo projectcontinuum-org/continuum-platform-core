@@ -1,14 +1,15 @@
-import * as monaco from 'monaco-editor';
+import * as monaco from '@theia/monaco-editor-core';
 
 let freemarkerRegistered = false;
 
 /**
  * Register FreeMarker template language support in Monaco Editor
  * Provides syntax highlighting for FreeMarker directives, interpolations, and comments
+ * Uses Theia's Monaco editor core for consistent integration
  */
 export const registerFreemarkerLanguage = () => {
   if (freemarkerRegistered) return;
-  
+
   try {
     // Register the language
     monaco.languages.register({ id: 'freemarker' });

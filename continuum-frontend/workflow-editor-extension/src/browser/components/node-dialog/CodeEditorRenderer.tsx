@@ -2,9 +2,10 @@ import React from 'react';
 import { ControlProps } from '@jsonforms/core';
 import { withJsonFormsControlProps } from '@jsonforms/react';
 import { Box, FormHelperText, Typography, useTheme } from '@mui/material';
-import Editor from 'react-monaco-editor';
+import { MonacoEditorWrapper } from '../monaco/MonacoEditorWrapper';
 import { isControl, rankWith } from '@jsonforms/core';
 import { registerFreemarkerLanguage } from '../../monco-editor-languages/freemarker-language';
+import { useMUIThemeStore } from '../../store/MUIThemeStore';
 
 interface CodeEditorRendererProps extends ControlProps {
   options?: {
@@ -25,8 +26,7 @@ const CodeEditorRenderer: React.FC<CodeEditorRendererProps> = (props) => {
   } = props;
 
   const muiTheme = useTheme();
-  const isDarkMode = muiTheme.palette.mode === 'dark';
-  const monacoTheme = isDarkMode ? 'vs-dark' : 'vs-light';
+  const monacoTheme = useMUIThemeStore((state) => state.monacoTheme);
 
   const language = options.language || 'kotlin';
   const rows = options.rows || 15;
@@ -83,7 +83,7 @@ const CodeEditorRenderer: React.FC<CodeEditorRendererProps> = (props) => {
           background: muiTheme.palette.background.default,
         }}
       >
-        <Editor
+        <MonacoEditorWrapper
           value={value}
           language={language}
           height={editorHeight}
