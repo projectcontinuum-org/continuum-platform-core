@@ -2,7 +2,7 @@
  * This file can be edited to customize webpack configuration.
  * To reset delete this file and rerun theia build again.
  */
-// @ts-check
+// @ts-nocheck
 const configs = require('./gen-webpack.config.js');
 const nodeConfig = require('./gen-webpack.node.config.js');
 
@@ -14,10 +14,6 @@ const nodeConfig = require('./gen-webpack.node.config.js');
  test: /\.js$/,
  loader: require.resolve('@theia/application-manager/lib/expose-loader')
  }); */
-
-// Note: MonacoPlugin removed - Theia already provides Monaco Editor with language support
-// through @theia/monaco-editor-core. All standard languages (Python, Java, SQL, etc.)
-// are already available without additional webpack configuration.
 
 module.exports = [
     ...configs,

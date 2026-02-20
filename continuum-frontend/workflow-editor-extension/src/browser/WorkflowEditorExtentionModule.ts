@@ -18,9 +18,11 @@ import ContinuumMenuContribution from './contribution/ContinuumMenuContribution'
 import ContinuumNodeDialog, { ContinuumNodeDialogProps } from './dialog/node-dialog/ContinuumNodeDialog';
 import WorkflowViewerWidgetFactory from './widgets/workflow-viewer/WorkflowViewerWidgetFactory';
 import WorkflowViewerOpenHandler from './handlers/WorkflowViewerOpenHandler';
+import { MonacoLanguageRegistration } from './language/MonacoLanguageRegistration';
 
 export default new ContainerModule((bind) => {
     bind(ContinuumThemeService).toSelf().inSingletonScope();
+    bind(MonacoLanguageRegistration).toSelf().inSingletonScope();
 
     // Commands
     bind(CreateNewWorkflowCommand).toSelf().inSingletonScope();

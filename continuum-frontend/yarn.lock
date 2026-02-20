@@ -2738,7 +2738,7 @@
   dependencies:
     "@types/node" "*"
 
-"@types/trusted-types@*":
+"@types/trusted-types@*", "@types/trusted-types@^2.0.7":
   version "2.0.7"
   resolved "https://registry.yarnpkg.com/@types/trusted-types/-/trusted-types-2.0.7.tgz#baccb07a970b91707df3a3e8ba6896c57ead2d11"
   integrity sha512-ScaPdn1dQczgbl0QFTeTOmVHFULt394XJgOQNoyVhZ6r2vLnMLJfBPd53SB52T/3G36VI1/g2MZaX0cwDuXsfw==
@@ -4480,6 +4480,13 @@ dom-helpers@^5.0.1:
   dependencies:
     "@babel/runtime" "^7.8.7"
     csstype "^3.0.2"
+
+dompurify@3.2.7:
+  version "3.2.7"
+  resolved "https://elilillyco.jfrog.io/artifactory/api/npm/Lilly-NPM/dompurify/-/dompurify-3.2.7.tgz#721d63913db5111dd6dfda8d3a748cfd7982d44a"
+  integrity sha512-WhL/YuveyGXJaerVlMYGWhvQswa7myDG17P7Vu65EWC05o8vfeNbvNf4d/BOvH99+ZW+LlQsc1GDKMa1vNK6dw==
+  optionalDependencies:
+    "@types/trusted-types" "^2.0.7"
 
 dompurify@^2.2.9:
   version "2.5.8"
@@ -6370,6 +6377,11 @@ markdown-it@^12.3.2:
     mdurl "^1.0.1"
     uc.micro "^1.0.5"
 
+marked@14.0.0:
+  version "14.0.0"
+  resolved "https://elilillyco.jfrog.io/artifactory/api/npm/Lilly-NPM/marked/-/marked-14.0.0.tgz#79a1477358a59e0660276f8fec76de2c33f35d83"
+  integrity sha512-uIj4+faQ+MgHgwUW1l2PsPglZLOLOT1uErt06dAPtx2kjteLAkbsd/0FiYg/MGS+i7ZKLb7w2WClxHkzOOuryQ==
+
 matcher@^3.0.0:
   version "3.0.0"
   resolved "https://registry.yarnpkg.com/matcher/-/matcher-3.0.0.tgz#bd9060f4c5b70aa8041ccc6f80368760994f30ca"
@@ -6624,10 +6636,13 @@ monaco-editor-webpack-plugin@^7.1.0:
   dependencies:
     loader-utils "^2.0.2"
 
-monaco-editor@^0.50.0:
-  version "0.50.0"
-  resolved "https://elilillyco.jfrog.io/artifactory/api/npm/Lilly-NPM/monaco-editor/-/monaco-editor-0.50.0.tgz#44e62b124c8aed224e1d310bbbe6ffd6d5122413"
-  integrity sha512-8CclLCmrRRh+sul7C08BmPBP3P8wVWfBHomsTcndxg5NRCEPfu/mc2AGU8k37ajjDVXcXFc12ORAMUkmk+lkFA==
+monaco-editor@^0.55.1:
+  version "0.55.1"
+  resolved "https://elilillyco.jfrog.io/artifactory/api/npm/Lilly-NPM/monaco-editor/-/monaco-editor-0.55.1.tgz#e74c6fe5a6bf985b817d2de3eb88d56afc494a1b"
+  integrity sha512-jz4x+TJNFHwHtwuV9vA9rMujcZRb0CEilTEwG2rRSpe/A7Jdkuj8xPKttCgOh+v/lkHy7HsZ64oj+q3xoAFl9A==
+  dependencies:
+    dompurify "3.2.7"
+    marked "14.0.0"
 
 mount-point@^3.0.0:
   version "3.0.0"

@@ -4,7 +4,6 @@ import { withJsonFormsControlProps } from '@jsonforms/react';
 import { Box, FormHelperText, Typography, useTheme } from '@mui/material';
 import { MonacoEditorWrapper } from '../monaco/MonacoEditorWrapper';
 import { isControl, rankWith } from '@jsonforms/core';
-import { registerFreemarkerLanguage } from '../../monco-editor-languages/freemarker-language';
 import { useMUIThemeStore } from '../../store/MUIThemeStore';
 
 interface CodeEditorRendererProps extends ControlProps {
@@ -33,13 +32,6 @@ const CodeEditorRenderer: React.FC<CodeEditorRendererProps> = (props) => {
   const format = options.format || 'code';
 
   const [value, setValue] = React.useState<string>(data || '');
-
-  // Register FreeMarker language on mount
-  React.useEffect(() => {
-    if (language === 'freemarker') {
-      registerFreemarkerLanguage();
-    }
-  }, [language]);
 
   // Sync local state with prop changes
   React.useEffect(() => {
