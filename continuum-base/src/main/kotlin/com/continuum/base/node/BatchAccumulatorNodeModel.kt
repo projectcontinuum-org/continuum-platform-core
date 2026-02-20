@@ -11,6 +11,46 @@ import org.slf4j.LoggerFactory
 import org.springframework.http.MediaType.TEXT_PLAIN_VALUE
 import org.springframework.stereotype.Component
 
+/**
+ * Node model for grouping rows into batches and enriching them with batch metadata.
+ *
+ * This node processes input rows and assigns them to batches of a specified size.
+ * Each row is enriched with two additional columns:
+ * - batch_id: The batch number (1-indexed)
+ * - row_count: The total number of rows in that batch
+ *
+ * **Batching Logic**:
+ * - Rows are grouped sequentially into batches of the specified size
+ * - The last batch may contain fewer rows if total rows is not evenly divisible by batch size
+ * - Batch IDs start at 1 (not 0)
+ *
+ * **Performance Optimization**:
+ * This implementation uses Parquet metadata reading for optimal performance:
+ * 1. Read total row count from Parquet file metadata (no data streaming required)
+ * 2. Calculate batch sizes based on row count
+ * 3. Stream through rows once to enrich them with batch metadata
+ *
+ * This approach avoids loading all rows into memory and minimizes I/O by reading the data
+ * only once, making it suitable for very large datasets.
+ *
+ * **Input**:
+ * - Port "data": Table to be batched
+ *
+ * **Output**:
+ * - Port "data": Original table with added batch_id and row_count columns
+ *
+ * **Configuration Properties**:
+ * - batchSize (required): Number of rows per batch (minimum: 1)
+ *
+ * **Use Cases**:
+ * - Processing large datasets in smaller chunks for API calls
+ * - Parallel processing by distributing batches to workers
+ * - Rate limiting by processing one batch at a time
+ * - Memory management when downstream operations are memory-intensive
+ *
+ * @see ProcessNodeModel
+ * @author Continuum Workflow
+ */
 @Component
 class BatchAccumulatorNodeModel : ProcessNodeModel() {
   companion object {
@@ -89,11 +129,26 @@ class BatchAccumulatorNodeModel : ProcessNodeModel() {
     propertiesUISchema = propertiesUiSchema
   )
 
+  /**
+   * Executes the batch accumulation algorithm using an optimized streaming approach.
+   *
+   * This implementation uses metadata reading for efficiency:
+   * 1. Read Parquet metadata to get total row count (no data streaming)
+   * 2. Calculate batch sizes based on row count
+   * 3. Stream through rows once to enrich them with batch_id and row_count
+   *
+   * This is more efficient than the two-pass approach as it avoids the first counting pass.
+   *
+   * @param properties Configuration containing batchSize
+   * @param inputs Input data stream containing the table to batch
+   * @param nodeOutputWriter Writer for output data with batch metadata
+   */
   override fun execute(
     properties: Map<String, Any>?,
     inputs: Map<String, NodeInputReader>,
     nodeOutputWriter: NodeOutputWriter
   ) {
+    // Extract and validate configuration properties
     val batchSize = (properties?.get("batchSize") as? Number)?.toInt() ?: throw NodeRuntimeException(
       workflowId = "",
       nodeId = "",
@@ -110,46 +165,68 @@ class BatchAccumulatorNodeModel : ProcessNodeModel() {
 
     LOGGER.info("Batching rows with batchSize=$batchSize")
 
-    // First pass: collect all rows
-    val allRows = mutableListOf<Map<String, Any>>()
-    inputs["data"]?.use { reader ->
-      var row = reader.read()
-      while (row != null) {
-        allRows.add(row)
-        row = reader.read()
-      }
+    // Get the input reader
+    val inputReader = inputs["data"] ?: run {
+      LOGGER.info("No input data provided")
+      return
     }
 
-    if (allRows.isEmpty()) {
+    // ========================================
+    // METADATA READ: Get row count from Parquet metadata
+    // ========================================
+    // Read the Parquet file metadata to get the total row count
+    // This is much faster than streaming through all rows
+    val totalRows = inputReader.getRowCount()
+
+    // Handle empty input
+    if (totalRows == 0L) {
       LOGGER.info("No rows to batch")
       return
     }
 
-    // Calculate batch sizes
-    val totalRows = allRows.size
-    val totalBatches = (totalRows + batchSize - 1) / batchSize // Ceiling division
+    // Calculate total number of batches (ceiling division)
+    val totalBatches = ((totalRows + batchSize - 1) / batchSize).toInt()
+
+    // Pre-calculate the row count for each batch
+    // Most batches will have batchSize rows, but the last batch may have fewer
     val batchSizes = mutableMapOf<Int, Int>()
 
     for (batchId in 1..totalBatches) {
       val startIdx = (batchId - 1) * batchSize
-      val endIdx = minOf(startIdx + batchSize, totalRows)
+      val endIdx = minOf(startIdx + batchSize, totalRows.toInt())
       batchSizes[batchId] = endIdx - startIdx
     }
 
     LOGGER.info("Created $totalBatches batches from $totalRows rows")
 
-    // Second pass: enrich rows with batch_id and row_count
+    // ========================================
+    // SINGLE PASS: Enrich rows with batch metadata
+    // ========================================
+    // Stream through all rows once and add batch_id and row_count columns.
+    // We use the pre-calculated batch sizes to enrich each row.
     nodeOutputWriter.createOutputPortWriter("data").use { writer ->
-      allRows.forEachIndexed { idx, row ->
-        val batchId = (idx / batchSize) + 1
-        val rowCount = batchSizes[batchId] ?: batchSize
+      inputReader.use { reader ->
+        var index = 0L
+        var row = reader.read()
 
-        val enrichedRow = row.toMutableMap().apply {
-          this["batch_id"] = batchId
-          this["row_count"] = rowCount
+        while (row != null) {
+          // Calculate which batch this row belongs to (1-indexed)
+          val batchId = (index / batchSize).toInt() + 1
+
+          // Look up the row count for this batch from our pre-calculated map
+          val rowCount = batchSizes[batchId] ?: batchSize
+
+          // Create enriched row with batch metadata
+          val enrichedRow = row.toMutableMap().apply {
+            this["batch_id"] = batchId
+            this["row_count"] = rowCount
+          }
+
+          // Write the enriched row to output
+          writer.write(index, enrichedRow)
+          index++
+          row = reader.read()
         }
-
-        writer.write(idx.toLong(), enrichedRow)
       }
     }
 
