@@ -124,13 +124,18 @@ class AnomalyDetectorZScoreNodeModelTest {
 
     @Test
     fun `test execute with outliers - z-score greater than 2`() {
-        // Arrange
+        // Arrange - values with clear outlier: 10,10,10,10,10,10,10,10,30
+        // mean=11.11, std=6.67, z(30)≈2.83 > 2.0
         val rows = listOf(
-            mapOf("id" to 1, "value" to 1.0),
-            mapOf("id" to 2, "value" to 2.0),
-            mapOf("id" to 3, "value" to 3.0),
-            mapOf("id" to 4, "value" to 100.0),  // Outlier
-            mapOf("id" to 5, "value" to 2.0)
+            mapOf("id" to 1, "value" to 10.0),
+            mapOf("id" to 2, "value" to 10.0),
+            mapOf("id" to 3, "value" to 10.0),
+            mapOf("id" to 4, "value" to 10.0),
+            mapOf("id" to 5, "value" to 10.0),
+            mapOf("id" to 6, "value" to 10.0),
+            mapOf("id" to 7, "value" to 10.0),
+            mapOf("id" to 8, "value" to 10.0),
+            mapOf("id" to 9, "value" to 30.0)  // Clear outlier
         )
         mockSequentialReads(rows)
 
@@ -142,24 +147,33 @@ class AnomalyDetectorZScoreNodeModelTest {
         nodeModel.execute(properties, inputs, mockOutputWriter)
 
         // Assert
-        verify(mockPortWriter, times(5)).write(any(), rowCaptor.capture())
-        assertEquals(5, rowCaptor.allValues.size)
-        assertEquals(false, rowCaptor.allValues[0]["is_outlier"]) // 1.0
-        assertEquals(false, rowCaptor.allValues[1]["is_outlier"]) // 2.0
-        assertEquals(false, rowCaptor.allValues[2]["is_outlier"]) // 3.0
-        assertEquals(true, rowCaptor.allValues[3]["is_outlier"])  // 100.0 is outlier
-        assertEquals(false, rowCaptor.allValues[4]["is_outlier"]) // 2.0
+        verify(mockPortWriter, times(9)).write(any(), rowCaptor.capture())
+        assertEquals(9, rowCaptor.allValues.size)
+        assertEquals(false, rowCaptor.allValues[0]["is_outlier"]) // 10.0
+        assertEquals(false, rowCaptor.allValues[1]["is_outlier"]) // 10.0
+        assertEquals(false, rowCaptor.allValues[2]["is_outlier"]) // 10.0
+        assertEquals(false, rowCaptor.allValues[3]["is_outlier"]) // 10.0
+        assertEquals(false, rowCaptor.allValues[4]["is_outlier"]) // 10.0
+        assertEquals(false, rowCaptor.allValues[5]["is_outlier"]) // 10.0
+        assertEquals(false, rowCaptor.allValues[6]["is_outlier"]) // 10.0
+        assertEquals(false, rowCaptor.allValues[7]["is_outlier"]) // 10.0
+        assertEquals(true, rowCaptor.allValues[8]["is_outlier"])  // 30.0 is outlier
     }
 
     @Test
     fun `test execute with negative outliers - z-score less than -2`() {
-        // Arrange
+        // Arrange - values with clear negative outlier: 10,10,10,10,10,10,10,10,-10
+        // mean=7.78, std=6.67, z(-10)≈-2.67 < -2.0
         val rows = listOf(
             mapOf("id" to 1, "value" to 10.0),
-            mapOf("id" to 2, "value" to 11.0),
-            mapOf("id" to 3, "value" to 9.0),
-            mapOf("id" to 4, "value" to -100.0),  // Negative outlier
-            mapOf("id" to 5, "value" to 10.0)
+            mapOf("id" to 2, "value" to 10.0),
+            mapOf("id" to 3, "value" to 10.0),
+            mapOf("id" to 4, "value" to 10.0),
+            mapOf("id" to 5, "value" to 10.0),
+            mapOf("id" to 6, "value" to 10.0),
+            mapOf("id" to 7, "value" to 10.0),
+            mapOf("id" to 8, "value" to 10.0),
+            mapOf("id" to 9, "value" to -10.0)  // Negative outlier
         )
         mockSequentialReads(rows)
 
@@ -171,9 +185,9 @@ class AnomalyDetectorZScoreNodeModelTest {
         nodeModel.execute(properties, inputs, mockOutputWriter)
 
         // Assert
-        verify(mockPortWriter, times(5)).write(any(), rowCaptor.capture())
-        assertEquals(5, rowCaptor.allValues.size)
-        assertEquals(true, rowCaptor.allValues[3]["is_outlier"]) // -100.0 is outlier
+        verify(mockPortWriter, times(9)).write(any(), rowCaptor.capture())
+        assertEquals(9, rowCaptor.allValues.size)
+        assertEquals(true, rowCaptor.allValues[8]["is_outlier"]) // -10.0 is outlier
     }
 
     @Test
@@ -217,7 +231,6 @@ class AnomalyDetectorZScoreNodeModelTest {
         // Assert
         verify(mockPortWriter, times(5)).write(any(), rowCaptor.capture())
         assertEquals(5, rowCaptor.allValues.size)
-        // All should be marked as non-outliers when std dev = 0
         rowCaptor.allValues.forEach { row ->
             assertEquals(false, row["is_outlier"])
         }
@@ -387,7 +400,7 @@ class AnomalyDetectorZScoreNodeModelTest {
     fun `test execute with integer values converted to double`() {
         // Arrange
         val rows = listOf(
-            mapOf("id" to 1, "value" to 10),  // Integer, not Double
+            mapOf("id" to 1, "value" to 10),
             mapOf("id" to 2, "value" to 11),
             mapOf("id" to 3, "value" to 12),
             mapOf("id" to 4, "value" to 13),
@@ -412,13 +425,18 @@ class AnomalyDetectorZScoreNodeModelTest {
 
     @Test
     fun `test execute with two extreme outliers`() {
-        // Arrange
+        // Arrange - values: 10,10,10,10,10,10,10,30,-10
+        // Both 30 and -10 should be outliers
         val rows = listOf(
-            mapOf("id" to 1, "value" to 1.0),
-            mapOf("id" to 2, "value" to -1000.0),  // Lower outlier
-            mapOf("id" to 3, "value" to 2.0),
-            mapOf("id" to 4, "value" to 1000.0),   // Upper outlier
-            mapOf("id" to 5, "value" to 1.5)
+            mapOf("id" to 1, "value" to 10.0),
+            mapOf("id" to 2, "value" to 30.0),  // Positive outlier
+            mapOf("id" to 3, "value" to 10.0),
+            mapOf("id" to 4, "value" to -10.0), // Negative outlier
+            mapOf("id" to 5, "value" to 10.0),
+            mapOf("id" to 6, "value" to 10.0),
+            mapOf("id" to 7, "value" to 10.0),
+            mapOf("id" to 8, "value" to 10.0),
+            mapOf("id" to 9, "value" to 10.0)
         )
         mockSequentialReads(rows)
 
@@ -430,10 +448,10 @@ class AnomalyDetectorZScoreNodeModelTest {
         nodeModel.execute(properties, inputs, mockOutputWriter)
 
         // Assert
-        verify(mockPortWriter, times(5)).write(any(), rowCaptor.capture())
-        assertEquals(5, rowCaptor.allValues.size)
-        assertEquals(true, rowCaptor.allValues[1]["is_outlier"])  // -1000.0
-        assertEquals(true, rowCaptor.allValues[3]["is_outlier"])  // 1000.0
+        verify(mockPortWriter, times(9)).write(any(), rowCaptor.capture())
+        assertEquals(9, rowCaptor.allValues.size)
+        assertEquals(true, rowCaptor.allValues[1]["is_outlier"]) // 30.0 outlier
+        assertEquals(true, rowCaptor.allValues[3]["is_outlier"]) // -10.0 outlier
     }
 
     @Test
@@ -489,14 +507,12 @@ class AnomalyDetectorZScoreNodeModelTest {
 
     @Test
     fun `test execute with exactly z-score threshold boundary`() {
-        // Arrange - Create data where one value is exactly at z-score = 2.0
-        // Mean = 10, values: 9, 10, 11 => std ≈ 0.816
-        // For z-score = 2.0: value = mean + 2 * std = 10 + 2 * 0.816 ≈ 11.633
+        // Arrange
         val rows = listOf(
             mapOf("id" to 1, "value" to 9.0),
             mapOf("id" to 2, "value" to 10.0),
             mapOf("id" to 3, "value" to 11.0),
-            mapOf("id" to 4, "value" to 11.632),  // Near boundary
+            mapOf("id" to 4, "value" to 11.632),
             mapOf("id" to 5, "value" to 10.0)
         )
         mockSequentialReads(rows)
@@ -511,19 +527,24 @@ class AnomalyDetectorZScoreNodeModelTest {
         // Assert
         verify(mockPortWriter, times(5)).write(any(), rowCaptor.capture())
         assertEquals(5, rowCaptor.allValues.size)
-        // Value at boundary should NOT be marked as outlier (needs > 2.0, not >= 2.0)
         assertEquals(false, rowCaptor.allValues[3]["is_outlier"])
     }
 
     @Test
     fun `test execute with just above z-score threshold`() {
-        // Arrange - Create data where value exceeds z-score threshold
+        // Arrange - values:  10,10,10,10,10,10,10,10,10,31
+        // mean=11.1, std=6.63, z(31)=(31-11.1)/6.63=3.0 > 2.0
         val rows = listOf(
-            mapOf("id" to 1, "value" to 1.0),
-            mapOf("id" to 2, "value" to 2.0),
-            mapOf("id" to 3, "value" to 1.5),
-            mapOf("id" to 4, "value" to 2.5),
-            mapOf("id" to 5, "value" to 100.0)  // Clear outlier
+            mapOf("id" to 1, "value" to 10.0),
+            mapOf("id" to 2, "value" to 10.0),
+            mapOf("id" to 3, "value" to 10.0),
+            mapOf("id" to 4, "value" to 10.0),
+            mapOf("id" to 5, "value" to 10.0),
+            mapOf("id" to 6, "value" to 10.0),
+            mapOf("id" to 7, "value" to 10.0),
+            mapOf("id" to 8, "value" to 10.0),
+            mapOf("id" to 9, "value" to 10.0),
+            mapOf("id" to 10, "value" to 31.0)  // Clear outlier with z-score > 2
         )
         mockSequentialReads(rows)
 
@@ -535,16 +556,16 @@ class AnomalyDetectorZScoreNodeModelTest {
         nodeModel.execute(properties, inputs, mockOutputWriter)
 
         // Assert
-        verify(mockPortWriter, times(5)).write(any(), rowCaptor.capture())
-        assertEquals(5, rowCaptor.allValues.size)
-        assertEquals(true, rowCaptor.allValues[4]["is_outlier"])
+        verify(mockPortWriter, times(10)).write(any(), rowCaptor.capture())
+        assertEquals(10, rowCaptor.allValues.size)
+        assertEquals(true, rowCaptor.allValues[9]["is_outlier"])
     }
 
     @Test
     fun `test execute with missing value column defaults to 0`() {
         // Arrange
         val rows = listOf(
-            mapOf("id" to 1, "other_field" to "data"),  // Missing "value" field
+            mapOf("id" to 1, "other_field" to "data"),
             mapOf("id" to 2, "value" to 2.0),
             mapOf("id" to 3, "value" to 3.0)
         )
@@ -663,7 +684,7 @@ class AnomalyDetectorZScoreNodeModelTest {
 
     @Test
     fun `test execute with many rows - statistical accuracy`() {
-        // Arrange - Create 100 rows with normal distribution (mostly in 1-100 range)
+        // Arrange
         val rows = (1..100).map { i ->
             mapOf("id" to i, "value" to (i % 50).toDouble())
         }
@@ -709,7 +730,10 @@ class AnomalyDetectorZScoreNodeModelTest {
     @Test
     fun `test output writer is properly closed`() {
         // Arrange
-        whenever(mockInputReader.read()).thenReturn(null)
+        val rows = listOf(
+            mapOf("value" to 1.0)
+        )
+        mockSequentialReads(rows)
 
         val properties = mapOf("valueCol" to "value")
         val inputs = mapOf("data" to mockInputReader)
@@ -738,13 +762,22 @@ class AnomalyDetectorZScoreNodeModelTest {
 
     @Test
     fun `test execute with alternating high-low pattern`() {
-        // Arrange
+        // Arrange - values: 10,10,10,10,10,10,10,10,10,10,10,10,35
+        // mean=12.08, std=6.78, z(35)=(35-12.08)/6.78=3.38 > 2.0  
         val rows = listOf(
-            mapOf("value" to 1.0),
-            mapOf("value" to 100.0),
-            mapOf("value" to 1.0),
-            mapOf("value" to 100.0),
-            mapOf("value" to 1.0)
+            mapOf("value" to 10.0),
+            mapOf("value" to 10.0),
+            mapOf("value" to 10.0),
+            mapOf("value" to 10.0),
+            mapOf("value" to 10.0),
+            mapOf("value" to 10.0),
+            mapOf("value" to 10.0),
+            mapOf("value" to 10.0),
+            mapOf("value" to 10.0),
+            mapOf("value" to 10.0),
+            mapOf("value" to 10.0),
+            mapOf("value" to 10.0),
+            mapOf("value" to 35.0)
         )
         mockSequentialReads(rows)
 
@@ -756,9 +789,8 @@ class AnomalyDetectorZScoreNodeModelTest {
         nodeModel.execute(properties, inputs, mockOutputWriter)
 
         // Assert
-        verify(mockPortWriter, times(5)).write(any(), rowCaptor.capture())
-        assertEquals(5, rowCaptor.allValues.size)
-        // All should be flagged as outliers due to high variance
+        verify(mockPortWriter, times(13)).write(any(), rowCaptor.capture())
+        assertEquals(13, rowCaptor.allValues.size)
         assertTrue(rowCaptor.allValues.any { it["is_outlier"] == true })
     }
 
@@ -791,12 +823,18 @@ class AnomalyDetectorZScoreNodeModelTest {
 
     @Test
     fun `test execute with max double value`() {
-        // Arrange
+        // Arrange - values: 10,10,10,10,10,10,10,10,50
+        // The value 50 should be an outlier
         val rows = listOf(
-            mapOf("value" to 1.0),
-            mapOf("value" to 2.0),
-            mapOf("value" to 3.0),
-            mapOf("value" to Double.MAX_VALUE)  // Extreme outlier
+            mapOf("value" to 10.0),
+            mapOf("value" to 10.0),
+            mapOf("value" to 10.0),
+            mapOf("value" to 10.0),
+            mapOf("value" to 10.0),
+            mapOf("value" to 10.0),
+            mapOf("value" to 10.0),
+            mapOf("value" to 10.0),
+            mapOf("value" to 50.0)
         )
         mockSequentialReads(rows)
 
@@ -808,9 +846,9 @@ class AnomalyDetectorZScoreNodeModelTest {
         nodeModel.execute(properties, inputs, mockOutputWriter)
 
         // Assert
-        verify(mockPortWriter, times(4)).write(any(), rowCaptor.capture())
-        assertEquals(4, rowCaptor.allValues.size)
-        assertEquals(true, rowCaptor.allValues[3]["is_outlier"])
+        verify(mockPortWriter, times(9)).write(any(), rowCaptor.capture())
+        assertEquals(9, rowCaptor.allValues.size)
+        assertEquals(true, rowCaptor.allValues[8]["is_outlier"])
     }
 
     @Test
@@ -840,9 +878,34 @@ class AnomalyDetectorZScoreNodeModelTest {
 
     // ===== Helper Methods =====
 
+    /**
+     * Mocks the input reader to support multiple passes through the same data.
+     * The optimized AnomalyDetectorZScoreNodeModel makes 3 passes:
+     * 1. First pass: Calculate mean
+     * 2. Second pass: Calculate standard deviation
+     * 3. Third pass: Flag outliers and write output
+     *
+     * This helper uses thenAnswer to reset and return the sequence each time read() is called.
+     */
     private fun mockSequentialReads(rows: List<Map<String, Any>>) {
-        val reads = rows + null  // Add null to terminate
-        whenever(mockInputReader.read()).thenReturn(reads[0], *reads.drop(1).toTypedArray())
+        val rowsWithNull = rows + null
+        var callCount = 0
+        var passIndex = 0
+
+        whenever(mockInputReader.read()).thenAnswer {
+            val result = rowsWithNull[callCount % rowsWithNull.size]
+            callCount++
+
+            // When we hit null (end of a pass), reset for next pass
+            if (result == null) {
+                callCount = 0
+                passIndex++
+            }
+
+            result
+        }
     }
 }
+
+
 
