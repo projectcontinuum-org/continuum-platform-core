@@ -9,11 +9,21 @@ import { JsonFormsCore, JsonSchema, UISchemaElement } from '@jsonforms/core';
 import CodeEditorControl, { codeEditorTester } from './CodeEditorRenderer';
 
 const StyledDialog = styled(Dialog)(({ theme }) => ({
+    '& .MuiPaper-root': {
+      backgroundColor: theme.palette.background.paper || theme.palette.background.default || '#1e1e1e',
+      backgroundImage: 'none',
+      opacity: 1,
+    },
     '& .MuiDialogContent-root': {
       padding: theme.spacing(2),
+      backgroundColor: theme.palette.background.paper || theme.palette.background.default || '#1e1e1e',
     },
     '& .MuiDialogActions-root': {
       padding: theme.spacing(1),
+      backgroundColor: theme.palette.background.paper || theme.palette.background.default || '#1e1e1e',
+    },
+    '& .MuiDialogTitle-root': {
+      backgroundColor: theme.palette.background.paper || theme.palette.background.default || '#1e1e1e',
     },
 }));
 
