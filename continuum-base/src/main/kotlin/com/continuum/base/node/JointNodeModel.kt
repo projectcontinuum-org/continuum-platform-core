@@ -11,6 +11,45 @@ import org.slf4j.LoggerFactory
 import org.springframework.http.MediaType.TEXT_PLAIN_VALUE
 import org.springframework.stereotype.Component
 
+/**
+ * Joint Node Model
+ *
+ * Joins (concatenates) column values from two input streams into a single output column.
+ * Processes rows pair-wise from both inputs, combining specified columns with a space separator.
+ *
+ * **Input Ports:**
+ * - `input-1`: First input stream
+ * - `input-2`: Second input stream
+ *
+ * **Output Ports:**
+ * - `output-1`: Stream with joined column values
+ *
+ * **Configuration Properties:**
+ * - `inputs` (required): Array of input configurations, must contain at least 2 elements:
+ *   - Each element has `columnName` property specifying which column to extract
+ * - `outputsColumnName` (required): Name for the output column containing joined values
+ *
+ * **Behavior:**
+ * - Requires exactly 2 input column configurations (validates at runtime)
+ * - Reads one row from each input stream simultaneously
+ * - Concatenates values from specified columns with a space separator
+ * - Automatically converts all data types to strings (numbers, booleans, etc.)
+ * - Missing column values are treated as empty strings
+ * - Stops when either input stream is exhausted
+ * - Output contains only the joined column (original columns are not preserved)
+ *
+ * **Example:**
+ * ```
+ * Input-1: [{msg-1: "Hello"}]
+ * Input-2: [{msg-2: "World"}]
+ * inputs: [{columnName: "msg-1"}, {columnName: "msg-2"}]
+ * outputsColumnName: "message"
+ * Output: [{message: "Hello World"}]
+ * ```
+ *
+ * @since 1.0
+ * @see ProcessNodeModel
+ */
 @Component
 class JointNodeModel : ProcessNodeModel() {
 
@@ -125,39 +164,94 @@ class JointNodeModel : ProcessNodeModel() {
     propertiesUISchema = propertiesUiSchema
   )
 
+  /**
+   * Executes the column join operation for two input streams.
+   *
+   * Validates input configuration, reads rows pair-wise from both input streams,
+   * extracts and concatenates specified column values, and writes to output stream.
+   * Processing continues until either input stream is exhausted.
+   *
+   * @param properties Configuration map containing:
+   *   - `inputs` (List<Map<String, String>>, required): Array of input configurations
+   *     Must contain at least 2 elements, each with a `columnName` property
+   *   - `outputsColumnName` (String, optional): Name for output column (defaults to "message")
+   * @param inputs Map of input port readers, expects "input-1" and "input-2" ports
+   * @param nodeOutputWriter Writer for output port data
+   *
+   * @throws NodeRuntimeException if:
+   *   - `inputs` property is missing or not a list
+   *   - `inputs` list has fewer than 2 elements
+   *   - Any input element is missing `columnName` property
+   *
+   * @see NodeInputReader
+   * @see NodeOutputWriter
+   */
   override fun execute(
     properties: Map<String, Any>?,
     inputs: Map<String, NodeInputReader>,
     nodeOutputWriter: NodeOutputWriter
   ) {
-    val inputColumnNames = (properties?.get("inputs") as List<Map<String, String>>)
+    // === Validate and extract input column configurations ===
+    // Cast to List<Map> with type safety check
+    val inputColumnNames = (properties?.get("inputs") as? List<Map<String, String>>)
+      ?: throw NodeRuntimeException(
+        workflowId = "",
+        nodeId = "",
+        message = "inputs is not provided"
+      )
+
+    // Validate array has at least 2 elements (required for joining)
+    if (inputColumnNames.size < 2) {
+      throw NodeRuntimeException(
+        workflowId = "",
+        nodeId = "",
+        message = "inputs must contain at least 2 elements, got: ${inputColumnNames.size}"
+      )
+    }
+
+    // Extract column names from first two input configurations
     val inputColumnName1 = inputColumnNames[0]["columnName"] ?: throw NodeRuntimeException(
       workflowId = "",
       nodeId = "",
-      message = "Input column name is not provided"
+      message = "Input column name 1 is not provided"
     )
     val inputColumnName2 = inputColumnNames[1]["columnName"] ?: throw NodeRuntimeException(
       workflowId = "",
       nodeId = "",
-      message = "Input column name is not provided"
+      message = "Input column name 2 is not provided"
     )
+
+    // Output column name defaults to "message" if not provided
     val outputColumnName = properties["outputsColumnName"] as String? ?: "message"
-    // Wait for random seconds
-//        Thread.sleep((1..5).random() * 500L)
+
     LOGGER.info("Jointing the input: ${objectMapper.writeValueAsString(inputs)}")
+
+    // === Create output writer and open both input streams ===
     nodeOutputWriter.createOutputPortWriter("output-1").use { writer ->
       inputs["input-1"]?.use { reader1 ->
         inputs["input-2"]?.use { reader2 ->
           var input1 = reader1.read()
           var input2 = reader2.read()
           var rowNumber = 0L
+
+          // === Process rows pair-wise until either stream is exhausted ===
           while (input1 != null && input2 != null) {
-            val dataCells = "${input1[inputColumnName1] as String} ${input2[inputColumnName2] as String}"
+            // Extract values from specified columns, converting to string
+            // Missing columns or null values become empty strings
+            val value1 = input1[inputColumnName1]?.toString() ?: ""
+            val value2 = input2[inputColumnName2]?.toString() ?: ""
+
+            // Concatenate with space separator
+            val dataCells = "$value1 $value2"
+
+            // Write output row with only the joined column
             writer.write(
               rowNumber, mapOf(
                 outputColumnName to dataCells
               )
             )
+
+            // Read next row from each input stream
             input1 = reader1.read()
             input2 = reader2.read()
             rowNumber++

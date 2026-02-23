@@ -147,7 +147,10 @@ class PivotColumnsNodeModel : ProcessNodeModel() {
     }
 
     // Find unique pivot values
-    val uniquePivotValues = allRows.mapNotNull { it[pivotCol] as? String }.distinct().sorted()
+    val uniquePivotValues = allRows
+      .mapNotNull { it[pivotCol]?.toString() }
+      .distinct()
+      .sorted()
     LOGGER.info("Found ${uniquePivotValues.size} unique pivot values: $uniquePivotValues")
 
     // Group by index column

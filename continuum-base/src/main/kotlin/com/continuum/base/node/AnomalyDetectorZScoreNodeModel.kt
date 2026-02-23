@@ -25,12 +25,15 @@ import kotlin.math.sqrt
  * - Values with |Z| > threshold are flagged as outliers
  * - Default threshold is 2.0, which flags approximately 5% of data in a normal distribution
  *
- * **Memory Efficiency**:
- * This implementation uses a three-pass streaming algorithm to handle large datasets without
- * loading all rows into memory:
- * 1. First pass: Calculate mean
- * 2. Second pass: Calculate standard deviation
- * 3. Third pass: Flag outliers and write results
+ * **Implementation**:
+ * This implementation uses a three-pass streaming algorithm with NodeInputReader.reset() to handle
+ * large datasets efficiently without loading all rows into memory:
+ * 1. First pass: Calculate mean by summing all values
+ * 2. Reset stream and second pass: Calculate standard deviation
+ * 3. Reset stream and third pass: Flag outliers based on Z-score threshold
+ *
+ * The reset() method reopens the Parquet file for each pass, maintaining memory efficiency
+ * while allowing multiple iterations over the data.
  *
  * **Input**:
  * - Port "data": Table with numeric column to analyze
@@ -157,11 +160,14 @@ class AnomalyDetectorZScoreNodeModel : ProcessNodeModel() {
   /**
    * Executes the Z-score anomaly detection algorithm using a memory-efficient streaming approach.
    *
-   * This implementation uses a three-pass streaming algorithm to avoid storing all rows in memory,
-   * which is critical for handling large datasets:
+   * This implementation uses a three-pass streaming algorithm with NodeInputReader.reset() to avoid
+   * storing all rows in memory, which is critical for handling large datasets:
    * 1. First pass: Calculate the mean by accumulating sum and count
-   * 2. Second pass: Calculate standard deviation using the computed mean
-   * 3. Third pass: Flag outliers and write output rows
+   * 2. Reset stream and second pass: Calculate standard deviation using the computed mean
+   * 3. Reset stream and third pass: Flag outliers and write output rows
+   *
+   * The reset() method reopens the underlying Parquet file between passes, allowing the data
+   * to be re-read from the beginning while maintaining constant memory usage.
    *
    * Z-score formula: Z = (value - mean) / std
    * A value is flagged as an outlier if |Z| > zThreshold
@@ -187,16 +193,25 @@ class AnomalyDetectorZScoreNodeModel : ProcessNodeModel() {
 
     LOGGER.info("Detecting anomalies in column: $valueCol using Z-score method (threshold: $zThreshold)")
 
-    // ========================================
-    // FIRST PASS: Calculate mean
-    // ========================================
-    // Stream through all rows once to calculate the mean without storing them in memory.
-    // We only keep track of the running sum and count.
+    // Declare variables for all passes outside the .use block
     var sum = 0.0
     var count = 0L
     var nullCount = 0
+    var sumSquaredDiff = 0.0
+    var mean = 0.0
+    var std = 0.0
 
+    // ====================================================================================
+    // SINGLE .use {} BLOCK FOR ALL THREE PASSES
+    // ====================================================================================
+    // This ensures the reader remains open throughout all passes, allowing reset() calls
+    // between passes. The reader will be automatically closed when exiting this block.
     inputs["data"]?.use { reader ->
+      // ========================================
+      // FIRST PASS: Calculate mean
+      // ========================================
+      // Stream through all rows once to calculate the mean without storing them in memory.
+      // We only keep track of the running sum and count.
       var row = reader.read()
 
       while (row != null) {
@@ -222,31 +237,29 @@ class AnomalyDetectorZScoreNodeModel : ProcessNodeModel() {
         count++
         row = reader.read()
       }
-    }
 
-    if (nullCount > 0) {
-      LOGGER.warn("Found $nullCount null or non-numeric values in column '$valueCol', defaulted to 0.0")
-    }
+      if (nullCount > 0) {
+        LOGGER.warn("Found $nullCount null or non-numeric values in column '$valueCol', defaulted to 0.0")
+      }
 
-    // Validate that we have data to analyze
-    if (count == 0L) {
-      LOGGER.warn("No data to analyze")
-      return
-    }
+      // Validate that we have data to analyze
+      if (count == 0L) {
+        LOGGER.warn("No data to analyze")
+        return@use  // Exit the .use block early
+      }
 
-    // Calculate the mean: mean = sum / count
-    val mean = sum / count
+      // Calculate the mean: mean = sum / count
+      mean = sum / count
 
-    // ========================================
-    // SECOND PASS: Calculate standard deviation
-    // ========================================
-    // Stream through all rows again to calculate standard deviation.
-    // We use the formula: std = sqrt(sum((x - mean)^2) / count)
-    var sumSquaredDiff = 0.0
-    var currentCount = 0L
+      // Reset the reader to beginning for second pass (reader still open)
+      reader.reset()
 
-    inputs["data"]?.use { reader ->
-      var row = reader.read()
+      // ========================================
+      // SECOND PASS: Calculate standard deviation
+      // ========================================
+      // Stream through all rows again to calculate standard deviation.
+      // We use the formula: std = sqrt(sum((x - mean)^2) / count)
+      row = reader.read()
 
       while (row != null) {
         val valueRaw = row[valueCol]
@@ -254,72 +267,73 @@ class AnomalyDetectorZScoreNodeModel : ProcessNodeModel() {
 
         // Accumulate the sum of squared differences from the mean
         sumSquaredDiff += (value - mean).pow(2)
-        currentCount++
         row = reader.read()
       }
-    }
 
-    // Calculate standard deviation: std = sqrt(variance)
-    val std = sqrt(sumSquaredDiff / count)
+      // Calculate standard deviation: std = sqrt(variance)
+      std = sqrt(sumSquaredDiff / count)
 
-    LOGGER.info("Statistics: mean=$mean, std=$std, count=$count")
+      LOGGER.info("Statistics: mean=$mean, std=$std, count=$count")
 
-    // Handle edge case where all values are identical (std = 0)
-    if (std == 0.0) {
-      LOGGER.warn("Standard deviation is 0, all values are the same - no outliers detected")
+      // Reset the reader to beginning for third pass (reader still open)
+      reader.reset()
 
-      // Stream through and mark all rows as non-outliers
-      nodeOutputWriter.createOutputPortWriter("data").use { writer ->
-        inputs["data"]?.use { reader ->
+      // ========================================
+      // THIRD PASS: Flag outliers and write output
+      // ========================================
+      // Stream through all rows one final time to calculate Z-scores and flag outliers.
+      // Z-score = (value - mean) / std
+      // A value is an outlier if |Z-score| > zThreshold
+
+      // Handle edge case where all values are identical (std = 0)
+      if (std == 0.0) {
+        LOGGER.warn("Standard deviation is 0, all values are the same - no outliers detected")
+
+        // Stream through and mark all rows as non-outliers
+        nodeOutputWriter.createOutputPortWriter("data").use { writer ->
           var index = 0L
-          var row = reader.read()
+          row = reader.read()
 
           while (row != null) {
-            writer.write(index, row + mapOf(outputColumnName to false))
+            val currentRow = row!!  // Non-null assertion: we know row is not null inside the while
+            writer.write(index, currentRow + mapOf(outputColumnName to false))
             index++
             row = reader.read()
           }
         }
-      }
-      return
-    }
+      } else {
+        // Normal case: calculate Z-scores and flag outliers
+        var outlierCount = 0
 
-    // ========================================
-    // THIRD PASS: Flag outliers and write output
-    // ========================================
-    // Stream through all rows one final time to calculate Z-scores and flag outliers.
-    // Z-score = (value - mean) / std
-    // A value is an outlier if |Z-score| > zThreshold
-    var outlierCount = 0
-
-    nodeOutputWriter.createOutputPortWriter("data").use { writer ->
-      inputs["data"]?.use { reader ->
-        var index = 0L
-        var row = reader.read()
-
-        while (row != null) {
-          val valueRaw = row[valueCol]
-          val value = (valueRaw as? Number)?.toDouble() ?: 0.0
-
-          // Calculate Z-score for this value
-          val zScore = (value - mean) / std
-
-          // Flag as outlier if absolute Z-score exceeds threshold
-          val isOutlier = kotlin.math.abs(zScore) > zThreshold
-
-          if (isOutlier) {
-            outlierCount++
-            LOGGER.debug("Outlier detected: value=$value, z-score=$zScore")
-          }
-
-          // Write the original row with the outlier flag added
-          writer.write(index, row + mapOf(outputColumnName to isOutlier))
-          index++
+        nodeOutputWriter.createOutputPortWriter("data").use { writer ->
+          var index = 0L
           row = reader.read()
-        }
-      }
-    }
 
-    LOGGER.info("Detected $outlierCount outliers out of $count rows (threshold: $zThreshold)")
+          while (row != null) {
+            val currentRow = row!!  // Non-null assertion: we know row is not null inside the while
+            val valueRaw = currentRow[valueCol]
+            val value = (valueRaw as? Number)?.toDouble() ?: 0.0
+
+            // Calculate Z-score for this value
+            val zScore = (value - mean) / std
+
+            // Flag as outlier if absolute Z-score exceeds threshold
+            val isOutlier = kotlin.math.abs(zScore) > zThreshold
+
+            if (isOutlier) {
+              outlierCount++
+              LOGGER.debug("Outlier detected: value=$value, z-score=$zScore")
+            }
+
+            // Write the original row with the outlier flag added
+            writer.write(index, currentRow + mapOf(outputColumnName to isOutlier))
+            index++
+            row = reader.read()
+          }
+        }
+
+        LOGGER.info("Detected $outlierCount outliers out of $count rows (threshold: $zThreshold)")
+      }
+    }  // ← Reader closes here after ALL passes complete
   }
 }

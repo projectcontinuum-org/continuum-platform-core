@@ -11,6 +11,43 @@ import org.slf4j.LoggerFactory
 import org.springframework.http.MediaType.TEXT_PLAIN_VALUE
 import org.springframework.stereotype.Component
 
+/**
+ * Conditional Splitter Node Model
+ *
+ * Splits input rows into two output streams based on a numeric threshold comparison.
+ * Each row is routed to either the "high" or "low" output port based on whether the
+ * specified column value is greater than or equal to the threshold.
+ *
+ * **Input Ports:**
+ * - `data`: Input table containing rows to be split
+ *
+ * **Output Ports:**
+ * - `high`: Rows where column value >= threshold
+ * - `low`: Rows where column value < threshold
+ *
+ * **Configuration Properties:**
+ * - `column` (required): Name of the numeric column to compare
+ * - `threshold` (required): Numeric threshold value for splitting
+ *
+ * **Behavior:**
+ * - Uses greater than or equal (>=) comparison for "high" output
+ * - Missing or non-numeric column values default to 0.0 with a warning logged
+ * - Each output stream maintains its own sequential row numbering starting from 0
+ * - All original row data is preserved in both outputs
+ * - Empty input results in empty outputs on both ports
+ *
+ * **Example:**
+ * ```
+ * Input: [{value: 100}, {value: 25}, {value: 50}]
+ * column: "value"
+ * threshold: 50
+ * High output: [{value: 100}, {value: 50}]  // >= 50
+ * Low output:  [{value: 25}]                // < 50
+ * ```
+ *
+ * @since 1.0
+ * @see ProcessNodeModel
+ */
 @Component
 class ConditionalSplitterNodeModel : ProcessNodeModel() {
   companion object {
@@ -102,11 +139,30 @@ class ConditionalSplitterNodeModel : ProcessNodeModel() {
     propertiesUISchema = propertiesUiSchema
   )
 
+  /**
+   * Executes the conditional split operation.
+   *
+   * Reads rows from input stream and routes each row to either "high" or "low" output
+   * based on whether the specified column value meets the threshold criterion.
+   * Both output streams maintain independent sequential row numbering.
+   *
+   * @param properties Configuration map containing:
+   *   - `column` (String, required): Name of the numeric column to evaluate
+   *   - `threshold` (Number, required): Threshold value for splitting decision
+   * @param inputs Map of input port readers, expects "data" port
+   * @param nodeOutputWriter Writer for output port data
+   *
+   * @throws NodeRuntimeException if column or threshold properties are missing or invalid
+   *
+   * @see NodeInputReader
+   * @see NodeOutputWriter
+   */
   override fun execute(
     properties: Map<String, Any>?,
     inputs: Map<String, NodeInputReader>,
     nodeOutputWriter: NodeOutputWriter
   ) {
+    // === Validate and extract required properties ===
     val column = properties?.get("column") as String? ?: throw NodeRuntimeException(
       workflowId = "",
       nodeId = "",
@@ -120,18 +176,30 @@ class ConditionalSplitterNodeModel : ProcessNodeModel() {
 
     LOGGER.info("Splitting rows on column '$column' with threshold $threshold")
 
+    // Track row counts for each output stream independently
     var highCount = 0L
     var lowCount = 0L
 
-    // Create both output writers
+    // === Create both output writers upfront (required for proper resource management) ===
     nodeOutputWriter.createOutputPortWriter("high").use { highWriter ->
       nodeOutputWriter.createOutputPortWriter("low").use { lowWriter ->
         inputs["data"]?.use { reader ->
           var row = reader.read()
 
+          // === Process each row and route to appropriate output ===
           while (row != null) {
-            val value = (row[column] as? Number)?.toDouble() ?: 0.0
+            // Extract numeric value from specified column
+            // If column is missing or not numeric, default to 0.0 with warning
+            val value = (row[column] as? Number)?.toDouble() ?: run {
+              if (!row.containsKey(column)) {
+                LOGGER.warn("Column '$column' not found in row, defaulting to 0.0")
+              }
+              0.0
+            }
 
+            // Route row based on threshold comparison
+            // High output: value >= threshold (greater than or equal)
+            // Low output: value < threshold (less than)
             if (value >= threshold) {
               highWriter.write(highCount, row)
               highCount++
@@ -140,6 +208,7 @@ class ConditionalSplitterNodeModel : ProcessNodeModel() {
               lowCount++
             }
 
+            // Read next row from input stream
             row = reader.read()
           }
         }

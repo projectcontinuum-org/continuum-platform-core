@@ -11,6 +11,45 @@ import org.slf4j.LoggerFactory
 import org.springframework.http.MediaType.TEXT_PLAIN_VALUE
 import org.springframework.stereotype.Component
 
+/**
+ * Column Join Node Model
+ *
+ * Joins columns from two input tables by concatenating their values with a space separator.
+ * Processes rows pair-wise from left and right tables, stopping when either table runs out of rows.
+ *
+ * **Input Ports:**
+ * - `left`: Left input table
+ * - `right`: Right input table
+ *
+ * **Output Ports:**
+ * - `output`: Table with joined column values
+ *
+ * **Configuration Properties:**
+ * - `columnNameLeft` (required): Column name from the left table to join
+ * - `columnNameRight` (required): Column name from the right table to join
+ * - `outputColumnName` (required): Name for the output column containing joined values
+ *
+ * **Behavior:**
+ * - Reads one row from each table simultaneously
+ * - Concatenates values from specified columns with a space separator
+ * - Automatically converts all data types to strings (numbers, booleans, etc.)
+ * - Missing column values are treated as empty strings
+ * - Stops when either input table is exhausted (similar to SQL inner join on row number)
+ * - Trailing/leading whitespace is trimmed from final result
+ *
+ * **Example:**
+ * ```
+ * Left table:  [{name: "Alice"}, {name: "Bob"}]
+ * Right table: [{city: "NYC"}, {city: "LA"}]
+ * columnNameLeft: "name"
+ * columnNameRight: "city"
+ * outputColumnName: "fullInfo"
+ * Output: [{fullInfo: "Alice NYC"}, {fullInfo: "Bob LA"}]
+ * ```
+ *
+ * @since 1.0
+ * @see ProcessNodeModel
+ */
 @Component
 class ColumnJoinNodeModel : ProcessNodeModel() {
   companion object {
@@ -114,11 +153,31 @@ class ColumnJoinNodeModel : ProcessNodeModel() {
     propertiesUISchema = propertiesUiSchema
   )
 
+  /**
+   * Executes the column join operation.
+   *
+   * Reads rows pair-wise from left and right input tables, extracts values from specified columns,
+   * concatenates them with a space separator, and writes the result to the output table.
+   * Processing continues until either input table is exhausted.
+   *
+   * @param properties Configuration map containing:
+   *   - `columnNameLeft` (String, required): Column name from left table
+   *   - `columnNameRight` (String, required): Column name from right table
+   *   - `outputColumnName` (String, required): Name for output column with joined values
+   * @param inputs Map of input port readers, expects "left" and "right" ports
+   * @param nodeOutputWriter Writer for output port data
+   *
+   * @throws NodeRuntimeException if any required property is missing
+   *
+   * @see NodeInputReader
+   * @see NodeOutputWriter
+   */
   override fun execute(
     properties: Map<String, Any>?,
     inputs: Map<String, NodeInputReader>,
     nodeOutputWriter: NodeOutputWriter
   ) {
+    // === Validate and extract required properties ===
     val columnNameLeft = properties?.get("columnNameLeft") as String? ?: throw NodeRuntimeException(
       workflowId = "",
       nodeId = "",
@@ -137,6 +196,7 @@ class ColumnJoinNodeModel : ProcessNodeModel() {
 
     LOGGER.info("Joining columns: $columnNameLeft and $columnNameRight into $outputColumnName")
 
+    // === Create output writer and open both input streams ===
     nodeOutputWriter.createOutputPortWriter("output").use { writer ->
       inputs["left"]?.use { leftReader ->
         inputs["right"]?.use { rightReader ->
@@ -144,17 +204,24 @@ class ColumnJoinNodeModel : ProcessNodeModel() {
           var rightRow = rightReader.read()
           var rowNumber = 0L
 
+          // === Process rows pair-wise until either stream is exhausted ===
           while (leftRow != null && rightRow != null) {
-            val leftValue = leftRow[columnNameLeft] as? String ?: ""
-            val rightValue = rightRow[columnNameRight] as? String ?: ""
+            // Extract values from specified columns, converting to string
+            // Missing columns or null values become empty strings
+            val leftValue = leftRow[columnNameLeft]?.toString() ?: ""
+            val rightValue = rightRow[columnNameRight]?.toString() ?: ""
+
+            // Concatenate with space and trim whitespace
             val joinedValue = "$leftValue $rightValue".trim()
 
+            // Write output row with only the joined column
             writer.write(
               rowNumber, mapOf(
                 outputColumnName to joinedValue
               )
             )
 
+            // Read next row from each input stream
             leftRow = leftReader.read()
             rightRow = rightReader.read()
             rowNumber++

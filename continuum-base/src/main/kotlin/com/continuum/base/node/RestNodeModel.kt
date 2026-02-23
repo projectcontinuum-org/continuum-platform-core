@@ -27,6 +27,7 @@ class RestNodeModel : ProcessNodeModel() {
     private val objectMapper = ObjectMapper()
     private val httpClient = HttpClient.newBuilder()
       .followRedirects(HttpClient.Redirect.NORMAL)
+      .connectTimeout(java.time.Duration.ofSeconds(30))
       .build()
 
     private val freemarkerConfig = Configuration(Configuration.VERSION_2_3_32).apply {
@@ -197,11 +198,26 @@ class RestNodeModel : ProcessNodeModel() {
             val url = renderTemplate(urlTemplate, row)
             val payload = renderTemplate(payloadTemplate, row)
 
+            // Validate URL
+            require(url.startsWith("http://") || url.startsWith("https://")) {
+              "URL must use HTTP or HTTPS protocol: $url"
+            }
+
             LOGGER.debug("Making $method request to: $url")
 
             // Build request
+            val uri = try {
+              URI.create(url)
+            } catch (e: IllegalArgumentException) {
+              throw NodeRuntimeException(
+                workflowId = "",
+                nodeId = "",
+                message = "Invalid URL format: $url, error: ${e.message}"
+              )
+            }
+
             val requestBuilder = HttpRequest.newBuilder()
-              .uri(URI.create(url))
+              .uri(uri)
               .header("Content-Type", "application/json")
 
             val request = when (method.uppercase()) {
@@ -233,11 +249,20 @@ class RestNodeModel : ProcessNodeModel() {
           } catch (e: Exception) {
             LOGGER.error("Failed to make HTTP request for row $rowNumber: ${e.message}")
 
-            // Add error response to row
+            // Add error response to row with error type
+            val errorType = when (e) {
+              is java.net.http.HttpTimeoutException -> "timeout"
+              is java.net.ConnectException -> "connection_refused"
+              is java.net.UnknownHostException -> "unknown_host"
+              is NodeRuntimeException -> "validation_error"
+              else -> "unknown_error"
+            }
+
             val newRow = row.toMutableMap().apply {
               this["response"] = mapOf(
                 "status" to -1,
-                "body" to "Error: ${e.message}"
+                "body" to "Error: ${e.message}",
+                "errorType" to errorType
               )
             }
 

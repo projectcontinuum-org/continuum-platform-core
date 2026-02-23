@@ -11,6 +11,39 @@ import org.slf4j.LoggerFactory
 import org.springframework.http.MediaType.TEXT_PLAIN_VALUE
 import org.springframework.stereotype.Component
 
+/**
+ * Dynamic Row Filter Node Model
+ *
+ * Filters rows from an input table based on a dynamic threshold comparison.
+ * Only rows where the specified column value is strictly greater than the threshold are passed through.
+ *
+ * **Input Ports:**
+ * - `data`: Input table containing rows to be filtered
+ *
+ * **Output Ports:**
+ * - `data`: Filtered table containing only rows that pass the threshold condition
+ *
+ * **Configuration Properties:**
+ * - `columnName` (required): The name of the numeric column to compare against the threshold
+ * - `threshold` (required): The numeric threshold value. Rows with column value > threshold pass through
+ *
+ * **Behavior:**
+ * - Uses strictly greater than comparison (>), not greater than or equal (>=)
+ * - Missing or non-numeric column values default to 0.0 with a warning logged
+ * - Row indices in output are sequential starting from 0, not preserving original indices
+ * - Empty input produces empty output
+ *
+ * **Example:**
+ * ```
+ * Input: [{age: 35}, {age: 25}, {age: 40}]
+ * columnName: "age"
+ * threshold: 30
+ * Output: [{age: 35}, {age: 40}]  // Only rows where age > 30
+ * ```
+ *
+ * @since 1.0
+ * @see ProcessNodeModel
+ */
 @Component
 class DynamicRowFilterNodeModel : ProcessNodeModel() {
   companion object {
@@ -98,11 +131,29 @@ class DynamicRowFilterNodeModel : ProcessNodeModel() {
     propertiesUISchema = propertiesUiSchema
   )
 
+  /**
+   * Executes the row filtering operation.
+   *
+   * Reads rows from the input stream, compares the specified column value against the threshold,
+   * and writes only rows that pass the filter (value > threshold) to the output stream.
+   *
+   * @param properties Configuration map containing:
+   *   - `columnName` (String, required): Name of the numeric column to filter on
+   *   - `threshold` (Number, required): Threshold value for comparison
+   * @param inputs Map of input port readers, expects "data" port with table rows
+   * @param nodeOutputWriter Writer for output port data
+   *
+   * @throws NodeRuntimeException if columnName or threshold properties are missing or invalid
+   *
+   * @see NodeInputReader
+   * @see NodeOutputWriter
+   */
   override fun execute(
     properties: Map<String, Any>?,
     inputs: Map<String, NodeInputReader>,
     nodeOutputWriter: NodeOutputWriter
   ) {
+    // === Validate and extract required properties ===
     val columnName = properties?.get("columnName") as String? ?: throw NodeRuntimeException(
       workflowId = "",
       nodeId = "",
@@ -116,19 +167,30 @@ class DynamicRowFilterNodeModel : ProcessNodeModel() {
 
     LOGGER.info("Filtering rows where $columnName > $threshold")
 
+    // === Create output writer and process input stream ===
     nodeOutputWriter.createOutputPortWriter("data").use { writer ->
       inputs["data"]?.use { reader ->
         var row = reader.read()
-        var rowNumber = 0L
+        var rowNumber = 0L // Sequential row index for output (only counts filtered rows)
 
+        // === Read and filter rows one at a time ===
         while (row != null) {
-          val value = (row[columnName] as? Number)?.toDouble() ?: 0.0
-
-          if (value > threshold) {
-            writer.write(rowNumber, row)
-            rowNumber++
+          // Extract numeric value from specified column
+          // If column is missing or not numeric, default to 0.0 with warning
+          val value = (row[columnName] as? Number)?.toDouble() ?: run {
+            if (!row.containsKey(columnName)) {
+              LOGGER.warn("Column '$columnName' not found in row, defaulting to 0.0")
+            }
+            0.0
           }
 
+          // === Apply filter: only pass rows where value > threshold (strictly greater than) ===
+          if (value > threshold) {
+            writer.write(rowNumber, row)
+            rowNumber++ // Increment only for rows that pass the filter
+          }
+
+          // Read next row from input stream
           row = reader.read()
         }
 
