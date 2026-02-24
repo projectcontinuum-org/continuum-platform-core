@@ -100,15 +100,30 @@ class NodeInputReader(
    * Gets the total number of rows in the Parquet file without reading all the data.
    *
    * This method reads only the Parquet file metadata (footer) to determine the row count,
-   * which is much more efficient than streaming through all rows.
+   * which is much more efficient than streaming through all rows. Use this method when you
+   * only need to know the count without accessing the actual row data.
+   *
+   * **When to use getRowCount() vs read():**
+   * - Use `getRowCount()` for metadata operations where only the count is needed (e.g.,
+   *   pre-allocating arrays, progress bars, validation checks)
+   * - Use `read()` when you need to access the actual row data (e.g., transformations,
+   *   aggregations, filtering)
+   * - Can combine both: call `getRowCount()` first for initialization, then `read()`
+   *   to process rows
+   *
+   * **Performance consideration:**
+   * Reading metadata is O(1) and only reads the file footer, while reading all rows
+   * is O(n) and processes the entire file. For large files, this difference can be
+   * significant (milliseconds vs seconds/minutes).
    *
    * The row count is cached after the first call, so subsequent calls return immediately
    * without re-opening the file.
    *
-   * This is useful for:
-   * - Pre-allocating buffers or data structures
-   * - Calculating statistics before processing
-   * - Progress tracking and reporting
+   * **Example use cases:**
+   * - Pre-allocating buffers or data structures sized to row count
+   * - Calculating statistics before processing (e.g., percentiles)
+   * - Progress tracking and reporting (current row / total rows)
+   * - Validation (ensuring file has expected number of records)
    * - Optimizing multi-pass algorithms
    *
    * @return The total number of rows in the Parquet file
