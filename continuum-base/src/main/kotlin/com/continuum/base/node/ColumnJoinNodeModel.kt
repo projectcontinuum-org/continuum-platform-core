@@ -79,8 +79,6 @@ class ColumnJoinNodeModel : ProcessNodeModel() {
     "Processing"
   )
 
-  private val _documentationMarkdown = ""
-
   val propertiesSchema: Map<String, Any> = objectMapper.readValue(
     """
         {
