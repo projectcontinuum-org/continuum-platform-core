@@ -3,6 +3,8 @@ import DialogTitle from '@mui/material/DialogTitle';
 import Dialog from '@mui/material/Dialog';
 import { Box, Button, DialogActions, DialogContent, IconButton, Typography, styled } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
+import MaximizeIcon from '@mui/icons-material/Fullscreen';
+import RestoreIcon from '@mui/icons-material/FullscreenExit';
 import { JsonForms } from '@jsonforms/react';
 import { materialCells, materialRenderers } from '@jsonforms/material-renderers';
 import { JsonFormsCore, JsonSchema, UISchemaElement } from '@jsonforms/core';
@@ -86,7 +88,9 @@ export default function NodeDialog({ onClose, onSave, readOnly=false, open, init
     const [hasErrors, setHasErrors] = React.useState(false);
     const [dialogSize, setDialogSize] = React.useState({ width: 600, height: 600 });
     const [isResizing, setIsResizing] = React.useState(false);
+    const [isMaximized, setIsMaximized] = React.useState(false);
     const resizeStartPos = React.useRef({ x: 0, y: 0, width: 0, height: 0 });
+    const previousSize = React.useRef({ width: 600, height: 600 });
 
     const handleClose = React.useCallback((args: any) => {
         console.log("handleClose", args);
@@ -103,7 +107,22 @@ export default function NodeDialog({ onClose, onSave, readOnly=false, open, init
         errors && setHasErrors(errors.length > 0)
     }, [data]);
 
+    const handleMaximize = React.useCallback(() => {
+        if (isMaximized) {
+            setDialogSize(previousSize.current);
+            setIsMaximized(false);
+        } else {
+            previousSize.current = dialogSize;
+            setDialogSize({
+                width: window.innerWidth,
+                height: window.innerHeight
+            });
+            setIsMaximized(true);
+        }
+    }, [isMaximized, dialogSize]);
+
     const handleResizeStart = React.useCallback((e: React.MouseEvent) => {
+        if (isMaximized) return;
         e.preventDefault();
         e.stopPropagation();
         setIsResizing(true);
@@ -113,7 +132,7 @@ export default function NodeDialog({ onClose, onSave, readOnly=false, open, init
             width: dialogSize.width,
             height: dialogSize.height,
         };
-    }, [dialogSize]);
+    }, [dialogSize, isMaximized]);
 
     React.useEffect(() => {
         if (!isResizing) return;
@@ -148,6 +167,17 @@ export default function NodeDialog({ onClose, onSave, readOnly=false, open, init
             customWidth={dialogSize.width}
             customHeight={dialogSize.height}>
             <DialogTitle>Node Settings</DialogTitle>
+            <IconButton
+                aria-label="maximize"
+                onClick={handleMaximize}
+                sx={{
+                    position: 'absolute',
+                    right: 48,
+                    top: 8,
+                    color: (theme) => theme.palette.grey[500],
+                }}>
+                {isMaximized ? <RestoreIcon /> : <MaximizeIcon />}
+            </IconButton>
             <IconButton
                 aria-label="close"
                 onClick={handleClose}
@@ -184,7 +214,7 @@ export default function NodeDialog({ onClose, onSave, readOnly=false, open, init
                     <Typography>Save changes</Typography>
                 </Button>
             </DialogActions>
-            <ResizeHandle onMouseDown={handleResizeStart} />
+            {!isMaximized && <ResizeHandle onMouseDown={handleResizeStart} />}
         </StyledDialog>
     );
 }

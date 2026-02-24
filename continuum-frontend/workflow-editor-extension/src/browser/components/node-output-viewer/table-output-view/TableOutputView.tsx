@@ -1,7 +1,9 @@
 import { IData } from "@continuum/core";
 import { DataGrid, GridColDef, GridPaginationModel } from "@mui/x-data-grid";
-import React, { useCallback, useEffect } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import DataService from "../../../service/DataService";
+import { JsonCellRenderer } from "./JsonCellRenderer";
+import { JsonViewerDialog } from "./JsonViewerDialog";
 
 const dataService = new DataService();
 
@@ -16,6 +18,8 @@ export function TableOutputView({outputData}: TableOutputViewProps) {
     const [page, setPage] = React.useState<number>(0);
     const [pageSize, setPageSize] = React.useState<number>(25);
     const [loading, setLoading] = React.useState<boolean>(true);
+    const [jsonViewerOpen, setJsonViewerOpen] = useState(false);
+    const [selectedJsonValue, setSelectedJsonValue] = useState<any>(null);
 
     const deserializeCell = (cell: any): any => {
         // Decode base64 value to string
@@ -54,7 +58,24 @@ export function TableOutputView({outputData}: TableOutputViewProps) {
                     });
                     return newRow;
                 }));
-                setColumns(data.data[0].map((cell: any)=>({ field: cell.name, headerName: cell.name, flex: 1, minWidth: 150 })));
+                setColumns(data.data[0].map((cell: any) => ({
+                    field: cell.name,
+                    headerName: cell.name,
+                    flex: 1,
+                    minWidth: 150,
+                    renderCell: (params: any) => {
+                        if (typeof params.value === 'object' && params.value !== null) {
+                            return <JsonCellRenderer
+                                value={params.value}
+                                onClick={(value) => {
+                                    setSelectedJsonValue(value);
+                                    setJsonViewerOpen(true);
+                                }}
+                            />;
+                        }
+                        return params.value;
+                    }
+                })));
                 setLoading(false);
             }
         });
@@ -69,36 +90,43 @@ export function TableOutputView({outputData}: TableOutputViewProps) {
     }, [setPage, setPageSize]);
 
     return (
-        <DataGrid
-            rows={rows}
-            rowCount={rowsCount}
-            columns={columns}
-            pageSizeOptions={[5, 25, 50, 100]}
-            paginationMode="server"
-            paginationModel={{
-                page: page,
-                pageSize: pageSize
-            }}
-            onPaginationModelChange={onPaginationModelChange}
-            loading={loading}
-            sx={{
-                width: "100%",
-                height: "100%",
-                minWidth: 0,
-                minHeight: 0,
-                "& .MuiDataGrid-virtualScroller": {
-                    overflowY: "auto", // Make only the rows scrollable
-                },
-                "& .MuiDataGrid-columnHeaders": {
-                    position: "sticky",
-                    top: 0,
-                    zIndex: 1, // Ensure the header stays on top
-                },
-                "& .MuiDataGrid-footerContainer": {
-                    position: "sticky",
-                    bottom: 0,
-                    zIndex: 1, // Ensure the footer stays on top
-                }
-            }}/>
+        <>
+            <DataGrid
+                rows={rows}
+                rowCount={rowsCount}
+                columns={columns}
+                pageSizeOptions={[5, 25, 50, 100]}
+                paginationMode="server"
+                paginationModel={{
+                    page: page,
+                    pageSize: pageSize
+                }}
+                onPaginationModelChange={onPaginationModelChange}
+                loading={loading}
+                sx={{
+                    width: "100%",
+                    height: "100%",
+                    minWidth: 0,
+                    minHeight: 0,
+                    "& .MuiDataGrid-virtualScroller": {
+                        overflowY: "auto", // Make only the rows scrollable
+                    },
+                    "& .MuiDataGrid-columnHeaders": {
+                        position: "sticky",
+                        top: 0,
+                        zIndex: 1, // Ensure the header stays on top
+                    },
+                    "& .MuiDataGrid-footerContainer": {
+                        position: "sticky",
+                        bottom: 0,
+                        zIndex: 1, // Ensure the footer stays on top
+                    }
+                }}/>
+            <JsonViewerDialog
+                open={jsonViewerOpen}
+                value={selectedJsonValue}
+                onClose={() => setJsonViewerOpen(false)}
+            />
+        </>
     );
 }
