@@ -12,23 +12,22 @@ import freemarker.template.Template
 import freemarker.template.TemplateExceptionHandler
 import org.slf4j.LoggerFactory
 import org.springframework.http.MediaType.TEXT_PLAIN_VALUE
+import org.springframework.http.HttpEntity
+import org.springframework.http.HttpHeaders
+import org.springframework.http.HttpMethod
+import org.springframework.http.ResponseEntity
 import org.springframework.stereotype.Component
+import org.springframework.web.client.RestTemplate
 import java.io.StringReader
 import java.io.StringWriter
-import java.net.URI
-import java.net.http.HttpClient
-import java.net.http.HttpRequest
-import java.net.http.HttpResponse
 
 @Component
-class RestNodeModel : ProcessNodeModel() {
+class RestNodeModel(
+  private val restTemplate: RestTemplate
+) : ProcessNodeModel() {
   companion object {
     private val LOGGER = LoggerFactory.getLogger(RestNodeModel::class.java)
     private val objectMapper = ObjectMapper()
-    private val httpClient = HttpClient.newBuilder()
-      .followRedirects(HttpClient.Redirect.NORMAL)
-      .connectTimeout(java.time.Duration.ofSeconds(30))
-      .build()
 
     private val freemarkerConfig = Configuration(Configuration.VERSION_2_3_32).apply {
       defaultEncoding = "UTF-8"
@@ -205,26 +204,24 @@ class RestNodeModel : ProcessNodeModel() {
 
             LOGGER.debug("Making $method request to: $url")
 
-            // Build request
-            val uri = try {
-              URI.create(url)
-            } catch (e: IllegalArgumentException) {
-              throw NodeRuntimeException(
-                workflowId = "",
-                nodeId = "",
-                message = "Invalid URL format: $url, error: ${e.message}"
-              )
+            // Build request headers
+            val headers = HttpHeaders().apply {
+              set("Content-Type", "application/json")
             }
 
-            val requestBuilder = HttpRequest.newBuilder()
-              .uri(uri)
-              .header("Content-Type", "application/json")
+            // Build request entity with payload (if applicable)
+            val requestEntity = if (payload.isNotEmpty() && method.uppercase() in listOf("POST", "PUT")) {
+              HttpEntity(payload, headers)
+            } else {
+              HttpEntity<String>(headers)
+            }
 
-            val request = when (method.uppercase()) {
-              "GET" -> requestBuilder.GET().build()
-              "POST" -> requestBuilder.POST(HttpRequest.BodyPublishers.ofString(payload)).build()
-              "PUT" -> requestBuilder.PUT(HttpRequest.BodyPublishers.ofString(payload)).build()
-              "DELETE" -> requestBuilder.DELETE().build()
+            // Convert method string to HttpMethod enum
+            val httpMethod = when (method.uppercase()) {
+              "GET" -> HttpMethod.GET
+              "POST" -> HttpMethod.POST
+              "PUT" -> HttpMethod.PUT
+              "DELETE" -> HttpMethod.DELETE
               else -> throw NodeRuntimeException(
                 workflowId = "",
                 nodeId = "",
@@ -233,13 +230,18 @@ class RestNodeModel : ProcessNodeModel() {
             }
 
             // Execute request
-            val response = httpClient.send(request, HttpResponse.BodyHandlers.ofString())
+            val response: ResponseEntity<String> = restTemplate.exchange(
+              url,
+              httpMethod,
+              requestEntity,
+              String::class.java
+            )
 
             // Add response to row
             val newRow = row.toMutableMap().apply {
               this["response"] = mapOf(
-                "status" to response.statusCode(),
-                "body" to response.body()
+                "status" to response.statusCode.value(),
+                "body" to response.body
               )
             }
 
@@ -251,9 +253,16 @@ class RestNodeModel : ProcessNodeModel() {
 
             // Add error response to row with error type
             val errorType = when (e) {
-              is java.net.http.HttpTimeoutException -> "timeout"
-              is java.net.ConnectException -> "connection_refused"
-              is java.net.UnknownHostException -> "unknown_host"
+              is org.springframework.web.client.ResourceAccessException -> {
+                when (e.cause) {
+                  is java.net.ConnectException -> "connection_refused"
+                  is java.net.UnknownHostException -> "unknown_host"
+                  is java.net.SocketTimeoutException -> "timeout"
+                  else -> "connection_error"
+                }
+              }
+              is org.springframework.web.client.HttpClientErrorException -> "client_error"
+              is org.springframework.web.client.HttpServerErrorException -> "server_error"
               is NodeRuntimeException -> "validation_error"
               else -> "unknown_error"
             }
