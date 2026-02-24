@@ -1,1 +1,0 @@
-export { registerFreemarkerLanguage } from './freemarker-language';

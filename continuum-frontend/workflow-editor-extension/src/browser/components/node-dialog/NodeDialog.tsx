@@ -61,6 +61,9 @@ const ResizeHandle = styled('div')(({ theme }) => ({
     },
 }));
 
+const MIN_DIALOG_WIDTH = 400;
+const MIN_DIALOG_HEIGHT = 300;
+
 const customRenderers = [
   { tester: codeEditorTester, renderer: CodeEditorControl },
   ...materialRenderers,
@@ -119,8 +122,8 @@ export default function NodeDialog({ onClose, onSave, readOnly=false, open, init
             const deltaX = e.clientX - resizeStartPos.current.x;
             const deltaY = e.clientY - resizeStartPos.current.y;
 
-            const newWidth = Math.max(400, resizeStartPos.current.width + deltaX);
-            const newHeight = Math.max(300, resizeStartPos.current.height + deltaY);
+            const newWidth = Math.max(MIN_DIALOG_WIDTH, resizeStartPos.current.width + deltaX);
+            const newHeight = Math.max(MIN_DIALOG_HEIGHT, resizeStartPos.current.height + deltaY);
 
             setDialogSize({ width: newWidth, height: newHeight });
         };
