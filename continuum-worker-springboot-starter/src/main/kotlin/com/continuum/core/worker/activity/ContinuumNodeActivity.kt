@@ -8,8 +8,11 @@ import com.continuum.core.commons.model.PortData
 import com.continuum.core.commons.model.PortDataStatus
 import com.continuum.core.commons.node.ProcessNodeModel
 import com.continuum.core.commons.node.TriggerNodeModel
+import com.continuum.core.commons.prototol.progress.NodeProgress
+import com.continuum.core.commons.prototol.progress.NodeProgressCallback
 import com.continuum.core.commons.utils.NodeInputReader
 import com.continuum.core.commons.utils.NodeOutputWriter
+import com.continuum.core.commons.workflow.IContinuumWorkflow
 import io.temporal.activity.Activity
 import io.temporal.spring.boot.ActivityImpl
 import jakarta.annotation.PostConstruct
@@ -65,6 +68,21 @@ class ContinuumNodeActivity(
     node: ContinuumWorkflowModel.Node,
     inputs: Map<String, PortData>
   ): IContinuumNodeActivity.NodeActivityOutput {
+    val nodeProgressCallback = object : NodeProgressCallback {
+      override fun report(nodeProgress: NodeProgress) {
+        LOGGER.info("NodeProgressCallback report - Node ID: ${node.id}, Progress: ${nodeProgress.progressPercentage}%, Message: ${nodeProgress.message}")
+        Activity.getExecutionContext().workflowClient.newWorkflowStub(
+          IContinuumWorkflow::class.java,
+          Activity.getExecutionContext().info.workflowId
+        ).updateNodeProgressSignal(
+          nodeProgress = nodeProgress
+        )
+      }
+
+      override fun report(progressPercentage: Int) {
+        report(NodeProgress(progressPercentage))
+      }
+    }
     Files.createDirectories(cacheStoragePath.resolve("${Activity.getExecutionContext().info.runId}/${node.id}"))
     try {
       // Find the node to execute
@@ -77,7 +95,8 @@ class ContinuumNodeActivity(
         processNodeMap[node.data.nodeModel]!!.run(
           node = node,
           inputs = nodeInputs,
-          nodeOutputWriter = nodeOutputWriter
+          nodeOutputWriter = nodeOutputWriter,
+          nodeProgressCallback = nodeProgressCallback
         )
         LOGGER.info("Uploading output files for node ${node.id} (${node.data.nodeModel})")
         val nodeOutput = prepareNodeOutputs(

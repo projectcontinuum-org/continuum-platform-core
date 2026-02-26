@@ -4,6 +4,7 @@ import com.continuum.core.commons.activity.IContinuumNodeActivity
 import com.continuum.core.commons.constant.TaskQueues
 import com.continuum.core.commons.constant.TaskQueues.WORKFLOW_TASK_QUEUE
 import com.continuum.core.commons.model.*
+import com.continuum.core.commons.prototol.progress.NodeProgress
 import com.continuum.core.commons.workflow.IContinuumWorkflow
 import com.continuum.core.worker.utils.StatusHelper
 import com.fasterxml.jackson.databind.ObjectMapper
@@ -46,6 +47,7 @@ class ContinuumWorkflow : IContinuumWorkflow {
     IContinuumNodeActivity::class.java,
     ActivityOptions {
       mergeActivityOptions(baseActivityOptions)
+//      setHeartbeatTimeout(Duration.ofMinutes(5))
     }
   )
 
@@ -218,5 +220,12 @@ class ContinuumWorkflow : IContinuumWorkflow {
 //            workflowSnapshot = currentRunningWorkflow!!,
       nodeToOutputsMap = nodeToOutputsMap
     )
+  }
+
+  override fun updateNodeProgressSignal(nodeProgress: NodeProgress) {
+    // This signal can be called very frequently, so we want to avoid doing too much processing here
+    // We will just log the progress and let the activity heartbeat handle the rest
+    LOGGER.info("Received node progress signal: ${nodeProgress.progressPercentage * 100}% - ${nodeProgress.message ?: ""}")
+    sendUpdateEvent()
   }
 }

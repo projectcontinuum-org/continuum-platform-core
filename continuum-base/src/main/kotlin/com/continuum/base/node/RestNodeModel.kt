@@ -3,6 +3,7 @@ package com.continuum.base.node
 import com.continuum.core.commons.exception.NodeRuntimeException
 import com.continuum.core.commons.model.ContinuumWorkflowModel
 import com.continuum.core.commons.node.ProcessNodeModel
+import com.continuum.core.commons.prototol.progress.NodeProgressCallback
 import com.continuum.core.commons.utils.NodeInputReader
 import com.continuum.core.commons.utils.NodeOutputWriter
 import com.fasterxml.jackson.core.type.TypeReference
@@ -10,6 +11,7 @@ import com.fasterxml.jackson.databind.ObjectMapper
 import freemarker.template.Configuration
 import freemarker.template.Template
 import freemarker.template.TemplateExceptionHandler
+import io.temporal.activity.Activity
 import org.slf4j.LoggerFactory
 import org.springframework.http.MediaType.TEXT_PLAIN_VALUE
 import org.springframework.http.HttpEntity
@@ -37,6 +39,9 @@ class RestNodeModel(
       fallbackOnNullLoopVariable = false
       numberFormat = "computer"  // Outputs: 1000, 100, not 1,000, 1,00
     }
+
+    // Progress reporting interval in milliseconds (report every 5 seconds)
+    private const val PROGRESS_REPORT_INTERVAL_MS = 5000L
   }
 
   final override val inputPorts = mapOf(
@@ -167,11 +172,34 @@ class RestNodeModel(
     }
   }
 
+  /**
+   * This method is required by the base class but is not used in this implementation.
+   * The main logic is implemented in the overloaded execute method that includes the NodeProgressCallback.
+   * This is to maintain compatibility with the base class while allowing for progress reporting in the main execute method.
+   *
+   * If the base class calls this method, it will simply do nothing, as the actual execution logic is in the other execute method.
+   */
   override fun execute(
     properties: Map<String, Any>?,
     inputs: Map<String, NodeInputReader>,
     nodeOutputWriter: NodeOutputWriter
+  ) {}
+
+  override fun execute(
+    properties: Map<String, Any>?,
+    inputs: Map<String, NodeInputReader>,
+    nodeOutputWriter: NodeOutputWriter,
+    nodeProgressCallback: NodeProgressCallback?
   ) {
+    // nodeProgressCallback must not be null for this node, as we want to report progress
+    if(nodeProgressCallback == null) {
+      throw NodeRuntimeException(
+        isRetriable = true,
+        workflowId = Activity.getExecutionContext().info.workflowId,
+        nodeId = this.metadata.id ?: "",
+        message = "NodeProgressCallback is required for RestNodeModel"
+      )
+    }
     val method = properties?.get("method") as String? ?: throw NodeRuntimeException(
       workflowId = "",
       nodeId = "",
@@ -184,14 +212,29 @@ class RestNodeModel(
     )
     val payloadTemplate = properties["payload"] as String? ?: ""
 
-    LOGGER.info("REST Node: method=$method, urlTemplate=$urlTemplate")
+    var lastProgressReportTime = System.currentTimeMillis()
 
+    LOGGER.info("REST Node: method=$method, urlTemplate=$urlTemplate")
+    val totalRowCount = inputs["data"]?.getRowCount()
     nodeOutputWriter.createOutputPortWriter("data").use { writer ->
       inputs["data"]?.use { reader ->
         var row = reader.read()
         var rowNumber = 0L
 
         while (row != null) {
+          val currentTime = System.currentTimeMillis()
+          val progressPercentage = if (totalRowCount != null && totalRowCount > 0) {
+            ((rowNumber + 1) * 100 / totalRowCount).toInt()
+          } else {
+            0
+          }
+
+          // Report progress only every X seconds
+          if (currentTime - lastProgressReportTime >= PROGRESS_REPORT_INTERVAL_MS) {
+            nodeProgressCallback.report(progressPercentage)
+            lastProgressReportTime = currentTime
+            LOGGER.debug("Progress: $progressPercentage% ($rowNumber/$totalRowCount rows processed)")
+          }
           try {
             // Render templates
             val url = renderTemplate(urlTemplate, row)
@@ -240,7 +283,7 @@ class RestNodeModel(
             // Add response to row
             val newRow = row.toMutableMap().apply {
               this["response"] = mapOf(
-                "status" to response.statusCode.value(),
+                "status" to response.statusCodeValue,
                 "body" to response.body
               )
             }
@@ -282,6 +325,8 @@ class RestNodeModel(
           row = reader.read()
         }
 
+        // Report final progress (100%)
+        nodeProgressCallback.report(100)
         LOGGER.info("Processed $rowNumber HTTP requests")
       }
     }

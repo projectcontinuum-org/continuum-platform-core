@@ -1,6 +1,7 @@
 package com.continuum.core.commons.node
 
 import com.continuum.core.commons.model.ContinuumWorkflowModel
+import com.continuum.core.commons.prototol.progress.NodeProgressCallback
 import com.continuum.core.commons.utils.KnimeHelper.Companion.continuumTableToKnimeContainerInputTable
 import com.continuum.core.commons.utils.KnimeHelper.Companion.knimeContainerOutputTableToPortOutput
 import com.continuum.core.commons.utils.NodeInputReader
@@ -50,7 +51,8 @@ abstract class KnimeNodeModel : ProcessNodeModel() {
   override fun run(
     node: ContinuumWorkflowModel.Node,
     inputs: Map<String, NodeInputReader>,
-    nodeOutputWriter: NodeOutputWriter
+    nodeOutputWriter: NodeOutputWriter,
+    nodeProgressCallback: NodeProgressCallback?
   ) {
     try {
       val workflowRunId = Activity.getExecutionContext().info.runId
