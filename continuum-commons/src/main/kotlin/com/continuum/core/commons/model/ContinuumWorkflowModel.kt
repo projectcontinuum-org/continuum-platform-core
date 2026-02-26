@@ -1,5 +1,6 @@
 package com.continuum.core.commons.model
 
+import com.continuum.core.commons.prototol.progress.NodeProgress
 import com.fasterxml.jackson.annotation.JsonCreator
 import com.fasterxml.jackson.annotation.JsonIgnore
 import com.fasterxml.jackson.annotation.JsonProperty
@@ -76,7 +77,8 @@ data class ContinuumWorkflowModel @JsonCreator constructor(
     @JsonProperty("properties") val properties: Map<String, Any> = mapOf(),
     @JsonProperty("propertiesSchema") val propertiesSchema: Map<String, Any> = mapOf(),
     @JsonProperty("propertiesUISchema") val propertiesUISchema: Map<String, Any> = mapOf(),
-    @JsonProperty("status") var status: NodeStatus? = null
+    @JsonProperty("status") var status: NodeStatus? = null,
+    @JsonProperty("nodeProgress") var nodeProgress: NodeProgress? = null
   )
 
   data class NodePort @JsonCreator constructor(

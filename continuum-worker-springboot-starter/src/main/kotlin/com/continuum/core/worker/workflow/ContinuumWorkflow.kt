@@ -4,6 +4,7 @@ import com.continuum.core.commons.activity.IContinuumNodeActivity
 import com.continuum.core.commons.constant.TaskQueues
 import com.continuum.core.commons.constant.TaskQueues.WORKFLOW_TASK_QUEUE
 import com.continuum.core.commons.model.*
+import com.continuum.core.commons.prototol.progress.ContinuumNodeActivitySignal
 import com.continuum.core.commons.prototol.progress.NodeProgress
 import com.continuum.core.commons.workflow.IContinuumWorkflow
 import com.continuum.core.worker.utils.StatusHelper
@@ -222,10 +223,19 @@ class ContinuumWorkflow : IContinuumWorkflow {
     )
   }
 
-  override fun updateNodeProgressSignal(nodeProgress: NodeProgress) {
+  override fun updateNodeProgressSignal(
+    continuumNodeActivitySignal: ContinuumNodeActivitySignal
+  ) {
+    val nodeProgress = continuumNodeActivitySignal.nodeProgress
     // This signal can be called very frequently, so we want to avoid doing too much processing here
     // We will just log the progress and let the activity heartbeat handle the rest
-    LOGGER.info("Received node progress signal: ${nodeProgress.progressPercentage * 100}% - ${nodeProgress.message ?: ""}")
+    LOGGER.info("Received node progress signal: ${nodeProgress.progressPercentage}% - ${nodeProgress.message ?: ""}")
+    // find the node and update it's nodeProgress
+    val nodeToUpdate = currentRunningWorkflow?.nodes
+      ?.find { it.id == continuumNodeActivitySignal.nodeId }!!
+    nodeToUpdate.data.nodeProgress = nodeProgress
+    LOGGER.info("Node id: ${nodeToUpdate.data.id} Node title: ${nodeToUpdate.data.title} Node current progress: ${nodeToUpdate.data.nodeProgress?.progressPercentage ?: "null"}%")
+
     sendUpdateEvent()
   }
 }

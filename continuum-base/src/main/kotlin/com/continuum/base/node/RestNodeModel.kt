@@ -41,7 +41,7 @@ class RestNodeModel(
     }
 
     // Progress reporting interval in milliseconds (report every 5 seconds)
-    private const val PROGRESS_REPORT_INTERVAL_MS = 5000L
+    private const val PROGRESS_REPORT_INTERVAL_MS = 500L
   }
 
   final override val inputPorts = mapOf(
@@ -173,6 +173,21 @@ class RestNodeModel(
   }
 
   /**
+   * Calculates the progress percentage based on the number of rows processed.
+   *
+   * @param rowsProcessed The number of rows that have been processed
+   * @param totalRows The total number of rows to process
+   * @return Progress percentage (0-99), capped at 99 during processing to ensure 100% is only reported at completion
+   */
+  private fun calculateProgressPercentage(rowsProcessed: Long, totalRows: Long?): Int {
+    return if (totalRows != null && totalRows > 0) {
+      (rowsProcessed * 100 / totalRows).toInt().coerceAtMost(99)
+    } else {
+      0
+    }
+  }
+
+  /**
    * This method is required by the base class but is not used in this implementation.
    * The main logic is implemented in the overloaded execute method that includes the NodeProgressCallback.
    * This is to maintain compatibility with the base class while allowing for progress reporting in the main execute method.
@@ -222,19 +237,8 @@ class RestNodeModel(
         var rowNumber = 0L
 
         while (row != null) {
-          val currentTime = System.currentTimeMillis()
-          val progressPercentage = if (totalRowCount != null && totalRowCount > 0) {
-            ((rowNumber + 1) * 100 / totalRowCount).toInt()
-          } else {
-            0
-          }
-
-          // Report progress only every X seconds
-          if (currentTime - lastProgressReportTime >= PROGRESS_REPORT_INTERVAL_MS) {
-            nodeProgressCallback.report(progressPercentage)
-            lastProgressReportTime = currentTime
-            LOGGER.debug("Progress: $progressPercentage% ($rowNumber/$totalRowCount rows processed)")
-          }
+          // Fake random delay
+          Thread.sleep((2000..5000).random().toLong())
           try {
             // Render templates
             val url = renderTemplate(urlTemplate, row)
@@ -289,7 +293,6 @@ class RestNodeModel(
             }
 
             writer.write(rowNumber, newRow)
-            rowNumber++
 
           } catch (e: Exception) {
             LOGGER.error("Failed to make HTTP request for row $rowNumber: ${e.message}")
@@ -319,7 +322,17 @@ class RestNodeModel(
             }
 
             writer.write(rowNumber, newRow)
-            rowNumber++
+          }
+
+          rowNumber++
+
+          // Report progress only every X seconds
+          val currentTime = System.currentTimeMillis()
+          if (currentTime - lastProgressReportTime >= PROGRESS_REPORT_INTERVAL_MS) {
+            val progressPercentage = calculateProgressPercentage(rowNumber, totalRowCount)
+            nodeProgressCallback.report(progressPercentage)
+            lastProgressReportTime = currentTime
+            LOGGER.debug("Progress: $progressPercentage% ($rowNumber/$totalRowCount rows processed)")
           }
 
           row = reader.read()

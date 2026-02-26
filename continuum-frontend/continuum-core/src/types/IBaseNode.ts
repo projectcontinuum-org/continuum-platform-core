@@ -23,6 +23,16 @@ export interface IBaseNodeData {
     nodeModel: string;
     status?: "ACTIVE" | "CONFIGURED" | "BUSY" | "SUCCESS" | "FAILED" | "WARNING" | "PRE-PROCESSING" | "POST-PROCESSING";
     progressPercentage?: number;
+    nodeProgress?: INodeProgress;
+}
+
+export interface INodeProgress {
+    progressPercentage: number;
+    message?: string;
+    stage?: string;
+    allStages?: string[];
+    stageDurationMs?: number;
+    totalDurationMs?: number;
 }
 
 export interface IPortProps {

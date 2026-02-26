@@ -8,6 +8,7 @@ import com.continuum.core.commons.model.PortData
 import com.continuum.core.commons.model.PortDataStatus
 import com.continuum.core.commons.node.ProcessNodeModel
 import com.continuum.core.commons.node.TriggerNodeModel
+import com.continuum.core.commons.prototol.progress.ContinuumNodeActivitySignal
 import com.continuum.core.commons.prototol.progress.NodeProgress
 import com.continuum.core.commons.prototol.progress.NodeProgressCallback
 import com.continuum.core.commons.utils.NodeInputReader
@@ -75,7 +76,10 @@ class ContinuumNodeActivity(
           IContinuumWorkflow::class.java,
           Activity.getExecutionContext().info.workflowId
         ).updateNodeProgressSignal(
-          nodeProgress = nodeProgress
+          continuumNodeActivitySignal = ContinuumNodeActivitySignal(
+            nodeId = node.id,
+            nodeProgress = nodeProgress
+          )
         )
       }
 
