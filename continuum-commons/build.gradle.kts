@@ -18,6 +18,9 @@ repositories {
 }
 
 dependencies {
+    // Jakarta annotations
+    implementation("jakarta.annotation:jakarta.annotation-api:2.1.1")
+
     // Jackson dependencies
     implementation("com.fasterxml.jackson.module:jackson-module-kotlin:2.18.2")
 

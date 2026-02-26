@@ -19,6 +19,9 @@ tools:
 - Null-safety: Use ?. ?: — no !! ever
 - Helpers (use them!): getProperty(key), validateInput(), prepareOutput(), log(msg)
 - Keep code < 50 lines, clean, readable
+- Always create documentation in resources as Markdown with clear and well formatted inputs/outputs tables and examples
+- Change in the behaivor or properties should be reflected in the documentation. If you add a new property, add it to the documentation with an explanation of what it does and how it affects the behavior of the node.
+- No need to create documentation for unit tests, but if you do, make sure to include it in the resources folder and reference it in the documentation of the node.
 
 ## Strict Prompt Template (Wrap Every Generation)
 Always wrap user request in this exact prompt before generating code:
@@ -41,8 +44,32 @@ Always wrap user request in this exact prompt before generating code:
 - Node properties are configuration of the node and it has a JSON and UI schema defined in the metadata. The properties are passed in the `properties` parameter of the `execute` function as a Map<String, Any>.
 - The propertiesUISchema of the node is a JSONForm that defines how the properties are rendered in the UI. The propertiesSchema defines the structure and validation of the properties.
 
-Working example (JoinNodeModel — reference this style):
+Example user Request:
+Create ColumnJoinNodeModel
+- two input ports "left" and "right" Table
+- Properties: columnNameLeft (string), columnNameRight (string), outputColumnName (string)
+- Output ports "output" Table with one column outputColumnName that joins left[columnNameLeft] and right[columnNameRight]
+- UI Schema: React Material JSONForm with controls for the three properties
+- Behavior: For each row, read left[columnNameLeft] and right[columnNameRight], join them with a space, and write to output[outputColumnName]
+- Thinking: Identify input columns, read rows, create new table with joined column, return output
+- Category: "Processing"
+- Example Properties: {
+    "columnNameLeft": "name",
+    "columnNameRight": "city",
+    "outputColumnName": "fullInfo"
+  }
+- Detailed Example Input: [
+    {"left": {"name": "Alice"}, "right": {"city": "NY"}},
+    {"left": {"name": "Bob"}, "right": {"city": "LA"}}
+  ]
+- Detailed Example Output: [
+    {"fullInfo": "Alice NY"},
+    {"fullInfo": "Bob LA"}
+  ]
 
+expected Kotlin code output:
+
+```kotlin
 package com.continuum.base.node
 
 import com.continuum.core.commons.exception.NodeRuntimeException
@@ -57,27 +84,34 @@ import org.springframework.http.MediaType.TEXT_PLAIN_VALUE
 import org.springframework.stereotype.Component
 
 @Component
-class JointNodeModel: ProcessNodeModel() {
-
+class ColumnJoinNodeModel: ProcessNodeModel() {
     companion object {
-        private val LOGGER = LoggerFactory.getLogger(JointNodeModel::class.java)
+        private val LOGGER = LoggerFactory.getLogger(ColumnJoinNodeModel::class.java)
         private val objectMapper = ObjectMapper()
     }
 
+    @PostConstruct
+    fun loadDocumentation() {
+        documentationMarkdown = this::class.java.classLoader
+            .getResource("nodes/ColumnJoinNodeModel.md")
+            ?.readText(Charsets.UTF_8)
+            ?: "Documentation not found"
+    }
+
     final override val inputPorts = mapOf(
-        "input-1" to ContinuumWorkflowModel.NodePort(
-            name = "first input string",
+        "left" to ContinuumWorkflowModel.NodePort(
+            name = "left input table",
             contentType = TEXT_PLAIN_VALUE
         ),
-        "input-2" to ContinuumWorkflowModel.NodePort(
-            name = "second input string",
+        "right" to ContinuumWorkflowModel.NodePort(
+            name = "right input table",
             contentType = TEXT_PLAIN_VALUE
         )
     )
 
     final override val outputPorts = mapOf(
-        "output-1" to ContinuumWorkflowModel.NodePort(
-            name = "part 1",
+        "output" to ContinuumWorkflowModel.NodePort(
+            name = "output table",
             contentType = TEXT_PLAIN_VALUE
         )
     )
@@ -86,71 +120,13 @@ class JointNodeModel: ProcessNodeModel() {
         "Processing"
     )
 
-    val propertiesSchema: Map<String, Any> = objectMapper.readValue(
-        """
-        {
-          "type": "object",
-          "properties": {
-            "inputs": {
-                "type": "array",
-                "items": {
-                    "type": "object",
-                    "properties": {
-                        "columnName": {
-                            "type": "string",
-                            "title": "Input column Name"
-                        }
-                    },
-                    "required": ["columnName"]
-                }
-            },
-            "outputsColumnName": {
-              "type": "string",
-              "title": "Output Column Name",
-              "description": "The name of the column to split"
-            }
-          },
-          "required": ["outputsColumnName", "inputs"]
-        }
-        """.trimIndent(),
-        object: TypeReference<Map<String, Any>>() {}
-    )
-
-    val propertiesUiSchema: Map<String, Any> = objectMapper.readValue(
-        """
-        {
-          "type": "VerticalLayout",
-          "elements": [
-            {
-              "type": "Control",
-              "scope": "#/properties/inputs",
-              "options": {
-                "detail": {
-                  "type": "VerticalLayout",
-                  "elements": [
-                    {
-                      "type": "Control",
-                      "scope": "#/properties/columnName"
-                    }
-                  ]
-                }
-              }
-            },
-            {
-              "type": "Control",
-              "scope": "#/properties/outputsColumnName"
-            }
-          ]
-        }
-        """.trimIndent(),
-        object: TypeReference<Map<String, Any>>() {}
-    )
+    // propertiesSchema and propertiesUiSchema definitions would go here
 
     override val metadata = ContinuumWorkflowModel.NodeData(
         id = this.javaClass.name,
-        description = "Joint the input strings into one",
-        title = "Joint Node",
-        subTitle = "Joint the input strings",
+        description = "Joins two columns from left and right tables into one output column",
+        title = "Column Join Node",
+        subTitle = "Join columns from two tables",
         nodeModel = this.javaClass.name,
         icon = """
             <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" strokeWidth={1.5} viewBox="0 0 24 24">
@@ -160,11 +136,9 @@ class JointNodeModel: ProcessNodeModel() {
         inputs = inputPorts,
         outputs = outputPorts,
         properties = mapOf(
-            "inputs" to listOf(
-                mapOf("columnName" to "msg-1"),
-                mapOf("columnName" to "msg-2")
-            ),
-            "outputsColumnName" to "message"
+            "columnNameLeft" to "name",
+            "columnNameRight" to "city",
+            "outputColumnName" to "fullInfo"
         ),
         propertiesSchema = propertiesSchema,
         propertiesUISchema = propertiesUiSchema
@@ -175,46 +149,48 @@ class JointNodeModel: ProcessNodeModel() {
         inputs: Map<String, NodeInputReader>,
         nodeOutputWriter: NodeOutputWriter
     ) {
-        val inputColumnNames = (properties?.get("inputs") as List<Map<String, String>>)
-        val inputColumnName1 = inputColumnNames[0]["columnName"] ?: throw NodeRuntimeException(
+        val columnNameLeft = properties?.get("columnNameLeft") as String? ?: throw NodeRuntimeException(
             workflowId = "",
             nodeId = "",
-            message = "Input column name is not provided"
+            message = "columnNameLeft is not provided"
         )
-        val inputColumnName2 = inputColumnNames[1]["columnName"] ?: throw NodeRuntimeException(
+        val columnNameRight = properties["columnNameRight"] as String? ?: throw NodeRuntimeException(
             workflowId = "",
             nodeId = "",
-            message = "Input column name is not provided"
+            message = "columnNameRight is not provided"
+         )
+        val outputColumnName = properties["outputColumnName"] as String? ?: throw NodeRuntimeException(
+            workflowId = "",
+            nodeId = "",
+            message = "outputColumnName is not provided"
         )
-        val outputColumnName = properties["outputsColumnName"] as String? ?: "message"
-        LOGGER.info("Jointing the input: ${objectMapper.writeValueAsString(inputs)}")
-        nodeOutputWriter.createOutputPortWriter("output-1").use { writer ->
-            inputs["input-1"]?.use { reader1 ->
-                inputs["input-2"]?.use { reader2 ->
-                    var input1 = reader1.read()
-                    var input2 = reader2.read()
+        LOGGER.info("Joining columns: $columnNameLeft and $columnNameRight into $outputColumnName")
+        nodeOutputWriter.createOutputPortWriter("output").use { writer ->
+            inputs["left"]?.use { leftReader ->
+                inputs["right"]?.use { rightReader ->
+                    var leftRow = leftReader.read()
+                    var rightRow = rightReader.read()
                     var rowNumber = 0L
-                    while (input1 != null && input2 != null) {
-                        val dataCells = "${input1[inputColumnName1] as String} ${input2[inputColumnName2] as String}"
+                    while (leftRow != null && rightRow != null) {
+                        val leftValue = leftRow[columnNameLeft] as? String ?: ""
+                        val rightValue = rightRow[columnNameRight] as? String ?: ""
+                        val joinedValue = "$leftValue $rightValue".trim()
                         writer.write(rowNumber, mapOf(
-                            outputColumnName to dataCells
+                            outputColumnName to joinedValue
                         ))
-                        input1 = reader1.read()
-                        input2 = reader2.read()
+                        leftRow = leftReader.read()
+                        rightRow = rightReader.read()
                         rowNumber++
                     }
                 }
             }
         }
-
     }
-
 }
-
-Task: "
+```
 
 ## Response Style
-- After generating: "Here's your Node.kt — copy-paste into src/nodes/ and restart worker."
+- After generating: "Here's your Node.kt — copy-paste into src/nodes/ and ./gradlew :continuum-base:build to compile!"
 - Suggest filename: e.g., AgeFilterNode.kt
 - If unclear: Ask "Can you describe the input/output or column names?"
 - No fluff—no explanations unless asked. Just code + file path.
@@ -225,3 +201,4 @@ Task: "
 - If user wants batching/security: Add chunked(100) or SecurityManager notes.
 - The propertiesUISchema only has following JSONFrom Renderer sets:
   1. React Material https://jsonforms.io/docs/renderer-sets
+  1. A custom monano-editor renderer wrapping react-monaco-editor for code properties (e.g., kotlin, freemarker templates, etc.). supported options: format (code), language (kotlin, javascript, json, etc.), rows (number of lines to show)

@@ -18,95 +18,96 @@ import java.util.concurrent.atomic.AtomicInteger
 import kotlin.io.path.absolutePathString
 
 abstract class KnimeNodeModel : ProcessNodeModel() {
-    abstract val knimeExecutablePath: String
-    abstract val knimeWorkspacesRoot: String
-    abstract val knimeWorkflowRootDir: String
-    abstract val knimeNodeFactoryClass: String
-    abstract val knimeNodeName: String
-    private val templateHelper = TemplateHelper()
+  abstract val knimeExecutablePath: String
+  abstract val knimeWorkspacesRoot: String
+  abstract val knimeWorkflowRootDir: String
+  abstract val knimeNodeFactoryClass: String
+  abstract val knimeNodeName: String
+  private val templateHelper = TemplateHelper()
 
-    companion object {
-        private const val WORKFLOW_TEMPLATE_RESOURCE_ROOT = "knime-workflow-template"
-        private const val WORKFLOW_SET_TEMPLATE_FILE_NAME = "workflowset.meta.template"
-        private const val WORKFLOW_METADATA_XML_TEMPLATE_FILE_NAME = "workflow-metadata.xml.template"
-        private const val WORKFLOW_KNIME_TEMPLATE_FILE_NAME = "workflow.knime.template"
-        private const val WORKFLOW_INPUT_NODE_SETTINGS_TEMPLATE_FILE_NAME = "input-node-template/settings.xml.template"
-        private const val WORKFLOW_OUTPUT_NODE_SETTINGS_TEMPLATE_FILE_NAME = "output-node-template/settings.xml.template"
-        private const val WORKFLOW_PROCESSING_NODE_SETTINGS_TEMPLATE_FILE_NAME = "processing-node-template/settings.xml.template"
-        private val LOGGER = LoggerFactory.getLogger(KnimeNodeModel::class.java)
-        private val objectMapper = ObjectMapper()
+  companion object {
+    private const val WORKFLOW_TEMPLATE_RESOURCE_ROOT = "knime-workflow-template"
+    private const val WORKFLOW_SET_TEMPLATE_FILE_NAME = "workflowset.meta.template"
+    private const val WORKFLOW_METADATA_XML_TEMPLATE_FILE_NAME = "workflow-metadata.xml.template"
+    private const val WORKFLOW_KNIME_TEMPLATE_FILE_NAME = "workflow.knime.template"
+    private const val WORKFLOW_INPUT_NODE_SETTINGS_TEMPLATE_FILE_NAME = "input-node-template/settings.xml.template"
+    private const val WORKFLOW_OUTPUT_NODE_SETTINGS_TEMPLATE_FILE_NAME = "output-node-template/settings.xml.template"
+    private const val WORKFLOW_PROCESSING_NODE_SETTINGS_TEMPLATE_FILE_NAME =
+      "processing-node-template/settings.xml.template"
+    private val LOGGER = LoggerFactory.getLogger(KnimeNodeModel::class.java)
+    private val objectMapper = ObjectMapper()
 
-        // Create a new thread pool executor service
-        private val executor = Executors.newFixedThreadPool(
-            1,
-            ThreadFactory {
-                val threadNumber = AtomicInteger(1)
-                Thread(it, "knime-executor-${threadNumber.andIncrement}-")
-            }
-        )
-    }
+    // Create a new thread pool executor service
+    private val executor = Executors.newFixedThreadPool(
+      1,
+      ThreadFactory {
+        val threadNumber = AtomicInteger(1)
+        Thread(it, "knime-executor-${threadNumber.andIncrement}-")
+      }
+    )
+  }
 
-    override fun run(
-        node: ContinuumWorkflowModel.Node,
-        inputs: Map<String, NodeInputReader>,
-        nodeOutputWriter: NodeOutputWriter
-    ) {
-        try {
-            val workflowRunId = Activity.getExecutionContext().info.runId
-            // Create temporary directory for the workflow
-            val workflowDir = File(
-                knimeWorkflowRootDir,
-                "${workflowRunId}${File.separator}${node.id}"
-            )
+  override fun run(
+    node: ContinuumWorkflowModel.Node,
+    inputs: Map<String, NodeInputReader>,
+    nodeOutputWriter: NodeOutputWriter
+  ) {
+    try {
+      val workflowRunId = Activity.getExecutionContext().info.runId
+      // Create temporary directory for the workflow
+      val workflowDir = File(
+        knimeWorkflowRootDir,
+        "${workflowRunId}${File.separator}${node.id}"
+      )
 
-            LOGGER.info("Generating workflow at ${workflowDir.absolutePath}")
+      LOGGER.info("Generating workflow at ${workflowDir.absolutePath}")
 
-            // Render the workflow
-            renderKnimeWorkflow(
-                workflowDir.toPath(),
-                node.data.properties!!
-            )
+      // Render the workflow
+      renderKnimeWorkflow(
+        workflowDir.toPath(),
+        node.data.properties!!
+      )
 
-            // Execute the workflow
-            executeKnimeWorkflow(
-                workflowDir.toPath(),
-                inputs,
-                nodeOutputWriter
-            ).get()
+      // Execute the workflow
+      executeKnimeWorkflow(
+        workflowDir.toPath(),
+        inputs,
+        nodeOutputWriter
+      ).get()
 
-            // clean up the workflow directory
+      // clean up the workflow directory
 //            workflowDir.deleteRecursively()
 
-            execute(
-                node.data.properties,
-                inputs,
-                nodeOutputWriter
-            )
-        } catch (ex: Exception) {
-            LOGGER.error("Error while executing node ${node.id}", ex)
-            throw ex
-        }
+      execute(
+        node.data.properties,
+        inputs,
+        nodeOutputWriter
+      )
+    } catch (ex: Exception) {
+      LOGGER.error("Error while executing node ${node.id}", ex)
+      throw ex
     }
+  }
 
-    // Starts knime as a process and attach to it stdio
-    fun executeKnimeWorkflow(
-        workflowPath: Path,
-        inputs: Map<String, NodeInputReader>,
-        nodeOutputWriter: NodeOutputWriter
-    ): Future<Int> {
-        val inputs = prepareWorkflowInputs(
-            workflowPath,
-            inputs
-        )
-        val outputs = outputPorts.keys.mapIndexed { index, portId ->
-            val nodeId = inputPorts.size + index + 1
-            "-option=${nodeId},outputPathOrUrl,${workflowPath.resolve("$portId.json").toFile().absolutePath},String"
-        }.joinToString(" \\\\n")
+  // Starts knime as a process and attach to it stdio
+  fun executeKnimeWorkflow(
+    workflowPath: Path,
+    inputs: Map<String, NodeInputReader>,
+    nodeOutputWriter: NodeOutputWriter
+  ): Future<Int> {
+    val inputs = prepareWorkflowInputs(
+      workflowPath,
+      inputs
+    )
+    val outputs = outputPorts.keys.mapIndexed { index, portId ->
+      val nodeId = inputPorts.size + index + 1
+      "-option=${nodeId},outputPathOrUrl,${workflowPath.resolve("$portId.json").toFile().absolutePath},String"
+    }.joinToString(" \\\\n")
 
-        val workspaceDir = File(knimeWorkspacesRoot, "knime-workspace-${Thread.currentThread().threadId()}")
-        // read all the stdio of the process in a single thread
-        return executor.submit<Int> {
-            val command = """
+    val workspaceDir = File(knimeWorkspacesRoot, "knime-workspace-${Thread.currentThread().threadId()}")
+    // read all the stdio of the process in a single thread
+    return executor.submit<Int> {
+      val command = """
                 "$knimeExecutablePath" \
                 -nosplash \
                 -debug \
@@ -120,305 +121,305 @@ abstract class KnimeNodeModel : ProcessNodeModel() {
                 $outputs
             """.trimIndent()
 
-            val processBuilder = ProcessBuilder(
-                "/bin/bash",
-                "-c",
-                command
-            )
+      val processBuilder = ProcessBuilder(
+        "/bin/bash",
+        "-c",
+        command
+      )
 
-            processBuilder.redirectErrorStream(true)
-            val process = processBuilder.start()
-            LOGGER.info("Starting KNIME process with command: $command")
-            process.inputStream.bufferedReader().use { reader ->
-                reader.lines().forEach { line ->
-                    LOGGER.debug("KNIME: $line")
-                }
-            }
-            process.waitFor()
-            LOGGER.info("KNIME process finished with exit code ${process.exitValue()}")
-            if (process.exitValue() != 0) {
-                throw RuntimeException("KNIME process failed with exit code ${process.exitValue()}")
-            }
-
-            workspaceDir.deleteRecursively()
-
-            // convert the KNIME container output table to Continuum table
-            outputPorts.keys.forEachIndexed { index, portId ->
-                val outputFile = workflowPath.resolve("$portId.json").toFile()
-                if (outputFile.exists()) {
-                    nodeOutputWriter.createOutputPortWriter(portId).use { writer ->
-                        knimeContainerOutputTableToPortOutput(
-                            outputFile,
-                            writer
-                        )
-                    }
-                } else {
-                    LOGGER.warn("Output file $portId.json not found")
-                }
-            }
-
-            LOGGER.info("KNIME process finished successfully")
-            process.exitValue()
+      processBuilder.redirectErrorStream(true)
+      val process = processBuilder.start()
+      LOGGER.info("Starting KNIME process with command: $command")
+      process.inputStream.bufferedReader().use { reader ->
+        reader.lines().forEach { line ->
+          LOGGER.debug("KNIME: $line")
         }
+      }
+      process.waitFor()
+      LOGGER.info("KNIME process finished with exit code ${process.exitValue()}")
+      if (process.exitValue() != 0) {
+        throw RuntimeException("KNIME process failed with exit code ${process.exitValue()}")
+      }
+
+      workspaceDir.deleteRecursively()
+
+      // convert the KNIME container output table to Continuum table
+      outputPorts.keys.forEachIndexed { index, portId ->
+        val outputFile = workflowPath.resolve("$portId.json").toFile()
+        if (outputFile.exists()) {
+          nodeOutputWriter.createOutputPortWriter(portId).use { writer ->
+            knimeContainerOutputTableToPortOutput(
+              outputFile,
+              writer
+            )
+          }
+        } else {
+          LOGGER.warn("Output file $portId.json not found")
+        }
+      }
+
+      LOGGER.info("KNIME process finished successfully")
+      process.exitValue()
+    }
+  }
+
+  fun prepareWorkflowInputs(
+    workflowPath: Path,
+    inputs: Map<String, NodeInputReader>
+  ): String {
+    // Prepare the inputs for the workflow
+
+    return inputPorts.keys.mapIndexed { index, portId ->
+      val inputFile = workflowPath.resolve("$portId.json")
+      val knimeInputsTable = continuumTableToKnimeContainerInputTable(
+        inputs[portId]!!
+      )
+      val knimeInputsTableJson = objectMapper.writeValueAsString(knimeInputsTable)
+      inputFile.toFile().createNewFile()
+      inputFile.toFile().writeText(knimeInputsTableJson)
+
+      "-option=${index},inputPathOrUrl,${inputFile.toFile().absolutePath},String"
+    }.joinToString(" \\\\n")
+  }
+
+  fun renderKnimeWorkflow(
+    workflowDir: Path,
+    nodeProperties: Map<String, Any>
+  ) {
+    // create all parent directories if not exists
+    if (!workflowDir.toFile().exists()) {
+      LOGGER.info("Creating workflow directory at ${workflowDir.absolutePathString()}")
+      workflowDir.toFile().mkdirs()
     }
 
-    fun prepareWorkflowInputs(
-        workflowPath: Path,
-        inputs: Map<String, NodeInputReader>
-    ): String {
-        // Prepare the inputs for the workflow
+    // Render workflowset.meta file
+    renderWorkflowSet(
+      workflowDir
+    )
 
-        return inputPorts.keys.mapIndexed { index, portId ->
-            val inputFile = workflowPath.resolve("$portId.json")
-            val knimeInputsTable = continuumTableToKnimeContainerInputTable(
-                inputs[portId]!!
-            )
-            val knimeInputsTableJson = objectMapper.writeValueAsString(knimeInputsTable)
-            inputFile.toFile().createNewFile()
-            inputFile.toFile().writeText(knimeInputsTableJson)
+    // Render workflow.metadata.xml file
+    renderWorkflowMetadataXml(
+      workflowDir
+    )
 
-            "-option=${index},inputPathOrUrl,${inputFile.toFile().absolutePath},String"
-        }.joinToString(" \\\\n")
+    // Render workflow.knime file
+    renderWorkflowKnime(
+      workflowDir,
+      mapOf(
+        "inputPorts" to inputPorts,
+        "outputPorts" to outputPorts,
+      )
+    )
+
+    // Render input node settings file
+    inputPorts.keys.forEach {
+      val inputNodeDir = workflowDir.resolve(it)
+      if (!inputNodeDir.toFile().exists()) {
+        LOGGER.info("Creating input node directory at ${inputNodeDir.absolutePathString()}")
+        inputNodeDir.toFile().mkdirs()
+      }
+      renderInput(
+        inputNodeDir
+      )
     }
 
-    fun renderKnimeWorkflow(
-        workflowDir: Path,
-        nodeProperties: Map<String, Any>
-    ) {
-        // create all parent directories if not exists
-        if (!workflowDir.toFile().exists()) {
-            LOGGER.info("Creating workflow directory at ${workflowDir.absolutePathString()}")
-            workflowDir.toFile().mkdirs()
-        }
-
-        // Render workflowset.meta file
-        renderWorkflowSet(
-            workflowDir
-        )
-
-        // Render workflow.metadata.xml file
-        renderWorkflowMetadataXml(
-            workflowDir
-        )
-
-        // Render workflow.knime file
-        renderWorkflowKnime(
-            workflowDir,
-            mapOf(
-                "inputPorts" to inputPorts,
-                "outputPorts" to outputPorts,
-            )
-        )
-
-        // Render input node settings file
-        inputPorts.keys.forEach {
-            val inputNodeDir = workflowDir.resolve(it)
-            if (!inputNodeDir.toFile().exists()) {
-                LOGGER.info("Creating input node directory at ${inputNodeDir.absolutePathString()}")
-                inputNodeDir.toFile().mkdirs()
-            }
-            renderInput(
-                inputNodeDir
-            )
-        }
-
-        // Render processing node settings file
-        val processingNodeDir = workflowDir.resolve("processing-node")
-        if (!processingNodeDir.toFile().exists()) {
-            LOGGER.info("Creating processing node directory at ${processingNodeDir.absolutePathString()}")
-            processingNodeDir.toFile().mkdirs()
-        }
-        renderProcessingNode(
-            processingNodeDir,
-            mapOf(
-                "knimeNodeFactoryClass" to knimeNodeFactoryClass,
-                "knimeNodeName" to knimeNodeName,
-                "nodeDescription" to metadata.description,
-                "nodeProperties" to nodeProperties,
-            )
-        )
-
-        // Render output node settings file
-        outputPorts.keys.forEach {
-            val outputNodeDir = workflowDir.resolve(it)
-            if (!outputNodeDir.toFile().exists()) {
-                LOGGER.info("Creating output node directory at ${outputNodeDir.absolutePathString()}")
-                outputNodeDir.toFile().mkdirs()
-            }
-            renderOutput(
-                outputNodeDir
-            )
-        }
+    // Render processing node settings file
+    val processingNodeDir = workflowDir.resolve("processing-node")
+    if (!processingNodeDir.toFile().exists()) {
+      LOGGER.info("Creating processing node directory at ${processingNodeDir.absolutePathString()}")
+      processingNodeDir.toFile().mkdirs()
     }
+    renderProcessingNode(
+      processingNodeDir,
+      mapOf(
+        "knimeNodeFactoryClass" to knimeNodeFactoryClass,
+        "knimeNodeName" to knimeNodeName,
+        "nodeDescription" to metadata.description,
+        "nodeProperties" to nodeProperties,
+      )
+    )
 
-    fun renderWorkflowSet(
-        workflowDir: Path
-    ) {
-        // Load templates from jar resources
-        val workflowSetTemplate = this::class.java.classLoader
-            .getResourceAsStream(
-                listOf(
-                    WORKFLOW_TEMPLATE_RESOURCE_ROOT,
-                    WORKFLOW_SET_TEMPLATE_FILE_NAME
-                ).joinToString(File.separator)
-            )
-            ?.bufferedReader()
-            ?.use { it.readText() }
-            ?: throw IllegalStateException("Workflow set template not found")
-        templateHelper.loadTemplate(WORKFLOW_SET_TEMPLATE_FILE_NAME, workflowSetTemplate)
-        val workflowSet = templateHelper.renderTemplate(WORKFLOW_SET_TEMPLATE_FILE_NAME, mapOf())
-        val workflowSetFileName = WORKFLOW_SET_TEMPLATE_FILE_NAME
-            .split(".")
-            .dropLast(1)
-            .joinToString(".")
-        val workflowSetFile = workflowDir.resolve(
-            workflowSetFileName
-        ).toFile()
-        if (!workflowSetFile.exists()) {
-            workflowSetFile.createNewFile()
-        }
-        workflowSetFile.writeText(workflowSet)
+    // Render output node settings file
+    outputPorts.keys.forEach {
+      val outputNodeDir = workflowDir.resolve(it)
+      if (!outputNodeDir.toFile().exists()) {
+        LOGGER.info("Creating output node directory at ${outputNodeDir.absolutePathString()}")
+        outputNodeDir.toFile().mkdirs()
+      }
+      renderOutput(
+        outputNodeDir
+      )
     }
+  }
 
-    fun renderWorkflowMetadataXml(
-        workflowDir: Path
-    ) {
-        val workflowMetadataXmlTemplate = this::class.java.classLoader
-            .getResourceAsStream(
-                listOf(
-                    WORKFLOW_TEMPLATE_RESOURCE_ROOT,
-                    WORKFLOW_METADATA_XML_TEMPLATE_FILE_NAME
-                ).joinToString(File.separator)
-            )
-            ?.bufferedReader()
-            ?.use { it.readText() }
-            ?: throw IllegalStateException("Workflow metadata xml template not found")
-
-        templateHelper.loadTemplate(WORKFLOW_METADATA_XML_TEMPLATE_FILE_NAME, workflowMetadataXmlTemplate)
-        val workflowMetadataXml = templateHelper.renderTemplate(WORKFLOW_METADATA_XML_TEMPLATE_FILE_NAME, mapOf())
-        val workflowMetadataXmlFileName = WORKFLOW_METADATA_XML_TEMPLATE_FILE_NAME
-            .split(".")
-            .dropLast(1)
-            .joinToString(".")
-        val workflowMetadataXmlFile = workflowDir.resolve(
-            workflowMetadataXmlFileName
-        ).toFile()
-        if (!workflowMetadataXmlFile.exists()) {
-            workflowMetadataXmlFile.createNewFile()
-        }
-        workflowMetadataXmlFile.writeText(workflowMetadataXml)
+  fun renderWorkflowSet(
+    workflowDir: Path
+  ) {
+    // Load templates from jar resources
+    val workflowSetTemplate = this::class.java.classLoader
+      .getResourceAsStream(
+        listOf(
+          WORKFLOW_TEMPLATE_RESOURCE_ROOT,
+          WORKFLOW_SET_TEMPLATE_FILE_NAME
+        ).joinToString(File.separator)
+      )
+      ?.bufferedReader()
+      ?.use { it.readText() }
+      ?: throw IllegalStateException("Workflow set template not found")
+    templateHelper.loadTemplate(WORKFLOW_SET_TEMPLATE_FILE_NAME, workflowSetTemplate)
+    val workflowSet = templateHelper.renderTemplate(WORKFLOW_SET_TEMPLATE_FILE_NAME, mapOf())
+    val workflowSetFileName = WORKFLOW_SET_TEMPLATE_FILE_NAME
+      .split(".")
+      .dropLast(1)
+      .joinToString(".")
+    val workflowSetFile = workflowDir.resolve(
+      workflowSetFileName
+    ).toFile()
+    if (!workflowSetFile.exists()) {
+      workflowSetFile.createNewFile()
     }
+    workflowSetFile.writeText(workflowSet)
+  }
 
-    fun renderWorkflowKnime(
-        workflowDir: Path,
-        model: Map<String, Any>,
-    ) {
-        val workflowKnimeTemplate = this::class.java.classLoader
-            .getResourceAsStream(
-                listOf(
-                    WORKFLOW_TEMPLATE_RESOURCE_ROOT,
-                    WORKFLOW_KNIME_TEMPLATE_FILE_NAME
-                ).joinToString(File.separator)
-            )
-            ?.bufferedReader()
-            ?.use { it.readText() }
-            ?: throw IllegalStateException("Workflow knime template not found")
+  fun renderWorkflowMetadataXml(
+    workflowDir: Path
+  ) {
+    val workflowMetadataXmlTemplate = this::class.java.classLoader
+      .getResourceAsStream(
+        listOf(
+          WORKFLOW_TEMPLATE_RESOURCE_ROOT,
+          WORKFLOW_METADATA_XML_TEMPLATE_FILE_NAME
+        ).joinToString(File.separator)
+      )
+      ?.bufferedReader()
+      ?.use { it.readText() }
+      ?: throw IllegalStateException("Workflow metadata xml template not found")
 
-        templateHelper.loadTemplate(WORKFLOW_KNIME_TEMPLATE_FILE_NAME, workflowKnimeTemplate)
-        val workflowKnime = templateHelper.renderTemplate(WORKFLOW_KNIME_TEMPLATE_FILE_NAME, model)
-        val workflowKnimeFileName = WORKFLOW_KNIME_TEMPLATE_FILE_NAME
-            .split(".")
-            .dropLast(1)
-            .joinToString(".")
-        val workflowKnimeFile = workflowDir.resolve(
-            workflowKnimeFileName
-        ).toFile()
-        if (!workflowKnimeFile.exists()) {
-            workflowKnimeFile.createNewFile()
-        }
-        workflowKnimeFile.writeText(workflowKnime)
+    templateHelper.loadTemplate(WORKFLOW_METADATA_XML_TEMPLATE_FILE_NAME, workflowMetadataXmlTemplate)
+    val workflowMetadataXml = templateHelper.renderTemplate(WORKFLOW_METADATA_XML_TEMPLATE_FILE_NAME, mapOf())
+    val workflowMetadataXmlFileName = WORKFLOW_METADATA_XML_TEMPLATE_FILE_NAME
+      .split(".")
+      .dropLast(1)
+      .joinToString(".")
+    val workflowMetadataXmlFile = workflowDir.resolve(
+      workflowMetadataXmlFileName
+    ).toFile()
+    if (!workflowMetadataXmlFile.exists()) {
+      workflowMetadataXmlFile.createNewFile()
     }
+    workflowMetadataXmlFile.writeText(workflowMetadataXml)
+  }
 
-    fun renderInput(
-        nodeDir: Path
-    ) {
-        val inputNodeSettingsTemplate = this::class.java.classLoader
-            .getResourceAsStream(
-                listOf(
-                    WORKFLOW_TEMPLATE_RESOURCE_ROOT,
-                    WORKFLOW_INPUT_NODE_SETTINGS_TEMPLATE_FILE_NAME
-                ).joinToString(File.separator)
-            )
-            ?.bufferedReader()
-            ?.use { it.readText() }
-            ?: throw IllegalStateException("Input node settings template not found")
-        templateHelper.loadTemplate(WORKFLOW_INPUT_NODE_SETTINGS_TEMPLATE_FILE_NAME, inputNodeSettingsTemplate)
-        val inputNodeSettings = templateHelper.renderTemplate(WORKFLOW_INPUT_NODE_SETTINGS_TEMPLATE_FILE_NAME, mapOf())
-        WORKFLOW_INPUT_NODE_SETTINGS_TEMPLATE_FILE_NAME
-            .split(".")
-            .dropLast(1)
-            .joinToString(".")
-        val inputNodeSettingsFile = nodeDir.resolve(
-            "settings.xml"
-        ).toFile()
-        if (!inputNodeSettingsFile.exists()) {
-            inputNodeSettingsFile.createNewFile()
-        }
-        inputNodeSettingsFile.writeText(inputNodeSettings)
+  fun renderWorkflowKnime(
+    workflowDir: Path,
+    model: Map<String, Any>,
+  ) {
+    val workflowKnimeTemplate = this::class.java.classLoader
+      .getResourceAsStream(
+        listOf(
+          WORKFLOW_TEMPLATE_RESOURCE_ROOT,
+          WORKFLOW_KNIME_TEMPLATE_FILE_NAME
+        ).joinToString(File.separator)
+      )
+      ?.bufferedReader()
+      ?.use { it.readText() }
+      ?: throw IllegalStateException("Workflow knime template not found")
+
+    templateHelper.loadTemplate(WORKFLOW_KNIME_TEMPLATE_FILE_NAME, workflowKnimeTemplate)
+    val workflowKnime = templateHelper.renderTemplate(WORKFLOW_KNIME_TEMPLATE_FILE_NAME, model)
+    val workflowKnimeFileName = WORKFLOW_KNIME_TEMPLATE_FILE_NAME
+      .split(".")
+      .dropLast(1)
+      .joinToString(".")
+    val workflowKnimeFile = workflowDir.resolve(
+      workflowKnimeFileName
+    ).toFile()
+    if (!workflowKnimeFile.exists()) {
+      workflowKnimeFile.createNewFile()
     }
+    workflowKnimeFile.writeText(workflowKnime)
+  }
 
-    fun renderOutput(
-        nodeDir: Path
-    ) {
-        val outputNodeSettingsTemplate = this::class.java.classLoader
-            .getResourceAsStream(
-                listOf(
-                    WORKFLOW_TEMPLATE_RESOURCE_ROOT,
-                    WORKFLOW_OUTPUT_NODE_SETTINGS_TEMPLATE_FILE_NAME
-                ).joinToString(File.separator)
-            )
-            ?.bufferedReader()
-            ?.use { it.readText() }
-            ?: throw IllegalStateException("Output node settings template not found")
-        templateHelper.loadTemplate(WORKFLOW_OUTPUT_NODE_SETTINGS_TEMPLATE_FILE_NAME, outputNodeSettingsTemplate)
-        val outputNodeSettings =
-            templateHelper.renderTemplate(WORKFLOW_OUTPUT_NODE_SETTINGS_TEMPLATE_FILE_NAME, mapOf())
-        WORKFLOW_OUTPUT_NODE_SETTINGS_TEMPLATE_FILE_NAME
-            .split(".")
-            .dropLast(1)
-            .joinToString(".")
-        val outputNodeSettingsFile = nodeDir.resolve(
-            "settings.xml"
-        ).toFile()
-        if (!outputNodeSettingsFile.exists()) {
-            outputNodeSettingsFile.createNewFile()
-        }
-        outputNodeSettingsFile.writeText(outputNodeSettings)
+  fun renderInput(
+    nodeDir: Path
+  ) {
+    val inputNodeSettingsTemplate = this::class.java.classLoader
+      .getResourceAsStream(
+        listOf(
+          WORKFLOW_TEMPLATE_RESOURCE_ROOT,
+          WORKFLOW_INPUT_NODE_SETTINGS_TEMPLATE_FILE_NAME
+        ).joinToString(File.separator)
+      )
+      ?.bufferedReader()
+      ?.use { it.readText() }
+      ?: throw IllegalStateException("Input node settings template not found")
+    templateHelper.loadTemplate(WORKFLOW_INPUT_NODE_SETTINGS_TEMPLATE_FILE_NAME, inputNodeSettingsTemplate)
+    val inputNodeSettings = templateHelper.renderTemplate(WORKFLOW_INPUT_NODE_SETTINGS_TEMPLATE_FILE_NAME, mapOf())
+    WORKFLOW_INPUT_NODE_SETTINGS_TEMPLATE_FILE_NAME
+      .split(".")
+      .dropLast(1)
+      .joinToString(".")
+    val inputNodeSettingsFile = nodeDir.resolve(
+      "settings.xml"
+    ).toFile()
+    if (!inputNodeSettingsFile.exists()) {
+      inputNodeSettingsFile.createNewFile()
     }
+    inputNodeSettingsFile.writeText(inputNodeSettings)
+  }
 
-    fun renderProcessingNode(
-        nodeDir: Path,
-        model: Map<String, Any>
-    ) {
-        val processingNodeSettingsTemplate = getProcessingNodeSettingsTemplate()
-        templateHelper.loadTemplate(
-            WORKFLOW_PROCESSING_NODE_SETTINGS_TEMPLATE_FILE_NAME,
-            processingNodeSettingsTemplate
-        )
-        val processingNodeSettings =
-            templateHelper.renderTemplate(WORKFLOW_PROCESSING_NODE_SETTINGS_TEMPLATE_FILE_NAME, model)
-        WORKFLOW_PROCESSING_NODE_SETTINGS_TEMPLATE_FILE_NAME
-            .split(".")
-            .dropLast(1)
-            .joinToString(".")
-        val processingNodeSettingsFile = nodeDir.resolve(
-            "settings.xml"
-        ).toFile()
-        if (!processingNodeSettingsFile.exists()) {
-            processingNodeSettingsFile.createNewFile()
-        }
-        processingNodeSettingsFile.writeText(processingNodeSettings)
+  fun renderOutput(
+    nodeDir: Path
+  ) {
+    val outputNodeSettingsTemplate = this::class.java.classLoader
+      .getResourceAsStream(
+        listOf(
+          WORKFLOW_TEMPLATE_RESOURCE_ROOT,
+          WORKFLOW_OUTPUT_NODE_SETTINGS_TEMPLATE_FILE_NAME
+        ).joinToString(File.separator)
+      )
+      ?.bufferedReader()
+      ?.use { it.readText() }
+      ?: throw IllegalStateException("Output node settings template not found")
+    templateHelper.loadTemplate(WORKFLOW_OUTPUT_NODE_SETTINGS_TEMPLATE_FILE_NAME, outputNodeSettingsTemplate)
+    val outputNodeSettings =
+      templateHelper.renderTemplate(WORKFLOW_OUTPUT_NODE_SETTINGS_TEMPLATE_FILE_NAME, mapOf())
+    WORKFLOW_OUTPUT_NODE_SETTINGS_TEMPLATE_FILE_NAME
+      .split(".")
+      .dropLast(1)
+      .joinToString(".")
+    val outputNodeSettingsFile = nodeDir.resolve(
+      "settings.xml"
+    ).toFile()
+    if (!outputNodeSettingsFile.exists()) {
+      outputNodeSettingsFile.createNewFile()
     }
+    outputNodeSettingsFile.writeText(outputNodeSettings)
+  }
 
-    abstract fun getProcessingNodeSettingsTemplate(): String
+  fun renderProcessingNode(
+    nodeDir: Path,
+    model: Map<String, Any>
+  ) {
+    val processingNodeSettingsTemplate = getProcessingNodeSettingsTemplate()
+    templateHelper.loadTemplate(
+      WORKFLOW_PROCESSING_NODE_SETTINGS_TEMPLATE_FILE_NAME,
+      processingNodeSettingsTemplate
+    )
+    val processingNodeSettings =
+      templateHelper.renderTemplate(WORKFLOW_PROCESSING_NODE_SETTINGS_TEMPLATE_FILE_NAME, model)
+    WORKFLOW_PROCESSING_NODE_SETTINGS_TEMPLATE_FILE_NAME
+      .split(".")
+      .dropLast(1)
+      .joinToString(".")
+    val processingNodeSettingsFile = nodeDir.resolve(
+      "settings.xml"
+    ).toFile()
+    if (!processingNodeSettingsFile.exists()) {
+      processingNodeSettingsFile.createNewFile()
+    }
+    processingNodeSettingsFile.writeText(processingNodeSettings)
+  }
+
+  abstract fun getProcessingNodeSettingsTemplate(): String
 }

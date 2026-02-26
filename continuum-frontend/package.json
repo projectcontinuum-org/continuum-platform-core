@@ -2,13 +2,14 @@
   "name": "continuum-frontend",
   "private": true,
   "scripts": {
-    "build": "turbo build --no-cache",
+    "build": "turbo build",
+    "rebuild": "turbo build --no-cache --force",
     "dev": "turbo dev",
     "lint": "turbo lint",
     "clean": "turbo clean",
     "format": "prettier --write \"**/*.{ts,tsx,md}\"",
     "watch": "turbo watch",
-    "start:workbench": "turbo start --filter=@continuum/workbench",
+    "start:workbench": "turbo start --filter=@continuum/workbench --no-cache --force",
     "build:workbench": "turbo build --filter=@continuum/workbench",
     "start:workbench-thin": "turbo start --filter=@continuum/workbench-thin",
     "build:workbench-thin": "turbo build --no-cache --filter=@continuum/workbench-thin"

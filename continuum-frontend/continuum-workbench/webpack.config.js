@@ -2,10 +2,9 @@
  * This file can be edited to customize webpack configuration.
  * To reset delete this file and rerun theia build again.
  */
-// @ts-check
+// @ts-nocheck
 const configs = require('./gen-webpack.config.js');
 const nodeConfig = require('./gen-webpack.node.config.js');
-const MonacoPlugin = require('monaco-editor-webpack-plugin');
 
 /**
  * Expose bundled modules on window.theia.moduleName namespace, e.g.
@@ -15,17 +14,6 @@ const MonacoPlugin = require('monaco-editor-webpack-plugin');
  test: /\.js$/,
  loader: require.resolve('@theia/application-manager/lib/expose-loader')
  }); */
-if (configs.length > 0 && configs[0].plugins) {
-    /** @type {any} */
-    const pluginsArray = configs[0].plugins;
-    pluginsArray.push(
-        new MonacoPlugin({
-            languages: ['json', 'typescript', 'javascript', 'kotlin'],
-            customLanguages: [],
-            filename: '[name].monaco-worker.js'
-        })
-    );
-}
 
 module.exports = [
     ...configs,

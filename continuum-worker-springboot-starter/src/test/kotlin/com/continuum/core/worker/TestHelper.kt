@@ -21,7 +21,8 @@ class TestHelper(
   @Autowired
   lateinit var outputDestination: OutputDestination
 
-  private fun getDestination(channelName: String) = environment.getProperty("spring.cloud.stream.bindings.${channelName}.destination")
+  private fun getDestination(channelName: String) =
+    environment.getProperty("spring.cloud.stream.bindings.${channelName}.destination")
 
   fun sendMessage(message: Message<*>, channelName: String) {
     inputDestination.send(message, getDestination("${channelName}-in-0"))
@@ -34,7 +35,7 @@ class TestHelper(
   fun receiveAll(timeout: Long, channelName: String, messages: MutableList<Message<*>>) {
     do {
       val message = outputDestination.receive(timeout, getDestination(channelName))
-      if(message != null)
+      if (message != null)
         messages.add(message)
     } while (message != null)
   }

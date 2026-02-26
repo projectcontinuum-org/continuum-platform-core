@@ -63,6 +63,9 @@ dependencies {
     implementation("org.jetbrains.kotlin:kotlin-script-runtime:2.1.0")
     implementation("org.jetbrains.kotlin:kotlin-scripting-jsr223:2.1.0")
 
+    // FreeMarker template engine
+    implementation("org.freemarker:freemarker:2.3.32")
+
     // Test dependencies
     testImplementation("org.springframework.boot:spring-boot-starter-test")
     testImplementation("org.jetbrains.kotlin:kotlin-test-junit5")

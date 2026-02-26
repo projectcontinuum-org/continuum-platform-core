@@ -9,13 +9,13 @@ import org.springframework.context.annotation.Configuration
 
 @Configuration
 class TestConfig {
-    @Bean
-    fun testDataConverter(): DataConverter {
-        val mapper = JacksonJsonPayloadConverter.newDefaultObjectMapper()
-        val km = KotlinModule.Builder().build()
-        mapper.registerModule(km)
-        val jacksonConverter = JacksonJsonPayloadConverter(mapper)
-        return DefaultDataConverter.newDefaultInstance()
-            .withPayloadConverterOverrides(jacksonConverter)
-    }
+  @Bean
+  fun testDataConverter(): DataConverter {
+    val mapper = JacksonJsonPayloadConverter.newDefaultObjectMapper()
+    val km = KotlinModule.Builder().build()
+    mapper.registerModule(km)
+    val jacksonConverter = JacksonJsonPayloadConverter(mapper)
+    return DefaultDataConverter.newDefaultInstance()
+      .withPayloadConverterOverrides(jacksonConverter)
+  }
 }

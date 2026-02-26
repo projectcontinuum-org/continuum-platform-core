@@ -11,38 +11,38 @@ import org.springframework.stereotype.Component
 
 @Component
 class StatusHelper(
-    val streamBridge: StreamBridge
+  val streamBridge: StreamBridge
 ) {
-    companion object {
-        private val LOGGER = LoggerFactory.getLogger(StatusHelper::class.java)
-        private var streamBridge: StreamBridge? = null
+  companion object {
+    private val LOGGER = LoggerFactory.getLogger(StatusHelper::class.java)
+    private var streamBridge: StreamBridge? = null
 
-        fun publishWorkflowSnapshot(
-            workflowId: String,
-            workflowSnapshot: WorkflowUpdateEvent
-        ) {
+    fun publishWorkflowSnapshot(
+      workflowId: String,
+      workflowSnapshot: WorkflowUpdateEvent
+    ) {
 
-            if(streamBridge != null) {
-                try {
-                    streamBridge!!.send(
-                        Channels.CONTINUUM_WORKFLOW_STATE_CHANGE_EVENT,
-                        MessageBuilder
-                            .withPayload(workflowSnapshot)
-                            .setHeader(KafkaHeaders.KEY, workflowId)
-                            .setHeader("content-type", "application/json")
-                            .build()
-                    )
-                } catch (ex: RuntimeException) {
-                    LOGGER.error("Unable to send status", ex)
-                }
-            } else {
-                LOGGER.warn("StreamBridge is null. Cannot send message to Kafka.")
-            }
+      if (streamBridge != null) {
+        try {
+          streamBridge!!.send(
+            Channels.CONTINUUM_WORKFLOW_STATE_CHANGE_EVENT,
+            MessageBuilder
+              .withPayload(workflowSnapshot)
+              .setHeader(KafkaHeaders.KEY, workflowId)
+              .setHeader("content-type", "application/json")
+              .build()
+          )
+        } catch (ex: RuntimeException) {
+          LOGGER.error("Unable to send status", ex)
         }
+      } else {
+        LOGGER.warn("StreamBridge is null. Cannot send message to Kafka.")
+      }
     }
+  }
 
-    @PostConstruct
-    fun postConstruct() {
-        StatusHelper.streamBridge = this.streamBridge
-    }
+  @PostConstruct
+  fun postConstruct() {
+    StatusHelper.streamBridge = this.streamBridge
+  }
 }

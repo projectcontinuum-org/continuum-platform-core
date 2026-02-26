@@ -7,22 +7,21 @@ import io.temporal.common.SearchAttributeKey
 import io.temporal.workflow.QueryMethod
 import io.temporal.workflow.WorkflowInterface
 import io.temporal.workflow.WorkflowMethod
-import java.time.OffsetDateTime
 
 @WorkflowInterface
 interface IContinuumWorkflow {
-    companion object {
-        val WORKFLOW_FILE_PATH : SearchAttributeKey<String> = SearchAttributeKey.forKeyword("Continuum:WorkflowFileName")
-        val WORKFLOW_STATUS: SearchAttributeKey<Long> = SearchAttributeKey.forLong("Continuum:ExecutionStatus")
-    }
+  companion object {
+    val WORKFLOW_FILE_PATH: SearchAttributeKey<String> = SearchAttributeKey.forKeyword("Continuum:WorkflowFileName")
+    val WORKFLOW_STATUS: SearchAttributeKey<Long> = SearchAttributeKey.forLong("Continuum:ExecutionStatus")
+  }
 
-    @WorkflowMethod
-    fun start(
-        continuumWorkflow: ContinuumWorkflowModel
-    ): Map<String, Map<String, PortData>>
+  @WorkflowMethod
+  fun start(
+    continuumWorkflow: ContinuumWorkflowModel
+  ): Map<String, Map<String, PortData>>
 
-    @QueryMethod
-    fun getWorkflowSnapshot(): WorkflowSnapshot
+  @QueryMethod
+  fun getWorkflowSnapshot(): WorkflowSnapshot
 }
 
 

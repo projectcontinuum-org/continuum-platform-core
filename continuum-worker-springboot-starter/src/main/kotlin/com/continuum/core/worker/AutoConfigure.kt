@@ -10,16 +10,17 @@ import org.springframework.context.annotation.Configuration
 @Configuration
 @ComponentScan
 class AutoConfigure {
-    init {
-        registerKotlinMapper()
-    }
+  init {
+    registerKotlinMapper()
+  }
 }
+
 fun registerKotlinMapper() {
-    val mapper = JacksonJsonPayloadConverter.newDefaultObjectMapper()
-    val km = KotlinModule.Builder().build()
-    mapper.registerModule(km)
-    val jacksonConverter = JacksonJsonPayloadConverter(mapper)
-    val dataConverter = DefaultDataConverter.newDefaultInstance()
-        .withPayloadConverterOverrides(jacksonConverter)
-    GlobalDataConverter.register(dataConverter)
+  val mapper = JacksonJsonPayloadConverter.newDefaultObjectMapper()
+  val km = KotlinModule.Builder().build()
+  mapper.registerModule(km)
+  val jacksonConverter = JacksonJsonPayloadConverter(mapper)
+  val dataConverter = DefaultDataConverter.newDefaultInstance()
+    .withPayloadConverterOverrides(jacksonConverter)
+  GlobalDataConverter.register(dataConverter)
 }
