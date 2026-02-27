@@ -216,7 +216,7 @@ class RestNodeModel(
 
         while (row != null) {
           // Fake random delay
-          Thread.sleep((2000..5000).random().toLong())
+          Thread.sleep((10..100).random().toLong())
           try {
             // Render templates
             val url = renderTemplate(urlTemplate, row)

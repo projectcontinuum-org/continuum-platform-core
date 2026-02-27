@@ -266,6 +266,9 @@ class AnomalyDetectorZScoreNodeModel : ProcessNodeModel() {
       var rowsProcessed = 0L
 
       while (row != null) {
+        // Artificial delay for testing progress reporting
+        Thread.sleep((10..100).random().toLong())
+
         val valueRaw = row[valueCol]
 
         val value = when {
@@ -338,6 +341,9 @@ class AnomalyDetectorZScoreNodeModel : ProcessNodeModel() {
       rowsProcessed = 0L
 
       while (row != null) {
+        // Artificial delay for testing progress reporting
+        Thread.sleep((10..100).random().toLong())
+
         val valueRaw = row[valueCol]
         val value = (valueRaw as? Number)?.toDouble() ?: 0.0
 
@@ -395,6 +401,9 @@ class AnomalyDetectorZScoreNodeModel : ProcessNodeModel() {
           row = reader.read()
 
           while (row != null) {
+            // Artificial delay for testing progress reporting
+            Thread.sleep((10..100).random().toLong())
+
             val currentRow = row!!
             writer.write(index, currentRow + mapOf(outputColumnName to false))
             index++
@@ -432,6 +441,9 @@ class AnomalyDetectorZScoreNodeModel : ProcessNodeModel() {
           row = reader.read()
 
           while (row != null) {
+            // Artificial delay for testing progress reporting (500-1000ms)
+            Thread.sleep((10..100).random().toLong())
+
             val currentRow = row!!
             val valueRaw = currentRow[valueCol]
             val value = (valueRaw as? Number)?.toDouble() ?: 0.0

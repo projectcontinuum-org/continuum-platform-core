@@ -4,11 +4,90 @@
     "active": false,
     "nodes": [
         {
+            "id": "6",
+            "type": "BaseNode",
+            "position": {
+                "x": 426.43583721614345,
+                "y": 433.82473140643623
+            },
+            "data": {
+                "id": "com.continuum.base.node.ConditionalSplitterNodeModel",
+                "description": "Splits rows into two outputs based on threshold comparison",
+                "title": "Conditional Splitter",
+                "subTitle": "Split by threshold",
+                "icon": "<svg xmlns=\"http://www.w3.org/2000/svg\" fill=\"none\" stroke=\"currentColor\" strokeWidth={1.5} viewBox=\"0 0 24 24\">\n    <path strokeLinecap=\"round\" strokeLinejoin=\"round\" d=\"M3 7.5L7.5 3m0 0L12 7.5M7.5 3v13.5m13.5 0L16.5 21m0 0L12 16.5m4.5 4.5V7.5\" />\n</svg>",
+                "nodeModel": "com.continuum.base.node.ConditionalSplitterNodeModel",
+                "busy": null,
+                "inputs": {
+                    "data": {
+                        "name": "input table",
+                        "contentType": "text/plain"
+                    }
+                },
+                "outputs": {
+                    "high": {
+                        "name": "high values (>= threshold)",
+                        "contentType": "text/plain"
+                    },
+                    "low": {
+                        "name": "low values (< threshold)",
+                        "contentType": "text/plain"
+                    }
+                },
+                "properties": {
+                    "column": "value",
+                    "threshold": 15
+                },
+                "propertiesSchema": {
+                    "type": "object",
+                    "properties": {
+                        "column": {
+                            "type": "string",
+                            "title": "Column Name",
+                            "description": "The column to compare against threshold"
+                        },
+                        "threshold": {
+                            "type": "number",
+                            "title": "Threshold",
+                            "description": "Split point: high (>= threshold), low (< threshold)"
+                        }
+                    },
+                    "required": [
+                        "column",
+                        "threshold"
+                    ]
+                },
+                "propertiesUISchema": {
+                    "type": "VerticalLayout",
+                    "elements": [
+                        {
+                            "type": "Control",
+                            "scope": "#/properties/column"
+                        },
+                        {
+                            "type": "Control",
+                            "scope": "#/properties/threshold"
+                        }
+                    ]
+                },
+                "status": null,
+                "nodeProgress": null
+            },
+            "width": 255,
+            "height": 123,
+            "selected": true,
+            "positionAbsolute": {
+                "x": 426.43583721614345,
+                "y": 433.82473140643623
+            },
+            "dragging": false
+        },
+        {
             "id": "3",
             "type": "BaseNode",
             "position": {
-                "x": -14.25,
-                "y": 435.25
+                "x": -1.5257104056400976,
+                "y": 437.2590983570042
             },
             "data": {
                 "id": "com.continuum.base.node.AnomalyDetectorZScoreNodeModel",
@@ -84,10 +163,10 @@
             },
             "width": 255,
             "height": 123,
-            "selected": true,
+            "selected": false,
             "positionAbsolute": {
-                "x": -14.25,
-                "y": 435.25
+                "x": -1.5257104056400976,
+                "y": 437.2590983570042
             },
             "dragging": false
         },
@@ -95,8 +174,8 @@
             "id": "2",
             "type": "BaseNode",
             "position": {
-                "x": -375,
-                "y": 440
+                "x": -458.1740457386088,
+                "y": 451.9600324823517
             },
             "data": {
                 "id": "com.continuum.base.node.CreateTableNodeModel",
@@ -150,8 +229,8 @@
             "height": 100,
             "selected": false,
             "positionAbsolute": {
-                "x": -375,
-                "y": 440
+                "x": -458.1740457386088,
+                "y": 451.9600324823517
             },
             "dragging": false
         }
@@ -164,6 +243,14 @@
             "target": "3",
             "targetHandle": "data",
             "id": "reactflow__edge-2data-3data"
+        },
+        {
+            "type": "BaseEdge",
+            "source": "3",
+            "sourceHandle": "data",
+            "target": "6",
+            "targetHandle": "data",
+            "id": "reactflow__edge-3data-6data"
         }
     ]
 }

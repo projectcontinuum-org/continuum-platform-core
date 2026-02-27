@@ -110,7 +110,7 @@
             },
             "width": 224,
             "height": 100,
-            "selected": false,
+            "selected": true,
             "dragging": false,
             "positionAbsolute": {
                 "x": 482.79859619219434,
