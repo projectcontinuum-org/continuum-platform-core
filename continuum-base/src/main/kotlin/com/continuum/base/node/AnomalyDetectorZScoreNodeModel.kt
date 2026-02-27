@@ -3,6 +3,7 @@ package com.continuum.base.node
 import com.continuum.core.commons.exception.NodeRuntimeException
 import com.continuum.core.commons.model.ContinuumWorkflowModel
 import com.continuum.core.commons.node.ProcessNodeModel
+import com.continuum.core.commons.prototol.progress.NodeProgressCallback
 import com.continuum.core.commons.utils.NodeInputReader
 import com.continuum.core.commons.utils.NodeOutputWriter
 import com.fasterxml.jackson.core.type.TypeReference
@@ -138,8 +139,8 @@ class AnomalyDetectorZScoreNodeModel : ProcessNodeModel() {
   override val metadata = ContinuumWorkflowModel.NodeData(
     id = this.javaClass.name,
     description = "Detects outliers using Z-score method (flags values with |Z| > 2)",
-    title = "Anomaly Detector (Z-Score)",
-    subTitle = "Statistical outlier detection",
+    title = "Anomaly Detector",
+    subTitle = "(Z-Score) outlier detection",
     nodeModel = this.javaClass.name,
     icon = """
             <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" strokeWidth={1.5} viewBox="0 0 24 24">
@@ -179,7 +180,8 @@ class AnomalyDetectorZScoreNodeModel : ProcessNodeModel() {
   override fun execute(
     properties: Map<String, Any>?,
     inputs: Map<String, NodeInputReader>,
-    nodeOutputWriter: NodeOutputWriter
+    nodeOutputWriter: NodeOutputWriter,
+    nodeProgressCallback: NodeProgressCallback
   ) {
     // Extract and validate configuration properties
     val valueCol = properties?.get("valueCol") as String? ?: throw NodeRuntimeException(

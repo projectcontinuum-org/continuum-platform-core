@@ -39,8 +39,8 @@ class AnomalyDetectorZScoreNodeModelTest {
         val metadata = nodeModel.metadata
         assertEquals("com.continuum.base.node.AnomalyDetectorZScoreNodeModel", metadata.id)
         assertEquals("Detects outliers using Z-score method (flags values with |Z| > 2)", metadata.description)
-        assertEquals("Anomaly Detector (Z-Score)", metadata.title)
-        assertEquals("Statistical outlier detection", metadata.subTitle)
+        assertEquals("Anomaly Detector", metadata.title)
+        assertEquals("(Z-Score) outlier detection", metadata.subTitle)
         assertNotNull(metadata.icon)
         assertTrue(metadata.icon.toString().contains("svg"))
     }

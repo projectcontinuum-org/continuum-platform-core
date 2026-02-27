@@ -187,34 +187,12 @@ class RestNodeModel(
     }
   }
 
-  /**
-   * This method is required by the base class but is not used in this implementation.
-   * The main logic is implemented in the overloaded execute method that includes the NodeProgressCallback.
-   * This is to maintain compatibility with the base class while allowing for progress reporting in the main execute method.
-   *
-   * If the base class calls this method, it will simply do nothing, as the actual execution logic is in the other execute method.
-   */
-  override fun execute(
-    properties: Map<String, Any>?,
-    inputs: Map<String, NodeInputReader>,
-    nodeOutputWriter: NodeOutputWriter
-  ) {}
-
   override fun execute(
     properties: Map<String, Any>?,
     inputs: Map<String, NodeInputReader>,
     nodeOutputWriter: NodeOutputWriter,
-    nodeProgressCallback: NodeProgressCallback?
+    nodeProgressCallback: NodeProgressCallback
   ) {
-    // nodeProgressCallback must not be null for this node, as we want to report progress
-    if(nodeProgressCallback == null) {
-      throw NodeRuntimeException(
-        isRetriable = true,
-        workflowId = Activity.getExecutionContext().info.workflowId,
-        nodeId = this.metadata.id ?: "",
-        message = "NodeProgressCallback is required for RestNodeModel"
-      )
-    }
     val method = properties?.get("method") as String? ?: throw NodeRuntimeException(
       workflowId = "",
       nodeId = "",

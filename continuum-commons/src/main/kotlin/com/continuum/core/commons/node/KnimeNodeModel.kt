@@ -52,7 +52,7 @@ abstract class KnimeNodeModel : ProcessNodeModel() {
     node: ContinuumWorkflowModel.Node,
     inputs: Map<String, NodeInputReader>,
     nodeOutputWriter: NodeOutputWriter,
-    nodeProgressCallback: NodeProgressCallback?
+    nodeProgressCallback: NodeProgressCallback
   ) {
     try {
       val workflowRunId = Activity.getExecutionContext().info.runId
@@ -83,7 +83,8 @@ abstract class KnimeNodeModel : ProcessNodeModel() {
       execute(
         node.data.properties,
         inputs,
-        nodeOutputWriter
+        nodeOutputWriter,
+        nodeProgressCallback
       )
     } catch (ex: Exception) {
       LOGGER.error("Error while executing node ${node.id}", ex)
