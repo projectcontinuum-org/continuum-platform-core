@@ -13,10 +13,10 @@ import freemarker.template.Template
 import freemarker.template.TemplateExceptionHandler
 import io.temporal.activity.Activity
 import org.slf4j.LoggerFactory
-import org.springframework.http.MediaType.TEXT_PLAIN_VALUE
 import org.springframework.http.HttpEntity
 import org.springframework.http.HttpHeaders
 import org.springframework.http.HttpMethod
+import org.springframework.http.MediaType.TEXT_PLAIN_VALUE
 import org.springframework.http.ResponseEntity
 import org.springframework.stereotype.Component
 import org.springframework.web.client.RestTemplate
@@ -136,8 +136,8 @@ class RestNodeModel(
   override val metadata = ContinuumWorkflowModel.NodeData(
     id = this.javaClass.name,
     description = "Makes HTTP requests for each row using FreeMarker templated URLs and payloads",
-    title = "REST Node",
-    subTitle = "HTTP client with FreeMarker templates",
+    title = "REST Client",
+    subTitle = "Invoke REST APIs",
     nodeModel = this.javaClass.name,
     icon = """
             <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" strokeWidth={1.5} viewBox="0 0 24 24">

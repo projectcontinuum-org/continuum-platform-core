@@ -86,7 +86,7 @@ class CreateTableNodeModel : TriggerNodeModel() {
     nodeModel = this.javaClass.name,
     icon = """
             <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" strokeWidth={1.5} viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M17.25 6.75L22.5 12l-5.25 5.25m-10.5 0L1.5 12l5.25-5.25m7.5-3l-4.5 16.5" />
+            	<path d="M21.5 2h-19a.5.5 0 0 0-.5.5v19a.5.5 0 0 0 .5.5h19a.5.5 0 0 0 .5-.5v-19a.5.5 0 0 0-.5-.5zm-13 19H3v-5.5h5.5V21zm0-6.5H3v-5h5.5v5zm0-6H3V3h5.5v5.5zm6 12.5h-5v-5.5h5V21zm0-6.5h-5v-5h5v5zm0-6h-5V3h5v5.5zM21 21h-5.5v-5.5H21V21zm0-6.5h-5.5v-5H21v5zm0-6h-5.5V3H21v5.5z" fill="currentColor"/>
             </svg>
         """.trimIndent(),
     outputs = outputPorts,

@@ -8,7 +8,7 @@ import RadioButtonUncheckedIcon from '@mui/icons-material/RadioButtonUnchecked';
 import SkipNextIcon from '@mui/icons-material/SkipNext';
 import { IBaseNodeData, StageStatus } from "@continuum/core";
 import "./BaseNode.css";
-import { CircularProgress, Grid, Step, StepLabel, Stepper, Typography } from "@mui/material";
+import { Box, CircularProgress, Grid, Step, StepLabel, Stepper, Tooltip, Typography } from "@mui/material";
 import Bolt from "@mui/icons-material/Bolt";
 import { useMUIThemeStore } from "../../store/MUIThemeStore";
 import { mirage } from 'ldrs'
@@ -29,6 +29,25 @@ const getStepIcon = (status: StageStatus) => {
         case StageStatus.PENDING:
         default:
             return <RadioButtonUncheckedIcon color="disabled" fontSize="small" />;
+    }
+};
+
+const getStatusColor = (status: IBaseNodeData['status']) => {
+    switch (status) {
+        case 'SUCCESS':
+            return 'success.main';
+        case 'FAILED':
+            return 'error.main';
+        case 'WARNING':
+            return 'warning.main';
+        case 'BUSY':
+        case 'PRE-PROCESSING':
+        case 'POST-PROCESSING':
+            return 'info.main';
+        case 'ACTIVE':
+            return 'warning.main';
+        default:
+            return 'text.secondary';
     }
 };
 
@@ -65,27 +84,37 @@ export default function BaseNode(props: NodeProps<IBaseNodeData>) {
             ))}
         </Grid>
         <Grid className="node-content">
-          <Grid className="inner">
-            <Grid className="body">
+          <Box className="inner">
+            <Box className="body">
               {props.data.icon && (
-                <Grid sx={{ mr: 1, display: 'flex', alignItems: 'center' }}>
-                  <DynamicIcon icon={props.data.icon} fontSize="large" />
-                </Grid>
+                <DynamicIcon icon={props.data.icon} fontSize="large" />
               )}
-              <Grid className="text">
+              <Box className="text">
                 <Typography variant="h6">{props.data.title}</Typography>
                 {props.data.subTitle && (
-                  <Typography className="subline" variant="h6">
-                    {props.data.subTitle +
-                      ` #${props.id} ${props.data.status != null ? props.data.status : ""}`}
+                  <Tooltip title={props.data.subTitle} placement="top">
+                    <Typography className="subline" variant="body2">
+                      {props.data.subTitle}
+                    </Typography>
+                  </Tooltip>
+                )}
+                <Typography variant="caption" sx={{ display: 'block', color: 'text.disabled', fontSize: '0.65rem' }}>
+                  #{props.id}
+                </Typography>
+                {props.data.status && (
+                  <Typography
+                    variant="caption"
+                    sx={{ display: 'block', color: getStatusColor(props.data.status), fontWeight: 500 }}
+                  >
+                    {props.data.status}
                   </Typography>
                 )}
-              </Grid>
+              </Box>
 
               {props.data.status == "BUSY" && (
-                <Grid className="progress">
+                <Box className="progress">
                   <CircularProgress
-                    size={30}
+                    size={28}
                     color="secondary"
                     sx={{
                       animationDuration: "200ms",
@@ -95,16 +124,16 @@ export default function BaseNode(props: NodeProps<IBaseNodeData>) {
                       value: props.data.nodeProgress?.progressPercentage,
                     })}
                   />
-                </Grid>
+                </Box>
               )}
               {props.data.status == "PRE-PROCESSING" && (
-                <Grid className="progress">
+                <Box className="progress">
                   <l-mirage color={theme.palette.primary.main} />
-                </Grid>
+                </Box>
               )}
 
               {props.data.status != "BUSY" && (
-                <Grid className="status-badge">
+                <Box className="status-badge">
                   {props.data.status == "SUCCESS" && (
                     <CheckCircleIcon color="success" />
                   )}
@@ -115,18 +144,18 @@ export default function BaseNode(props: NodeProps<IBaseNodeData>) {
                     <WarningAmberIcon color="warning" />
                   )}
                   {props.data.status == "ACTIVE" && <Bolt color="warning" />}
-                </Grid>
+                </Box>
               )}
-            </Grid>
+            </Box>
             {props.data.nodeProgress?.stageStatus && (
               <Stepper
                 orientation="vertical"
                 sx={{
-                  mt: 1,
-                  mb: '10px',
+                  mt: 1.25,
+                  mb: 1.25,
                   '& .MuiStepLabel-root': { padding: '0' },
-                  '& .MuiStepLabel-label': { fontSize: '0.65rem' },
-                  '& .MuiStepConnector-line': { minHeight: '12px' },
+                  '& .MuiStepLabel-label': { fontSize: '0.75rem' },
+                  '& .MuiStepConnector-line': { minHeight: '10px' },
                   '& .MuiStep-root': { padding: '0' },
                 }}
               >
@@ -142,7 +171,7 @@ export default function BaseNode(props: NodeProps<IBaseNodeData>) {
                 ))}
               </Stepper>
             )}
-          </Grid>
+          </Box>
         </Grid>
         <Grid
           container
