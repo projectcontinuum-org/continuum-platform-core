@@ -33,6 +33,9 @@ Examples:
     # Silent mode (no output)
     python train.py -d data.parquet -m microsoft/phi-2 -o ./my-model --silent
 
+    # IPC mode - output progress as JSON for Continuum integration
+    python train.py -d data.parquet -m microsoft/phi-2 -o ./my-model --ipc
+
     # List available columns in parquet file
     python train.py -d data.parquet -m x -o x --list-columns
 
@@ -67,7 +70,10 @@ import os
 # We do this before argparse because we need to suppress output during imports
 _silent = "--silent" in sys.argv or "-s" in sys.argv
 
-if _silent:
+# Check if IPC mode is requested - outputs progress in NodeProgress JSON format
+_ipc_mode = "--ipc" in sys.argv
+
+if _silent or _ipc_mode:
     # Suppress Python warnings (e.g., DeprecationWarning, FutureWarning)
     import warnings
     warnings.filterwarnings("ignore")
@@ -80,6 +86,10 @@ if _silent:
     os.environ["TOKENIZERS_PARALLELISM"] = "false"       # Suppress tokenizer warnings
     os.environ["TQDM_DISABLE"] = "1"                     # Disable progress bars
     os.environ["HF_DATASETS_DISABLE_PROGRESS_BARS"] = "1"  # Disable dataset progress bars
+
+    # In IPC mode, preserve original stdout for JSON progress output
+    if _ipc_mode:
+        sys._original_stdout = sys.stdout  # type: ignore
 
     # Redirect stdout and stderr to /dev/null (null device)
     # This catches any remaining output that libraries might produce
@@ -96,6 +106,7 @@ if _silent:
 import argparse    # For parsing command-line arguments
 import json        # For parsing JSON content types
 import logging     # For controlling log output
+import time        # For tracking duration in RPC mode
 from pathlib import Path           # For file path handling
 from typing import Any, Optional, Generator   # For type hints
 
@@ -104,12 +115,33 @@ from typing import Any, Optional, Generator   # For type hints
 # =============================================================================
 
 # Version number - update this when making changes
-VERSION = "1.1.0"  # Updated for streaming data loading
+VERSION = "1.2.0"  # Added IPC mode with NodeProgress format
 
 # Default batch size for reading parquet files in chunks
 # This controls how many rows are read from disk at once
 # Smaller = less memory, larger = faster disk I/O
 DEFAULT_PARQUET_BATCH_SIZE = 10000
+
+# =============================================================================
+# TRAINING STAGES (for IPC progress reporting)
+# =============================================================================
+# These are the stages reported in IPC mode, matching Continuum's NodeProgress format
+
+STAGE_INIT = "initialization"
+STAGE_LOAD_DATA = "loading_dataset"
+STAGE_LOAD_MODEL = "loading_model"
+STAGE_CONFIGURE_LORA = "configuring_lora"
+STAGE_TRAINING = "training"
+STAGE_SAVING = "saving_model"
+
+ALL_STAGES = [
+    STAGE_INIT,
+    STAGE_LOAD_DATA,
+    STAGE_LOAD_MODEL,
+    STAGE_CONFIGURE_LORA,
+    STAGE_TRAINING,
+    STAGE_SAVING,
+]
 
 # Content type converters for Continuum DataRow format
 # The Continuum workflow system stores data in a generic format where each cell
@@ -134,6 +166,88 @@ CONTENT_TYPE_CONVERTERS = {
 # UTILITY FUNCTIONS
 # =============================================================================
 
+# Global state for IPC progress tracking
+_ipc_start_time: Optional[float] = None
+_ipc_stage_start_time: Optional[float] = None
+_ipc_current_stage: Optional[str] = None
+_ipc_stage_status: dict = {}
+
+
+def init_ipc_progress() -> None:
+    """Initialize IPC progress tracking at the start of training."""
+    global _ipc_start_time, _ipc_stage_status
+    _ipc_start_time = time.time()
+    # Initialize all stages as PENDING
+    _ipc_stage_status = {stage: "PENDING" for stage in ALL_STAGES}
+
+
+def report_ipc_progress(
+    stage: str,
+    status: str,
+    progress_percentage: int,
+    message: Optional[str] = None,
+) -> None:
+    """
+    Output progress in NodeProgress JSON format for IPC mode.
+
+    Format matches Continuum's NodeProgress.kt:
+    {
+        "progressPercentage": 50,
+        "message": "Training in progress",
+        "stageStatus": {
+            "initialization": "COMPLETED",
+            "loading_dataset": "COMPLETED",
+            "loading_model": "IN_PROGRESS",
+            ...
+        },
+        "stageDurationMs": 1234,
+        "totalDurationMs": 5678
+    }
+
+    Args:
+        stage: Current stage name (e.g., "loading_dataset")
+        status: Stage status - PENDING, IN_PROGRESS, COMPLETED, FAILED, SKIPPED
+        progress_percentage: Overall progress 0-100
+        message: Optional human-readable message
+    """
+    global _ipc_stage_start_time, _ipc_current_stage, _ipc_stage_status
+
+    if not _ipc_mode:
+        return
+
+    # Update stage status
+    _ipc_stage_status[stage] = status
+
+    # Calculate durations
+    current_time = time.time()
+    total_duration_ms = int((current_time - _ipc_start_time) * 1000) if _ipc_start_time else 0
+
+    stage_duration_ms = None
+    if status == "IN_PROGRESS":
+        _ipc_stage_start_time = current_time
+        _ipc_current_stage = stage
+    elif status in ("COMPLETED", "FAILED") and _ipc_current_stage == stage and _ipc_stage_start_time:
+        stage_duration_ms = int((current_time - _ipc_stage_start_time) * 1000)
+
+    # Build NodeProgress object
+    progress = {
+        "progressPercentage": progress_percentage,
+        "stageStatus": _ipc_stage_status.copy(),
+        "totalDurationMs": total_duration_ms,
+    }
+
+    if message:
+        progress["message"] = message
+
+    if stage_duration_ms is not None:
+        progress["stageDurationMs"] = stage_duration_ms
+
+    # Output as JSON line (to original stdout, not the redirected one)
+    # In IPC mode, we redirect stderr but keep a reference to original stdout
+    if hasattr(sys, '_original_stdout'):
+        print(json.dumps(progress), file=sys._original_stdout, flush=True)
+
+
 def log(message: str) -> None:
     """
     Print a message to the console, but only if not in silent mode.
@@ -142,10 +256,12 @@ def log(message: str) -> None:
     All user-facing output in this script should use log() instead of print()
     so that silent mode works correctly.
 
+    In IPC mode, regular log messages are suppressed (only JSON progress is output).
+
     Args:
         message: The message to print
     """
-    if not _silent:
+    if not _silent and not _ipc_mode:
         print(message)
 
 
@@ -632,6 +748,11 @@ def train(
     from peft import LoraConfig, get_peft_model, TaskType
     from trl import SFTTrainer, SFTConfig
 
+    # Initialize RPC progress tracking
+    if _ipc_mode:
+        init_ipc_progress()
+        report_ipc_progress(STAGE_INIT, "IN_PROGRESS", 0, "Initializing training pipeline")
+
     # =========================================================================
     # STEP 1: Platform Detection and Unsloth Availability
     # =========================================================================
@@ -655,11 +776,18 @@ def train(
         log(f"Platform: {platform.system()}, CUDA: {torch.cuda.is_available()}")
         log("Using standard HuggingFace transformers (Unsloth requires Linux + CUDA)")
 
+    # Mark initialization complete
+    if _ipc_mode:
+        report_ipc_progress(STAGE_INIT, "COMPLETED", 5, "Initialization complete")
+
     # =========================================================================
     # STEP 2: Load and Format Training Data (STREAMING)
     # =========================================================================
     # This is the memory-optimized approach. Instead of loading all data
     # into memory, we create a streaming dataset that reads on-demand.
+
+    if _ipc_mode:
+        report_ipc_progress(STAGE_LOAD_DATA, "IN_PROGRESS", 10, "Loading dataset")
 
     log(f"\nAnalyzing data from {data_path}...")
 
@@ -709,12 +837,18 @@ def train(
     output_dir = Path(output_path)
     output_dir.mkdir(parents=True, exist_ok=True)
 
+    if _ipc_mode:
+        report_ipc_progress(STAGE_LOAD_DATA, "COMPLETED", 20, f"Dataset ready: {total_rows:,} rows")
+
     # =========================================================================
     # STEP 3: Load Model and Tokenizer
     # =========================================================================
     # The approach differs based on whether Unsloth is available:
     # - With Unsloth: Use FastLanguageModel for optimized loading
     # - Without Unsloth: Use standard AutoModelForCausalLM
+
+    if _ipc_mode:
+        report_ipc_progress(STAGE_LOAD_MODEL, "IN_PROGRESS", 25, f"Loading model: {model_name}")
 
     if use_unsloth:
         # ----- UNSLOTH PATH (Linux + CUDA) -----
@@ -735,6 +869,10 @@ def train(
         )
 
         log("Configuring LoRA adapters...")
+
+        if _ipc_mode:
+            report_ipc_progress(STAGE_LOAD_MODEL, "COMPLETED", 40, "Model loaded")
+            report_ipc_progress(STAGE_CONFIGURE_LORA, "IN_PROGRESS", 45, "Configuring LoRA adapters")
 
         # Configure LoRA (Low-Rank Adaptation) for efficient fine-tuning
         # Instead of training all model weights, LoRA adds small adapter layers
@@ -800,6 +938,10 @@ def train(
 
         log("Configuring LoRA adapters...")
 
+        if _ipc_mode:
+            report_ipc_progress(STAGE_LOAD_MODEL, "COMPLETED", 40, "Model loaded")
+            report_ipc_progress(STAGE_CONFIGURE_LORA, "IN_PROGRESS", 45, "Configuring LoRA adapters")
+
         # Configure LoRA using the PEFT library
         lora_config = LoraConfig(
             r=lora_r,               # Rank of LoRA matrices
@@ -822,6 +964,9 @@ def train(
     # =========================================================================
     # STEP 4: Configure Training
     # =========================================================================
+
+    if _ipc_mode:
+        report_ipc_progress(STAGE_CONFIGURE_LORA, "COMPLETED", 50, "LoRA adapters configured")
 
     log("Initializing trainer...")
 
@@ -869,6 +1014,9 @@ def train(
     # STEP 5: Run Training
     # =========================================================================
 
+    if _ipc_mode:
+        report_ipc_progress(STAGE_TRAINING, "IN_PROGRESS", 55, f"Training for {max_steps} steps")
+
     log("\n" + "=" * 50)
     log("Starting training (streaming data from disk)...")
     log("=" * 50 + "\n")
@@ -883,9 +1031,15 @@ def train(
     # Memory stays constant regardless of file size!
     trainer.train()
 
+    if _ipc_mode:
+        report_ipc_progress(STAGE_TRAINING, "COMPLETED", 85, "Training complete")
+
     # =========================================================================
     # STEP 6: Save the Fine-tuned Model
     # =========================================================================
+
+    if _ipc_mode:
+        report_ipc_progress(STAGE_SAVING, "IN_PROGRESS", 90, "Saving model")
 
     log("\nSaving model...")
 
@@ -918,6 +1072,9 @@ def train(
     log("=" * 50)
     log(f"\nOutputs:")
     log(f"  LoRA adapter: {final_path}")
+
+    if _ipc_mode:
+        report_ipc_progress(STAGE_SAVING, "COMPLETED", 100, f"Model saved to {final_path}")
 
 
 # =============================================================================
@@ -1030,6 +1187,8 @@ def main() -> None:
         help="List available columns in the parquet file and exit")
     parser.add_argument("--silent", "-s", action="store_true",
         help="Silent mode - suppress all output")
+    parser.add_argument("--ipc", action="store_true",
+        help="IPC mode - output progress in NodeProgress JSON format for integration with Continuum")
     parser.add_argument("--version", "-v", action="version",
         version=f"%(prog)s {VERSION}")
 
