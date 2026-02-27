@@ -6,6 +6,9 @@ Fine-tune LLM models using LoRA with data from Continuum parquet files.
 Uses Unsloth for accelerated training on Linux+CUDA, falls back to
 standard HuggingFace transformers on other platforms.
 
+MEMORY OPTIMIZED: Uses streaming data loading to handle large parquet files
+with millions of rows without loading everything into memory.
+
 Requirements:
     pip install pyarrow pandas datasets torch transformers peft trl accelerate
 
@@ -94,14 +97,19 @@ import argparse    # For parsing command-line arguments
 import json        # For parsing JSON content types
 import logging     # For controlling log output
 from pathlib import Path           # For file path handling
-from typing import Any, Optional   # For type hints
+from typing import Any, Optional, Generator   # For type hints
 
 # =============================================================================
 # CONSTANTS
 # =============================================================================
 
 # Version number - update this when making changes
-VERSION = "1.0.0"
+VERSION = "1.1.0"  # Updated for streaming data loading
+
+# Default batch size for reading parquet files in chunks
+# This controls how many rows are read from disk at once
+# Smaller = less memory, larger = faster disk I/O
+DEFAULT_PARQUET_BATCH_SIZE = 10000
 
 # Content type converters for Continuum DataRow format
 # The Continuum workflow system stores data in a generic format where each cell
@@ -198,10 +206,14 @@ def check_dependencies() -> None:
 
 
 # =============================================================================
-# DATA LOADING FUNCTIONS
+# DATA LOADING FUNCTIONS (MEMORY OPTIMIZED)
 # =============================================================================
-# These functions handle loading data from parquet files. The script supports
-# two formats:
+# These functions handle loading data from parquet files using STREAMING.
+# Instead of loading the entire file into memory, we read it in batches
+# using PyArrow's iter_batches() method. This allows processing files with
+# millions of rows without running out of memory.
+#
+# The script supports two formats:
 #
 # 1. Continuum DataRow format: Used by the Continuum workflow system
 #    - Each row has a "rowNumber" and a "cells" array
@@ -286,142 +298,245 @@ def parse_continuum_row(row: dict) -> dict:
     return result
 
 
-def load_parquet_dataset(parquet_path: str) -> list:
+def detect_parquet_format(parquet_path: str) -> tuple[bool, list[str]]:
     """
-    Load a parquet file and convert its contents to a list of dictionaries.
+    Detect the format of a parquet file and return column information.
 
-    This function automatically detects whether the parquet file is in
-    Continuum DataRow format or standard columnar format and handles
-    each appropriately.
-
-    Continuum DataRow format detection:
-        - File has "rowNumber" and "cells" columns
-        - Each row's "cells" is an array of {name, value, contentType} objects
-
-    Standard columnar format:
-        - Columns are directly named (e.g., "instruction", "response")
-        - Values are directly readable without conversion
+    This function reads only the schema (metadata) of the parquet file,
+    NOT the actual data. This makes it very fast and memory-efficient.
 
     Args:
         parquet_path: Path to the parquet file
 
     Returns:
-        A list of dictionaries, where each dictionary represents one row
-        with column names as keys and converted values as values.
-
-    Example output:
-        [
-            {"instruction": "What is 2+2?", "response": "4"},
-            {"instruction": "What is the capital of France?", "response": "Paris"}
-        ]
+        A tuple of (is_continuum_format, column_names)
+        - is_continuum_format: True if file uses Continuum DataRow format
+        - column_names: List of column names (for standard format) or
+                       sample column names from first row (for Continuum format)
     """
     import pyarrow.parquet as pq
 
-    # Read the parquet file into a PyArrow table
-    table = pq.read_table(parquet_path)
+    # Read just the schema, not the data
+    schema = pq.read_schema(parquet_path)
+    column_names = schema.names
 
-    # Convert to a dictionary of columns {column_name: [values]}
-    records = table.to_pydict()
+    # Check if this is Continuum DataRow format
+    is_continuum = "rowNumber" in column_names and "cells" in column_names
 
-    # Check if this is Continuum DataRow format by looking for the characteristic columns
-    if "rowNumber" in records and "cells" in records:
-        # This is Continuum DataRow format
-        # We need to parse each row's cells array
-        num_rows = len(records["rowNumber"])
-        rows = []
+    if is_continuum:
+        # For Continuum format, we need to read the first row to get actual column names
+        # Read just one row to extract column names from the cells
+        parquet_file = pq.ParquetFile(parquet_path)
+        first_batch = next(parquet_file.iter_batches(batch_size=1))
+        first_row_dict = first_batch.to_pydict()
 
-        for i in range(num_rows):
-            # Reconstruct the row structure that parse_continuum_row expects
-            row = {
-                "rowNumber": records["rowNumber"][i],
-                "cells": records["cells"][i],
-            }
-            # Parse the Continuum format row into a flat dictionary
-            rows.append(parse_continuum_row(row))
+        if first_row_dict["cells"]:
+            cells = first_row_dict["cells"][0]
+            column_names = [cell["name"] for cell in cells]
 
-        return rows
-    else:
-        # This is standard columnar parquet format
-        # Convert to pandas DataFrame and then to list of dicts
-        # This is simpler because columns are already named and typed
-        df = table.to_pandas()
-        return df.to_dict("records")
+    return is_continuum, column_names
 
 
-def format_dataset(
-    data: list,
+def stream_parquet_rows(
+    parquet_path: str,
+    batch_size: int = DEFAULT_PARQUET_BATCH_SIZE
+) -> Generator[dict, None, None]:
+    """
+    Stream rows from a parquet file one at a time without loading entire file.
+
+    This is the MEMORY-OPTIMIZED version that uses PyArrow's iter_batches()
+    to read the file in chunks. Only one batch is in memory at a time.
+
+    MEMORY USAGE:
+        - Old approach: O(n) where n = total rows (could be gigabytes)
+        - New approach: O(batch_size) constant memory regardless of file size
+
+    For a file with 10 million rows:
+        - Old: Would load all 10M rows into memory
+        - New: Only loads 10,000 rows at a time (configurable via batch_size)
+
+    Args:
+        parquet_path: Path to the parquet file
+        batch_size: Number of rows to read at once (default: 10,000)
+                   Smaller = less memory, larger = faster I/O
+
+    Yields:
+        One dictionary per row, with column names as keys
+
+    Example:
+        >>> for row in stream_parquet_rows("data.parquet"):
+        ...     print(row["instruction"])
+        ...     # Process one row at a time, memory stays constant
+    """
+    import pyarrow.parquet as pq
+
+    # Detect the file format
+    is_continuum, _ = detect_parquet_format(parquet_path)
+
+    # Open the parquet file for streaming
+    parquet_file = pq.ParquetFile(parquet_path)
+
+    # Iterate through the file in batches
+    # iter_batches() reads batch_size rows at a time from disk
+    for batch in parquet_file.iter_batches(batch_size=batch_size):
+        # Convert the batch to a dictionary of columns
+        # {column_name: [values for this batch]}
+        batch_dict = batch.to_pydict()
+
+        if is_continuum:
+            # Continuum DataRow format - need to parse each row's cells
+            num_rows_in_batch = len(batch_dict["rowNumber"])
+
+            for i in range(num_rows_in_batch):
+                row = {
+                    "rowNumber": batch_dict["rowNumber"][i],
+                    "cells": batch_dict["cells"][i],
+                }
+                # Parse the Continuum format into a flat dictionary
+                yield parse_continuum_row(row)
+        else:
+            # Standard columnar format - columns are directly accessible
+            column_names = list(batch_dict.keys())
+            num_rows_in_batch = len(batch_dict[column_names[0]])
+
+            for i in range(num_rows_in_batch):
+                # Build a dictionary for this row
+                yield {col: batch_dict[col][i] for col in column_names}
+
+
+def count_parquet_rows(parquet_path: str) -> int:
+    """
+    Count the total number of rows in a parquet file without loading data.
+
+    This reads only the parquet metadata, which contains row counts.
+    Very fast and uses minimal memory regardless of file size.
+
+    Args:
+        parquet_path: Path to the parquet file
+
+    Returns:
+        Total number of rows in the file
+    """
+    import pyarrow.parquet as pq
+
+    parquet_file = pq.ParquetFile(parquet_path)
+    return parquet_file.metadata.num_rows
+
+
+def get_first_row(parquet_path: str) -> dict:
+    """
+    Get the first row of a parquet file for preview/validation.
+
+    Reads only one row, very memory efficient.
+
+    Args:
+        parquet_path: Path to the parquet file
+
+    Returns:
+        Dictionary representing the first row
+    """
+    for row in stream_parquet_rows(parquet_path, batch_size=1):
+        return row
+    return {}
+
+
+def load_parquet_sample(parquet_path: str, num_rows: int = 5) -> list[dict]:
+    """
+    Load a small sample of rows from a parquet file.
+
+    Useful for previewing data or listing columns.
+
+    Args:
+        parquet_path: Path to the parquet file
+        num_rows: Number of rows to load (default: 5)
+
+    Returns:
+        List of dictionaries, one per row
+    """
+    rows = []
+    for i, row in enumerate(stream_parquet_rows(parquet_path, batch_size=num_rows)):
+        rows.append(row)
+        if i >= num_rows - 1:
+            break
+    return rows
+
+
+def create_streaming_dataset(
+    parquet_path: str,
     input_column: str,
     output_column: str,
     system_prompt: Optional[str] = None,
+    batch_size: int = DEFAULT_PARQUET_BATCH_SIZE,
 ):
     """
-    Format raw data into a HuggingFace Dataset ready for instruction fine-tuning.
+    Create a HuggingFace IterableDataset that streams from a parquet file.
 
-    This function takes the loaded data and formats it into a specific prompt
-    template that teaches the model to follow instructions. The format is:
+    This is the MEMORY-OPTIMIZED approach for training. Instead of loading
+    all data into memory, it creates a streaming dataset that reads data
+    on-demand during training.
 
-        ### Instruction:
-        {user's instruction}
+    MEMORY COMPARISON:
+        - Dataset.from_list(): Loads ALL data into RAM before training
+        - IterableDataset: Streams data during training, constant memory
 
-        ### Response:
-        {expected response}
-
-    Optionally, a system prompt can be prepended:
-
-        ### System:
-        {system prompt}
-
-        ### Instruction:
-        {user's instruction}
-
-        ### Response:
-        {expected response}
+    The training loop will call the generator as needed, so only a small
+    amount of data is in memory at any time.
 
     Args:
-        data: List of dictionaries, each containing at least input_column and output_column
-        input_column: Name of the column containing instructions (default: "instruction")
-        output_column: Name of the column containing responses (default: "response")
-        system_prompt: Optional system prompt to prepend to all examples
+        parquet_path: Path to the parquet file
+        input_column: Column name for instruction text
+        output_column: Column name for response text
+        system_prompt: Optional system prompt to prepend
+        batch_size: Rows to read at once from parquet
 
     Returns:
-        A HuggingFace Dataset with a single "text" column containing formatted examples
-
-    Raises:
-        ValueError: If input_column or output_column is not found in the data
+        A HuggingFace IterableDataset that streams formatted training examples
     """
-    from datasets import Dataset
+    from datasets import IterableDataset
 
-    formatted_data = []
+    def data_generator() -> Generator[dict, None, None]:
+        """
+        Generator function that yields formatted training examples.
 
-    for row in data:
-        # Validate that required columns exist
-        if input_column not in row or output_column not in row:
-            available_cols = list(row.keys())
-            raise ValueError(
-                f"Columns '{input_column}' or '{output_column}' not found. "
-                f"Available columns: {available_cols}"
-            )
+        This generator:
+        1. Streams rows from the parquet file (memory efficient)
+        2. Formats each row into the instruction-response template
+        3. Yields one example at a time
 
-        # Build the instruction-response format
-        # This format is commonly used for instruction fine-tuning
-        text = f"### Instruction:\n{row[input_column]}\n\n### Response:\n{row[output_column]}"
+        The generator is called lazily during training, so data is
+        processed on-demand rather than all at once.
+        """
+        for row in stream_parquet_rows(parquet_path, batch_size=batch_size):
+            # Validate that required columns exist
+            if input_column not in row:
+                raise ValueError(
+                    f"Column '{input_column}' not found. Available: {list(row.keys())}"
+                )
+            if output_column not in row:
+                raise ValueError(
+                    f"Column '{output_column}' not found. Available: {list(row.keys())}"
+                )
 
-        # Optionally prepend system prompt
-        if system_prompt:
-            text = f"### System:\n{system_prompt}\n\n{text}"
+            # Build the instruction-response format
+            text = f"### Instruction:\n{row[input_column]}\n\n### Response:\n{row[output_column]}"
 
-        # Add to our formatted dataset
-        formatted_data.append({"text": text})
+            # Optionally prepend system prompt
+            if system_prompt:
+                text = f"### System:\n{system_prompt}\n\n{text}"
 
-    # Convert to HuggingFace Dataset format
-    return Dataset.from_list(formatted_data)
+            # Yield one formatted example
+            yield {"text": text}
+
+    # Create an IterableDataset from the generator
+    # This is lazy - the generator won't run until training starts
+    return IterableDataset.from_generator(data_generator)
 
 
 # =============================================================================
 # TRAINING FUNCTION
 # =============================================================================
 # This is the main training logic. It handles:
-# 1. Loading the data from parquet
+# 1. Loading the data from parquet (STREAMING - memory optimized)
 # 2. Formatting it for instruction tuning
 # 3. Loading the base model (with Unsloth acceleration if available)
 # 4. Configuring LoRA adapters for efficient fine-tuning
@@ -451,9 +566,10 @@ def train(
     use_4bit: bool = True,
     push_to_hub: bool = False,
     hub_model_id: Optional[str] = None,
+    parquet_batch_size: int = DEFAULT_PARQUET_BATCH_SIZE,
 ) -> None:
     """
-    Run the complete fine-tuning pipeline.
+    Run the complete fine-tuning pipeline with STREAMING data loading.
 
     This function orchestrates the entire training process:
 
@@ -461,9 +577,10 @@ def train(
        - Unsloth provides 2x faster training and 60% less memory usage
        - Falls back to standard HuggingFace on macOS, Windows, or CPU-only systems
 
-    2. DATA LOADING: Reads the parquet file and converts to training format
-       - Supports both Continuum DataRow format and standard parquet
-       - Formats data into instruction-response pairs
+    2. DATA LOADING (STREAMING): Creates a streaming dataset from parquet
+       - Does NOT load entire file into memory
+       - Reads data in batches during training
+       - Can handle files with millions of rows
 
     3. MODEL LOADING: Loads the base language model
        - Uses 4-bit quantization by default to reduce memory usage
@@ -476,6 +593,7 @@ def train(
 
     5. TRAINING: Runs the supervised fine-tuning loop
        - Uses HuggingFace's SFTTrainer for instruction tuning
+       - Data is streamed during training (low memory)
        - Saves checkpoints periodically
 
     6. SAVING: Saves the fine-tuned model
@@ -538,26 +656,53 @@ def train(
         log("Using standard HuggingFace transformers (Unsloth requires Linux + CUDA)")
 
     # =========================================================================
-    # STEP 2: Load and Format Training Data
+    # STEP 2: Load and Format Training Data (STREAMING)
     # =========================================================================
+    # This is the memory-optimized approach. Instead of loading all data
+    # into memory, we create a streaming dataset that reads on-demand.
 
-    log(f"\nLoading data from {data_path}...")
-    raw_data = load_parquet_dataset(data_path)
-    log(f"Loaded {len(raw_data)} records")
+    log(f"\nAnalyzing data from {data_path}...")
 
-    # Show available columns to help users identify the right column names
-    if raw_data:
-        log(f"Available columns: {list(raw_data[0].keys())}")
+    # Count total rows (reads only metadata, very fast)
+    total_rows = count_parquet_rows(data_path)
+    log(f"Total rows in file: {total_rows:,}")
 
-    # Format the data into instruction-response pairs
-    log(f"\nFormatting dataset with input='{input_column}', output='{output_column}'...")
-    dataset = format_dataset(raw_data, input_column, output_column, system_prompt)
-    log(f"Dataset prepared with {len(dataset)} examples")
+    # Get first row to show available columns and preview
+    first_row = get_first_row(data_path)
+    if first_row:
+        log(f"Available columns: {list(first_row.keys())}")
 
-    # Show a preview of the first training example so users can verify formatting
-    log("\n--- First training example ---")
-    log(dataset[0]["text"][:500])
-    log("..." if len(dataset[0]["text"]) > 500 else "")
+        # Validate columns exist before creating dataset
+        if input_column not in first_row:
+            raise ValueError(
+                f"Input column '{input_column}' not found. "
+                f"Available columns: {list(first_row.keys())}"
+            )
+        if output_column not in first_row:
+            raise ValueError(
+                f"Output column '{output_column}' not found. "
+                f"Available columns: {list(first_row.keys())}"
+            )
+
+    # Create streaming dataset (does NOT load data yet - lazy evaluation)
+    log(f"\nCreating streaming dataset with input='{input_column}', output='{output_column}'...")
+    log("(Data will be streamed during training - low memory usage)")
+
+    dataset = create_streaming_dataset(
+        data_path,
+        input_column,
+        output_column,
+        system_prompt,
+        batch_size=parquet_batch_size,
+    )
+
+    # Show a preview of the first training example
+    log("\n--- First training example preview ---")
+    preview_text = f"### Instruction:\n{first_row[input_column]}\n\n### Response:\n{first_row[output_column]}"
+    if system_prompt:
+        preview_text = f"### System:\n{system_prompt}\n\n{preview_text}"
+    log(preview_text[:500])
+    log("..." if len(preview_text) > 500 else "")
     log("---\n")
 
     # Create output directory if it doesn't exist
@@ -680,11 +825,19 @@ def train(
 
     log("Initializing trainer...")
 
+    # Calculate max_steps for streaming dataset
+    # Since IterableDataset doesn't have a length, we need to specify max_steps
+    # max_steps = (total_rows / batch_size / gradient_accumulation_steps) * epochs
+    steps_per_epoch = total_rows // (batch_size * gradient_accumulation_steps)
+    max_steps = steps_per_epoch * epochs
+
+    log(f"Training for {max_steps} steps ({epochs} epochs, {steps_per_epoch} steps/epoch)")
+
     # SFTConfig (Supervised Fine-Tuning Config) contains all training settings
     # This is the TRL library's way of configuring the SFTTrainer
     sft_config = SFTConfig(
         output_dir=str(output_dir),           # Where to save checkpoints
-        num_train_epochs=epochs,              # How many times to go through all data
+        max_steps=max_steps,                  # Total training steps (required for streaming)
         per_device_train_batch_size=batch_size,  # Samples per training step
         gradient_accumulation_steps=gradient_accumulation_steps,  # Simulate larger batches
         learning_rate=learning_rate,          # Step size for optimizer
@@ -708,7 +861,7 @@ def train(
     trainer = SFTTrainer(
         model=model,
         processing_class=tokenizer,  # Tokenizer for text processing
-        train_dataset=dataset,       # Our formatted dataset
+        train_dataset=dataset,       # Our STREAMING dataset
         args=sft_config,             # Training configuration
     )
 
@@ -717,16 +870,17 @@ def train(
     # =========================================================================
 
     log("\n" + "=" * 50)
-    log("Starting training...")
+    log("Starting training (streaming data from disk)...")
     log("=" * 50 + "\n")
 
     # This is where the actual training happens!
-    # The trainer will:
-    # 1. Iterate through the dataset for the specified number of epochs
-    # 2. Compute loss on each batch
-    # 3. Backpropagate gradients
-    # 4. Update model weights
-    # 5. Save checkpoints periodically
+    # With streaming dataset, data is loaded on-demand:
+    # 1. Trainer requests next batch
+    # 2. Generator reads batch_size rows from parquet
+    # 3. Rows are formatted and tokenized
+    # 4. Model computes loss and updates weights
+    # 5. Old batch is discarded, next batch loaded
+    # Memory stays constant regardless of file size!
     trainer.train()
 
     # =========================================================================
@@ -782,7 +936,7 @@ def main() -> None:
     """
     # Create argument parser with description and examples
     parser = argparse.ArgumentParser(
-        description="Fine-tune LLM models with LoRA using Continuum parquet data",
+        description="Fine-tune LLM models with LoRA using Continuum parquet data (memory optimized)",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog=__doc__,  # Use the module docstring as epilog
     )
@@ -865,6 +1019,9 @@ def main() -> None:
         help="Log metrics every N steps (default: 10)")
     parser.add_argument("--no-4bit", action="store_true",
         help="Disable 4-bit quantization (uses more memory)")
+    parser.add_argument("--parquet-batch-size", type=int, default=DEFAULT_PARQUET_BATCH_SIZE,
+        help=f"Rows to read at once from parquet file (default: {DEFAULT_PARQUET_BATCH_SIZE}). "
+             "Lower = less memory, higher = faster I/O")
     parser.add_argument("--push-to-hub", action="store_true",
         help="Push model to HuggingFace Hub after training")
     parser.add_argument("--hub-model-id",
@@ -893,12 +1050,17 @@ def main() -> None:
     # Handle --list-columns mode: just show columns and exit
     if args.list_columns:
         check_dependencies()
-        raw_data = load_parquet_dataset(str(data_path))
-        if raw_data:
-            print("Available columns:")
-            for col in raw_data[0].keys():
-                # Show column name and a preview of the first value
-                sample_value = str(raw_data[0][col])[:50]
+
+        # Use memory-efficient approach - only read first few rows
+        total_rows = count_parquet_rows(str(data_path))
+        print(f"File: {data_path}")
+        print(f"Total rows: {total_rows:,}")
+        print("\nAvailable columns:")
+
+        sample_rows = load_parquet_sample(str(data_path), num_rows=1)
+        if sample_rows:
+            for col in sample_rows[0].keys():
+                sample_value = str(sample_rows[0][col])[:50]
                 print(f"  - {col}: {sample_value}...")
         sys.exit(0)
 
@@ -929,6 +1091,7 @@ def main() -> None:
         use_4bit=not args.no_4bit,
         push_to_hub=args.push_to_hub,
         hub_model_id=args.hub_model_id,
+        parquet_batch_size=args.parquet_batch_size,
     )
 
 
