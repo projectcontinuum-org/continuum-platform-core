@@ -1,0 +1,34 @@
+[
+  {
+    "instruction": "What is the capital of France?",
+    "response": "The capital of France is Paris."
+  },
+  {
+    "instruction": "Explain photosynthesis in simple terms.",
+    "response": "Photosynthesis is the process by which plants convert sunlight, water, and carbon dioxide into glucose (sugar) and oxygen. Think of it as plants making their own food using sunlight as energy."
+  },
+  {
+    "instruction": "Write a Python function to calculate factorial.",
+    "response": "def factorial(n):\n    if n <= 1:\n        return 1\n    return n * factorial(n - 1)"
+  },
+  {
+    "instruction": "What are the primary colors?",
+    "response": "The primary colors are red, blue, and yellow. These colors cannot be created by mixing other colors together, but they can be combined to create all other colors."
+  },
+  {
+    "instruction": "Convert 100 Celsius to Fahrenheit.",
+    "response": "100°C equals 212°F. The formula is: F = (C × 9/5) + 32, so (100 × 9/5) + 32 = 212."
+  },
+  {
+    "instruction": "What is machine learning?",
+    "response": "Machine learning is a subset of artificial intelligence where computers learn patterns from data without being explicitly programmed. The system improves its performance through experience."
+  },
+  {
+    "instruction": "How do you reverse a string in Python?",
+    "response": "You can reverse a string using slicing: reversed_string = original_string[::-1]"
+  },
+  {
+    "instruction": "What is the difference between HTTP and HTTPS?",
+    "response": "HTTPS is the secure version of HTTP. It encrypts data using SSL/TLS, protecting information transmitted between the browser and server from being intercepted by attackers."
+  }
+]
