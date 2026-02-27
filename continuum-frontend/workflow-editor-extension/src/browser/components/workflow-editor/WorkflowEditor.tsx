@@ -16,7 +16,7 @@ import SendIcon from '@mui/icons-material/Send';
 const workflowService = new WorkflowService();
 
 const nodeTypes = {
-    BaseNode,
+  BaseNode
 };
 const edgeTypes = {
     BaseEdge

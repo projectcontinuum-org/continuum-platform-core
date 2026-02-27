@@ -3,14 +3,34 @@ import { Handle, NodeProps, Position } from "reactflow";
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import CancelIcon from '@mui/icons-material/Cancel';
 import WarningAmberIcon from '@mui/icons-material/WarningAmber';
-import { IBaseNodeData } from "@continuum/core";
-import "./BaseNode.css"
-import { CircularProgress, Grid, Typography } from "@mui/material";
+import HourglassEmptyIcon from '@mui/icons-material/HourglassEmpty';
+import RadioButtonUncheckedIcon from '@mui/icons-material/RadioButtonUnchecked';
+import SkipNextIcon from '@mui/icons-material/SkipNext';
+import { IBaseNodeData, StageStatus } from "@continuum/core";
+import "./BaseNode.css";
+import { CircularProgress, Grid, Step, StepLabel, Stepper, Typography } from "@mui/material";
 import Bolt from "@mui/icons-material/Bolt";
 import { useMUIThemeStore } from "../../store/MUIThemeStore";
 import { mirage } from 'ldrs'
+import DynamicIcon from "../utils/DynamicIcon";
 
 mirage.register()
+
+const getStepIcon = (status: StageStatus) => {
+    switch (status) {
+        case StageStatus.COMPLETED:
+            return <CheckCircleIcon color="success" fontSize="small" />;
+        case StageStatus.IN_PROGRESS:
+            return <HourglassEmptyIcon color="info" fontSize="small" />;
+        case StageStatus.FAILED:
+            return <CancelIcon color="error" fontSize="small" />;
+        case StageStatus.SKIPPED:
+            return <SkipNextIcon color="disabled" fontSize="small" />;
+        case StageStatus.PENDING:
+        default:
+            return <RadioButtonUncheckedIcon color="disabled" fontSize="small" />;
+    }
+};
 
 export default function BaseNode(props: NodeProps<IBaseNodeData>) {
     const [theme] = useMUIThemeStore((state)=>([state.theme]))
@@ -47,6 +67,11 @@ export default function BaseNode(props: NodeProps<IBaseNodeData>) {
         <Grid className="node-content">
           <Grid className="inner">
             <Grid className="body">
+              {props.data.icon && (
+                <Grid sx={{ mr: 1, display: 'flex', alignItems: 'center' }}>
+                  <DynamicIcon icon={props.data.icon} fontSize="large" />
+                </Grid>
+              )}
               <Grid className="text">
                 <Typography variant="h6">{props.data.title}</Typography>
                 {props.data.subTitle && (
@@ -93,6 +118,30 @@ export default function BaseNode(props: NodeProps<IBaseNodeData>) {
                 </Grid>
               )}
             </Grid>
+            {props.data.nodeProgress?.stageStatus && (
+              <Stepper
+                orientation="vertical"
+                sx={{
+                  mt: 1,
+                  mb: '10px',
+                  '& .MuiStepLabel-root': { padding: '0' },
+                  '& .MuiStepLabel-label': { fontSize: '0.65rem' },
+                  '& .MuiStepConnector-line': { minHeight: '12px' },
+                  '& .MuiStep-root': { padding: '0' },
+                }}
+              >
+                {Object.entries(props.data.nodeProgress.stageStatus).map(([stageName, status]) => (
+                  <Step key={stageName} active={status === StageStatus.IN_PROGRESS} completed={status === StageStatus.COMPLETED}>
+                    <StepLabel
+                      StepIconComponent={() => getStepIcon(status)}
+                      error={status === StageStatus.FAILED}
+                    >
+                      {stageName}
+                    </StepLabel>
+                  </Step>
+                ))}
+              </Stepper>
+            )}
           </Grid>
         </Grid>
         <Grid
