@@ -4,6 +4,8 @@ import com.continuum.core.commons.exception.NodeRuntimeException
 import com.continuum.core.commons.model.ContinuumWorkflowModel
 import com.continuum.core.commons.node.ProcessNodeModel
 import com.continuum.core.commons.prototol.progress.NodeProgressCallback
+import com.continuum.core.commons.prototol.progress.NodeProgress
+import com.continuum.core.commons.prototol.progress.StageStatus
 import com.continuum.core.commons.utils.NodeInputReader
 import com.continuum.core.commons.utils.NodeOutputWriter
 import com.fasterxml.jackson.core.type.TypeReference
@@ -62,6 +64,11 @@ class AnomalyDetectorZScoreNodeModel : ProcessNodeModel() {
     private val LOGGER = LoggerFactory.getLogger(AnomalyDetectorZScoreNodeModel::class.java)
     private val objectMapper = ObjectMapper()
     private const val Z_THRESHOLD = 2.0
+
+    // Stage names for progress reporting
+    private const val STAGE_CALCULATE_MEAN = "Calculate Mean"
+    private const val STAGE_CALCULATE_STD = "Calculate Standard Deviation"
+    private const val STAGE_FLAG_OUTLIERS = "Flag Outliers"
   }
 
   final override val inputPorts = mapOf(
@@ -195,6 +202,31 @@ class AnomalyDetectorZScoreNodeModel : ProcessNodeModel() {
 
     LOGGER.info("Detecting anomalies in column: $valueCol using Z-score method (threshold: $zThreshold)")
 
+    // Helper function to report stage progress
+    fun reportStageProgress(
+      progressPercentage: Int,
+      message: String,
+      calculateMean: StageStatus,
+      calculateStd: StageStatus,
+      flagOutliers: StageStatus
+    ) {
+      nodeProgressCallback.report(
+        NodeProgress(
+          progressPercentage = progressPercentage,
+          message = message,
+          stageStatus = mapOf(
+            STAGE_CALCULATE_MEAN to calculateMean,
+            STAGE_CALCULATE_STD to calculateStd,
+            STAGE_FLAG_OUTLIERS to flagOutliers
+          )
+        )
+      )
+    }
+
+    // Progress reporting interval in milliseconds (report every X seconds)
+    val progressReportIntervalMs = 500L
+    var lastProgressReportTime = System.currentTimeMillis()
+
     // Declare variables for all passes outside the .use block
     var sum = 0.0
     var count = 0L
@@ -203,40 +235,69 @@ class AnomalyDetectorZScoreNodeModel : ProcessNodeModel() {
     var mean = 0.0
     var std = 0.0
 
+    // Report initial state - all stages pending
+    reportStageProgress(
+      progressPercentage = 0,
+      message = "Starting anomaly detection",
+      calculateMean = StageStatus.PENDING,
+      calculateStd = StageStatus.PENDING,
+      flagOutliers = StageStatus.PENDING
+    )
+
     // ====================================================================================
     // SINGLE .use {} BLOCK FOR ALL THREE PASSES
     // ====================================================================================
-    // This ensures the reader remains open throughout all passes, allowing reset() calls
-    // between passes. The reader will be automatically closed when exiting this block.
     inputs["data"]?.use { reader ->
+      // Get total row count for progress calculation
+      val totalRows = reader.getRowCount()
+
       // ========================================
-      // FIRST PASS: Calculate mean
+      // FIRST PASS: Calculate mean (0-33%)
       // ========================================
-      // Stream through all rows once to calculate the mean without storing them in memory.
-      // We only keep track of the running sum and count.
+      reportStageProgress(
+        progressPercentage = 0,
+        message = "Calculating mean... (0/$totalRows rows)",
+        calculateMean = StageStatus.IN_PROGRESS,
+        calculateStd = StageStatus.PENDING,
+        flagOutliers = StageStatus.PENDING
+      )
+
       var row = reader.read()
+      var rowsProcessed = 0L
 
       while (row != null) {
         val valueRaw = row[valueCol]
 
-        // Handle null values and non-numeric data gracefully
         val value = when {
           valueRaw == null -> {
             nullCount++
-            LOGGER.warn("Row $count: Column '$valueCol' is null, defaulting to 0.0")
             0.0
           }
           valueRaw is Number -> valueRaw.toDouble()
           else -> {
             nullCount++
-            LOGGER.warn("Row $count: Column '$valueCol' value '$valueRaw' is not a number, defaulting to 0.0")
             0.0
           }
         }
 
-        // Accumulate sum for mean calculation
         sum += value
         count++
+        rowsProcessed++
+
+        // Report progress periodically during first pass (0-33%)
+        val currentTime = System.currentTimeMillis()
+        if (currentTime - lastProgressReportTime >= progressReportIntervalMs && totalRows > 0) {
+          val passProgress = (rowsProcessed * 33 / totalRows).toInt().coerceAtMost(32)
+          reportStageProgress(
+            progressPercentage = passProgress,
+            message = "Calculating mean... ($rowsProcessed/$totalRows rows)",
+            calculateMean = StageStatus.IN_PROGRESS,
+            calculateStd = StageStatus.PENDING,
+            flagOutliers = StageStatus.PENDING
+          )
+          lastProgressReportTime = currentTime
+        }
+
         row = reader.read()
       }
 
@@ -244,67 +305,126 @@ class AnomalyDetectorZScoreNodeModel : ProcessNodeModel() {
         LOGGER.warn("Found $nullCount null or non-numeric values in column '$valueCol', defaulted to 0.0")
       }
 
-      // Validate that we have data to analyze
       if (count == 0L) {
         LOGGER.warn("No data to analyze")
-        return@use  // Exit the .use block early
+        return@use
       }
 
-      // Calculate the mean: mean = sum / count
       mean = sum / count
 
-      // Reset the reader to beginning for second pass (reader still open)
+      reportStageProgress(
+        progressPercentage = 33,
+        message = "Mean calculated: $mean ($count rows)",
+        calculateMean = StageStatus.COMPLETED,
+        calculateStd = StageStatus.PENDING,
+        flagOutliers = StageStatus.PENDING
+      )
+
       reader.reset()
+      lastProgressReportTime = System.currentTimeMillis()
 
       // ========================================
-      // SECOND PASS: Calculate standard deviation
+      // SECOND PASS: Calculate standard deviation (33-66%)
       // ========================================
-      // Stream through all rows again to calculate standard deviation.
-      // We use the formula: std = sqrt(sum((x - mean)^2) / count)
+      reportStageProgress(
+        progressPercentage = 33,
+        message = "Calculating standard deviation... (0/$totalRows rows)",
+        calculateMean = StageStatus.COMPLETED,
+        calculateStd = StageStatus.IN_PROGRESS,
+        flagOutliers = StageStatus.PENDING
+      )
+
       row = reader.read()
+      rowsProcessed = 0L
 
       while (row != null) {
         val valueRaw = row[valueCol]
         val value = (valueRaw as? Number)?.toDouble() ?: 0.0
 
-        // Accumulate the sum of squared differences from the mean
         sumSquaredDiff += (value - mean).pow(2)
+        rowsProcessed++
+
+        // Report progress periodically during second pass (33-66%)
+        val currentTime = System.currentTimeMillis()
+        if (currentTime - lastProgressReportTime >= progressReportIntervalMs && totalRows > 0) {
+          val passProgress = 33 + (rowsProcessed * 33 / totalRows).toInt().coerceAtMost(32)
+          reportStageProgress(
+            progressPercentage = passProgress,
+            message = "Calculating standard deviation... ($rowsProcessed/$totalRows rows)",
+            calculateMean = StageStatus.COMPLETED,
+            calculateStd = StageStatus.IN_PROGRESS,
+            flagOutliers = StageStatus.PENDING
+          )
+          lastProgressReportTime = currentTime
+        }
+
         row = reader.read()
       }
 
-      // Calculate standard deviation: std = sqrt(variance)
       std = sqrt(sumSquaredDiff / count)
 
       LOGGER.info("Statistics: mean=$mean, std=$std, count=$count")
 
-      // Reset the reader to beginning for third pass (reader still open)
+      reportStageProgress(
+        progressPercentage = 66,
+        message = "Standard deviation calculated: $std",
+        calculateMean = StageStatus.COMPLETED,
+        calculateStd = StageStatus.COMPLETED,
+        flagOutliers = StageStatus.PENDING
+      )
+
       reader.reset()
+      lastProgressReportTime = System.currentTimeMillis()
 
       // ========================================
-      // THIRD PASS: Flag outliers and write output
+      // THIRD PASS: Flag outliers and write output (66-100%)
       // ========================================
-      // Stream through all rows one final time to calculate Z-scores and flag outliers.
-      // Z-score = (value - mean) / std
-      // A value is an outlier if |Z-score| > zThreshold
+      reportStageProgress(
+        progressPercentage = 66,
+        message = "Flagging outliers... (0/$totalRows rows)",
+        calculateMean = StageStatus.COMPLETED,
+        calculateStd = StageStatus.COMPLETED,
+        flagOutliers = StageStatus.IN_PROGRESS
+      )
 
-      // Handle edge case where all values are identical (std = 0)
       if (std == 0.0) {
         LOGGER.warn("Standard deviation is 0, all values are the same - no outliers detected")
 
-        // Stream through and mark all rows as non-outliers
         nodeOutputWriter.createOutputPortWriter("data").use { writer ->
           var index = 0L
           row = reader.read()
 
           while (row != null) {
-            val currentRow = row!!  // Non-null assertion: we know row is not null inside the while
+            val currentRow = row!!
             writer.write(index, currentRow + mapOf(outputColumnName to false))
             index++
+
+            // Report progress periodically during third pass (66-100%)
+            val currentTime = System.currentTimeMillis()
+            if (currentTime - lastProgressReportTime >= progressReportIntervalMs && totalRows > 0) {
+              val passProgress = 66 + (index * 34 / totalRows).toInt().coerceAtMost(33)
+              reportStageProgress(
+                progressPercentage = passProgress,
+                message = "Flagging outliers... ($index/$totalRows rows)",
+                calculateMean = StageStatus.COMPLETED,
+                calculateStd = StageStatus.COMPLETED,
+                flagOutliers = StageStatus.IN_PROGRESS
+              )
+              lastProgressReportTime = currentTime
+            }
+
             row = reader.read()
           }
         }
+
+        reportStageProgress(
+          progressPercentage = 100,
+          message = "Completed: No outliers (all values identical)",
+          calculateMean = StageStatus.COMPLETED,
+          calculateStd = StageStatus.COMPLETED,
+          flagOutliers = StageStatus.COMPLETED
+        )
       } else {
-        // Normal case: calculate Z-scores and flag outliers
         var outlierCount = 0
 
         nodeOutputWriter.createOutputPortWriter("data").use { writer ->
@@ -312,30 +432,48 @@ class AnomalyDetectorZScoreNodeModel : ProcessNodeModel() {
           row = reader.read()
 
           while (row != null) {
-            val currentRow = row!!  // Non-null assertion: we know row is not null inside the while
+            val currentRow = row!!
             val valueRaw = currentRow[valueCol]
             val value = (valueRaw as? Number)?.toDouble() ?: 0.0
 
-            // Calculate Z-score for this value
             val zScore = (value - mean) / std
-
-            // Flag as outlier if absolute Z-score exceeds threshold
             val isOutlier = kotlin.math.abs(zScore) > zThreshold
 
             if (isOutlier) {
               outlierCount++
-              LOGGER.debug("Outlier detected: value=$value, z-score=$zScore")
             }
 
-            // Write the original row with the outlier flag added
             writer.write(index, currentRow + mapOf(outputColumnName to isOutlier))
             index++
+
+            // Report progress periodically during third pass (66-100%)
+            val currentTime = System.currentTimeMillis()
+            if (currentTime - lastProgressReportTime >= progressReportIntervalMs && totalRows > 0) {
+              val passProgress = 66 + (index * 34 / totalRows).toInt().coerceAtMost(33)
+              reportStageProgress(
+                progressPercentage = passProgress,
+                message = "Flagging outliers... ($index/$totalRows rows, $outlierCount outliers found)",
+                calculateMean = StageStatus.COMPLETED,
+                calculateStd = StageStatus.COMPLETED,
+                flagOutliers = StageStatus.IN_PROGRESS
+              )
+              lastProgressReportTime = currentTime
+            }
+
             row = reader.read()
           }
         }
 
         LOGGER.info("Detected $outlierCount outliers out of $count rows (threshold: $zThreshold)")
+
+        reportStageProgress(
+          progressPercentage = 100,
+          message = "Completed: Detected $outlierCount outliers out of $count rows",
+          calculateMean = StageStatus.COMPLETED,
+          calculateStd = StageStatus.COMPLETED,
+          flagOutliers = StageStatus.COMPLETED
+        )
       }
-    }  // ← Reader closes here after ALL passes complete
+    }
   }
 }
