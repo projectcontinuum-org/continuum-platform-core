@@ -30,6 +30,8 @@ import software.amazon.awssdk.transfer.s3.model.UploadFileRequest
 import software.amazon.awssdk.transfer.s3.progress.LoggingTransferListener
 import java.nio.file.Files
 import java.nio.file.Path
+import java.util.concurrent.atomic.AtomicLong
+import java.util.concurrent.atomic.AtomicReference
 import kotlin.io.path.listDirectoryEntries
 import kotlin.system.measureTimeMillis
 
@@ -64,7 +66,7 @@ import kotlin.system.measureTimeMillis
  * @property cacheBucketName S3 bucket name for storing workflow data
  * @property cacheBucketBasePath Base path within the S3 bucket for workflow data
  * @property cacheStoragePath Local filesystem path for caching workflow data
- * @property progressReportRateLimitMs Minimum milliseconds between progress reports to avoid bloating workflow history (default: 5000ms)
+ * @property progressReportRateLimitMs Minimum milliseconds between progress reports to avoid bloating workflow history (default: 100ms)
  * @author Continuum Team
  * @since 1.0.0
  * @see IContinuumNodeActivity
@@ -87,48 +89,41 @@ class ContinuumNodeActivity(
   private val progressReportRateLimitMs: Long
 ) : IContinuumNodeActivity {
 
+  companion object {
+    private val LOGGER = LoggerFactory.getLogger(ContinuumNodeActivity::class.java)
+
+    /** Prefix used to indicate data is stored remotely in S3 */
+    private const val REMOTE_DATA_PREFIX = "{remote}"
+
+    /** Output file prefix pattern */
+    private const val OUTPUT_FILE_PREFIX = "output."
+
+    /** Parquet file extension */
+    private const val PARQUET_EXTENSION = ".parquet"
+  }
+
   /** Map of process node class names to their model instances */
   private val processNodeMap = mutableMapOf<String, ProcessNodeModel>()
 
   /** Map of trigger node class names to their model instances */
   private val triggerNodeMap = mutableMapOf<String, TriggerNodeModel>()
 
-  companion object {
-    /** Logger instance for this class */
-    private val LOGGER = LoggerFactory.getLogger(ContinuumNodeActivity::class.java)
-  }
-
   /**
    * Initializes the node maps after bean construction.
    *
-   * This method populates the [processNodeMap] and [triggerNodeMap] with all
-   * registered node model beans, using their fully qualified class names as keys.
-   * This enables fast lookup during workflow execution.
+   * Populates [processNodeMap] and [triggerNodeMap] with all registered node model beans,
+   * using their fully qualified class names as keys for fast lookup during workflow execution.
    */
   @PostConstruct
   fun onInit() {
-    // Register all process nodes by their class name
-    processNodesModelProvider.forEach {
-      processNodeMap[it.javaClass.name] = it
-    }
-    // Register all trigger nodes by their class name
-    triggerNodeModelProvider.forEach {
-      triggerNodeMap[it.javaClass.name] = it
-    }
+    processNodesModelProvider.forEach { processNodeMap[it.javaClass.name] = it }
+    triggerNodeModelProvider.forEach { triggerNodeMap[it.javaClass.name] = it }
     LOGGER.info("Registered process nodes: ${processNodeMap.keys}")
     LOGGER.info("Registered trigger nodes: ${triggerNodeMap.keys}")
   }
 
   /**
    * Executes a single workflow node as a Temporal activity.
-   *
-   * This is the main entry point for node execution. It performs the following steps:
-   * 1. Creates a progress callback to report execution progress to the parent workflow
-   * 2. Creates the local cache directory for this node's data
-   * 3. Downloads input data from S3 to local storage
-   * 4. Executes the appropriate node model (process or trigger)
-   * 5. Uploads output data from local storage to S3
-   * 6. Returns the node outputs with S3 references
    *
    * @param node The workflow node configuration to execute
    * @param inputs Map of input port IDs to their [PortData] (containing S3 references)
@@ -139,205 +134,168 @@ class ContinuumNodeActivity(
     node: ContinuumWorkflowModel.Node,
     inputs: Map<String, PortData>
   ): IContinuumNodeActivity.NodeActivityOutput {
-    // Create a callback to report progress updates to the parent workflow via Temporal signals
-    // Rate-limited to avoid bloating workflow history with too many signals
-    val lastReportTime = java.util.concurrent.atomic.AtomicLong(0)
-    val lastReportedStages = java.util.concurrent.atomic.AtomicReference<Map<String, StageStatus>?>(null)
+    val workflowRunId = Activity.getExecutionContext().info.runId
+    val nodeModel = node.data.nodeModel
 
-    val nodeProgressCallback = object : NodeProgressCallback {
-      /**
-       * Reports detailed progress including percentage and message.
-       * Rate-limited to avoid bloating workflow history - only reports if:
-       * - Progress is 0% (start) or 100% (complete)
-       * - A stage status has changed (e.g., IN_PROGRESS -> COMPLETED)
-       * - Sufficient time has elapsed since the last report (configurable via progressReportRateLimitMs)
-       */
+    // Create local cache directory for this node's input/output files
+    val nodeCachePath = cacheStoragePath.resolve("$workflowRunId/${node.id}")
+    Files.createDirectories(nodeCachePath)
+
+    val progressCallback = createProgressCallback(node.id)
+
+    return try {
+      when {
+        processNodeMap.containsKey(nodeModel) -> executeProcessNode(node, inputs, progressCallback)
+        triggerNodeMap.containsKey(nodeModel) -> executeTriggerNode(node, progressCallback)
+        else -> createErrorOutput(node.id, "Node model '$nodeModel' not found")
+      }
+    } catch (e: NodeRuntimeException) {
+      handleNodeException(node, e)
+    }
+  }
+
+  // ==========================================================================
+  // Node Execution Methods
+  // ==========================================================================
+
+  /**
+   * Executes a process node with the given inputs.
+   */
+  private fun executeProcessNode(
+    node: ContinuumWorkflowModel.Node,
+    inputs: Map<String, PortData>,
+    progressCallback: NodeProgressCallback
+  ): IContinuumNodeActivity.NodeActivityOutput {
+    val workflowRunId = Activity.getExecutionContext().info.runId
+    val nodeModel = node.data.nodeModel
+
+    LOGGER.info("Downloading input files for node ${node.id} ($nodeModel)")
+    val nodeInputs = prepareNodeInputs(node.id, inputs)
+    LOGGER.info("Input files downloaded for node ${node.id} ($nodeModel)")
+
+    val nodeOutputWriter = NodeOutputWriter(cacheStoragePath.resolve("$workflowRunId/${node.id}"))
+
+    processNodeMap[nodeModel]!!.run(
+      node = node,
+      inputs = nodeInputs,
+      nodeOutputWriter = nodeOutputWriter,
+      nodeProgressCallback = progressCallback
+    )
+
+    LOGGER.info("Uploading output files for node ${node.id} ($nodeModel)")
+    val nodeOutput = prepareNodeOutputs(node.id, nodeOutputWriter)
+    LOGGER.info("Output files uploaded for node ${node.id} ($nodeModel)")
+
+    return IContinuumNodeActivity.NodeActivityOutput(nodeId = node.id, outputs = nodeOutput)
+  }
+
+  /**
+   * Executes a trigger node (no inputs required).
+   */
+  private fun executeTriggerNode(
+    node: ContinuumWorkflowModel.Node,
+    @Suppress("UNUSED_PARAMETER") progressCallback: NodeProgressCallback
+  ): IContinuumNodeActivity.NodeActivityOutput {
+    val workflowRunId = Activity.getExecutionContext().info.runId
+    val nodeOutputWriter = NodeOutputWriter(cacheStoragePath.resolve("$workflowRunId/${node.id}"))
+
+    triggerNodeMap[node.data.nodeModel]!!.run(node, nodeOutputWriter = nodeOutputWriter)
+
+    return IContinuumNodeActivity.NodeActivityOutput(
+      nodeId = node.id,
+      outputs = prepareNodeOutputs(node.id, nodeOutputWriter)
+    )
+  }
+
+  // ==========================================================================
+  // Progress Callback
+  // ==========================================================================
+
+  /**
+   * Creates a rate-limited progress callback for reporting node execution progress.
+   *
+   * The callback is rate-limited to avoid bloating Temporal workflow history.
+   * It always reports:
+   * - 0% (start) and 100% (completion)
+   * - Stage status changes
+   * - Intermediate updates only if [progressReportRateLimitMs] has elapsed
+   *
+   * @param nodeId The ID of the node being executed
+   * @return A [NodeProgressCallback] instance
+   */
+  private fun createProgressCallback(nodeId: String): NodeProgressCallback {
+    val lastReportTime = AtomicLong(0)
+    val lastReportedStages = AtomicReference<Map<String, StageStatus>?>(null)
+
+    return object : NodeProgressCallback {
       override fun report(nodeProgress: NodeProgress) {
         val now = System.currentTimeMillis()
         val lastTime = lastReportTime.get()
-
-        // Check if any stage status has changed
         val currentStages = nodeProgress.stageStatus
         val previousStages = lastReportedStages.get()
         val stageChanged = currentStages != null && currentStages != previousStages
 
-        // Always report 0% (start), 100% (complete), or stage changes; rate-limit other updates
         val shouldReport = nodeProgress.progressPercentage == 0 ||
                            nodeProgress.progressPercentage == 100 ||
                            stageChanged ||
                            (now - lastTime) >= progressReportRateLimitMs
 
         if (!shouldReport) {
-          LOGGER.debug("Skipping progress report (rate limited) - Node ID: ${node.id}, Progress: ${nodeProgress.progressPercentage}%")
+          LOGGER.debug("Skipping progress report (rate limited) - Node: $nodeId, Progress: ${nodeProgress.progressPercentage}%")
           return
         }
 
         lastReportTime.set(now)
         lastReportedStages.set(currentStages)
-        LOGGER.info("NodeProgressCallback report - Node ID: ${node.id}, Progress: ${nodeProgress.progressPercentage}%, Message: ${nodeProgress.message}")
-        // Send progress signal to the parent workflow
-        Activity.getExecutionContext().workflowClient.newWorkflowStub(
-          IContinuumWorkflow::class.java,
-          Activity.getExecutionContext().info.workflowId
-        ).updateNodeProgressSignal(
-          continuumNodeActivitySignal = ContinuumNodeActivitySignal(
-            nodeId = node.id,
-            nodeProgress = nodeProgress
-          )
-        )
+        LOGGER.info("Progress report - Node: $nodeId, Progress: ${nodeProgress.progressPercentage}%, Message: ${nodeProgress.message}")
+
+        sendProgressSignal(nodeId, nodeProgress)
       }
 
-      /**
-       * Reports progress percentage only.
-       */
       override fun report(progressPercentage: Int) {
         report(NodeProgress(progressPercentage))
       }
     }
+  }
 
-    // Create local cache directory for this node's input/output files
-    Files.createDirectories(cacheStoragePath.resolve("${Activity.getExecutionContext().info.runId}/${node.id}"))
-    try {
-      // Determine node type and execute the appropriate node model
-      if (processNodeMap.containsKey(node.data.nodeModel)) {
-        // === PROCESS NODE EXECUTION ===
-        LOGGER.info("Downloading input files for node ${node.id} (${node.data.nodeModel})")
-        // Download all input port data from S3 to local cache
-        val nodeInputs = prepareNodeInputs(node.id, inputs)
-        LOGGER.info("Input files downloaded for node ${node.id} (${node.data.nodeModel})")
-
-        // Create output writer for the node to write its results
-        val nodeOutputWriter =
-          NodeOutputWriter(cacheStoragePath.resolve("${Activity.getExecutionContext().info.runId}/${node.id}"))
-
-        // Execute the process node with inputs and collect outputs
-        processNodeMap[node.data.nodeModel]!!.run(
-          node = node,
-          inputs = nodeInputs,
-          nodeOutputWriter = nodeOutputWriter,
-          nodeProgressCallback = nodeProgressCallback
-        )
-
-        // Upload output files to S3 and get references
-        LOGGER.info("Uploading output files for node ${node.id} (${node.data.nodeModel})")
-        val nodeOutput = prepareNodeOutputs(
-          nodeId = node.id,
-          nodeOutputWriter = nodeOutputWriter
-        )
-        LOGGER.info("Output files uploaded for node ${node.id} (${node.data.nodeModel})")
-
-        return IContinuumNodeActivity.NodeActivityOutput(
-          nodeId = node.id,
-          outputs = nodeOutput
-        )
-      } else if (triggerNodeMap.containsKey(node.data.nodeModel)) {
-        // === TRIGGER NODE EXECUTION ===
-        // Trigger nodes don't have inputs, they generate data (e.g., from external sources)
-        val nodeOutputWriter =
-          NodeOutputWriter(cacheStoragePath.resolve("${Activity.getExecutionContext().info.runId}/${node.id}"))
-
-        // Execute the trigger node
-        triggerNodeMap[node.data.nodeModel]!!.run(
-          node,
-          nodeOutputWriter = nodeOutputWriter
-        )
-
-        return IContinuumNodeActivity.NodeActivityOutput(
-          nodeId = node.id,
-          outputs = prepareNodeOutputs(
-            nodeId = node.id,
-            nodeOutputWriter = nodeOutputWriter
-          )
-        )
-      }
-    } catch (e: NodeRuntimeException) {
-      // Handle node-specific runtime exceptions
-      LOGGER.error("Error while executing node ${node.id} (${node.data.nodeModel})", e)
-      if (!e.isRetriable) {
-        // Non-retriable errors should fail immediately without Temporal retries
-        return IContinuumNodeActivity.NodeActivityOutput(
-          nodeId = node.id,
-          outputs = mapOf(
-            "\$error" to PortData(
-              tableSpec = emptyList(),
-              data = e.message ?: "Unknown error",
-              contentType = "text/plain",
-              status = PortDataStatus.FAILED
-            )
-          )
-        )
-      } else {
-        // Retriable errors should trigger Temporal's retry mechanism
-        throw e
-      }
-    }
-
-    // Node model not found - return error output
-    return IContinuumNodeActivity.NodeActivityOutput(
-      nodeId = node.id,
-      outputs = mapOf(
-        "\$error" to PortData(
-          tableSpec = emptyList(),
-          data = "Node model '${node.data.nodeModel}' not found",
-          contentType = "text/plain",
-          status = PortDataStatus.FAILED
-        )
+  /**
+   * Sends a progress signal to the parent workflow.
+   */
+  private fun sendProgressSignal(nodeId: String, nodeProgress: NodeProgress) {
+    Activity.getExecutionContext().workflowClient.newWorkflowStub(
+      IContinuumWorkflow::class.java,
+      Activity.getExecutionContext().info.workflowId
+    ).updateNodeProgressSignal(
+      continuumNodeActivitySignal = ContinuumNodeActivitySignal(
+        nodeId = nodeId,
+        nodeProgress = nodeProgress
       )
     )
   }
 
+  // ==========================================================================
+  // Data Transfer Methods
+  // ==========================================================================
+
   /**
    * Prepares node inputs by downloading data from S3 to local cache.
-   *
-   * This method downloads input Parquet files from S3 storage to the local filesystem
-   * for processing. Files are cached locally to avoid redundant downloads if they
-   * already exist.
-   *
-   * The S3 key is extracted from the [PortData.data] field by removing the "{remote}"
-   * prefix that indicates the data is stored remotely.
    *
    * @param nodeId The ID of the node being executed
    * @param inputs Map of input port IDs to their [PortData] containing S3 references
    * @return Map of input port IDs to [NodeInputReader] instances for reading the data
    */
-  fun prepareNodeInputs(
-    nodeId: String,
-    inputs: Map<String, PortData>
-  ): Map<String, NodeInputReader> {
+  private fun prepareNodeInputs(nodeId: String, inputs: Map<String, PortData>): Map<String, NodeInputReader> {
     val workflowRunId = Activity.getExecutionContext().info.runId
-    return inputs.mapValues {
-      // Construct local file path for the input data
-      val filePath = cacheStoragePath.resolve("$workflowRunId/$nodeId/input.${it.key}.parquet")
+
+    return inputs.mapValues { (portId, portData) ->
+      val filePath = cacheStoragePath.resolve("$workflowRunId/$nodeId/input.$portId$PARQUET_EXTENSION")
 
       if (!Files.exists(filePath)) {
-        // File not cached locally - download from S3
-        // Remove the "{remote}" prefix to get the actual S3 key
-        val destinationKey = "$cacheBucketBasePath/${it.value.data.toString().removePrefix("{remote}")}"
-
-        val uploadTime = measureTimeMillis {
-          // Use S3 transfer manager for efficient download with progress logging
-          s3TransferManager.downloadFile(
-            DownloadFileRequest.builder()
-              .getObjectRequest(
-                GetObjectRequest.builder()
-                  .bucket(cacheBucketName)
-                  .key(destinationKey)
-                  .build()
-              )
-              .destination(filePath)
-              .addTransferListener(
-                LoggingTransferListener.create()
-              )
-              .build()
-          ).completionFuture().get()
-        }
-        LOGGER.info("Download '$filePath' time: $uploadTime ms")
+        downloadFromS3(portData.data.toString().removePrefix(REMOTE_DATA_PREFIX), filePath)
       } else {
-        // File already exists in local cache - skip download
         LOGGER.info("File '$filePath' already exists, skipping download")
       }
 
-      // Return a reader for the downloaded/cached file
       NodeInputReader(filePath)
     }
   }
@@ -345,61 +303,98 @@ class ContinuumNodeActivity(
   /**
    * Prepares node outputs by uploading local files to S3 storage.
    *
-   * This method scans the node's output directory for Parquet files matching the
-   * pattern "output.{portId}.parquet", uploads them to S3, and returns [PortData]
-   * objects with references to the uploaded files.
-   *
    * @param nodeId The ID of the node that produced the outputs
    * @param nodeOutputWriter The output writer containing table specifications
    * @return Map of output port IDs to [PortData] with S3 references
    */
-  fun prepareNodeOutputs(
-    nodeId: String,
-    nodeOutputWriter: NodeOutputWriter
-  ): Map<String, PortData> {
+  private fun prepareNodeOutputs(nodeId: String, nodeOutputWriter: NodeOutputWriter): Map<String, PortData> {
     val workflowRunId = Activity.getExecutionContext().info.runId
     val nodeOutputPath = cacheStoragePath.resolve("$workflowRunId/$nodeId")
 
-    // Find all output Parquet files in the node's output directory
-    val lisOutputFiles = nodeOutputPath.listDirectoryEntries()
-      .filter { it.fileName.toString().startsWith("output.") && it.fileName.toString().endsWith(".parquet") }
+    return nodeOutputPath.listDirectoryEntries()
+      .filter { it.fileName.toString().startsWith(OUTPUT_FILE_PREFIX) && it.fileName.toString().endsWith(PARQUET_EXTENSION) }
+      .associate { outputFile ->
+        val portId = outputFile.fileName.toString()
+          .removePrefix(OUTPUT_FILE_PREFIX)
+          .removeSuffix(PARQUET_EXTENSION)
 
-    return lisOutputFiles.map {
-      // Extract port ID from filename (e.g., "output.port1.parquet" -> "port1")
-      val portId = it.fileName.toString().substringAfter("output.").substringBefore(".parquet")
+        val relativeFileKey = "$workflowRunId/$nodeId/$OUTPUT_FILE_PREFIX$portId$PARQUET_EXTENSION"
+        uploadToS3(outputFile, relativeFileKey)
 
-      // Construct S3 key for the output file
-      val relativeFileKey = "$workflowRunId/$nodeId/output.$portId.parquet"
-      val destinationKey = "$cacheBucketBasePath/$relativeFileKey"
-
-      // Upload the output file to S3 with progress logging
-      val uploadTime = measureTimeMillis {
-        s3TransferManager.uploadFile(
-          UploadFileRequest.builder()
-            .putObjectRequest(
-              PutObjectRequest.builder()
-                .bucket(cacheBucketName)
-                .key(destinationKey)
-                .build()
-            )
-            .source(it)
-            .addTransferListener(
-              LoggingTransferListener.create()
-            )
-            .build()
-        ).completionFuture().get()
+        portId to PortData(
+          tableSpec = nodeOutputWriter.getTableSpec(portId),
+          data = "$REMOTE_DATA_PREFIX$relativeFileKey",
+          contentType = "application/parquet",
+          status = PortDataStatus.SUCCESS
+        )
       }
-      LOGGER.info("Upload '$it' time: $uploadTime ms")
+  }
 
-      // Create PortData with reference to the uploaded S3 object
-      val portData = PortData(
-        tableSpec = nodeOutputWriter
-          .getTableSpec(portId),
-        data = "{remote}${relativeFileKey}",  // Prefix with "{remote}" to indicate S3 storage
-        contentType = "application/parquet",
-        status = PortDataStatus.SUCCESS
+  /**
+   * Downloads a file from S3 to the local filesystem.
+   */
+  private fun downloadFromS3(s3Key: String, destination: Path) {
+    val fullKey = "$cacheBucketBasePath/$s3Key"
+    val downloadTime = measureTimeMillis {
+      s3TransferManager.downloadFile(
+        DownloadFileRequest.builder()
+          .getObjectRequest(GetObjectRequest.builder().bucket(cacheBucketName).key(fullKey).build())
+          .destination(destination)
+          .addTransferListener(LoggingTransferListener.create())
+          .build()
+      ).completionFuture().get()
+    }
+    LOGGER.info("Downloaded '$destination' in ${downloadTime}ms")
+  }
+
+  /**
+   * Uploads a file to S3 storage.
+   */
+  private fun uploadToS3(source: Path, relativeKey: String) {
+    val fullKey = "$cacheBucketBasePath/$relativeKey"
+    val uploadTime = measureTimeMillis {
+      s3TransferManager.uploadFile(
+        UploadFileRequest.builder()
+          .putObjectRequest(PutObjectRequest.builder().bucket(cacheBucketName).key(fullKey).build())
+          .source(source)
+          .addTransferListener(LoggingTransferListener.create())
+          .build()
+      ).completionFuture().get()
+    }
+    LOGGER.info("Uploaded '$source' in ${uploadTime}ms")
+  }
+
+  // ==========================================================================
+  // Error Handling
+  // ==========================================================================
+
+  /**
+   * Handles node execution exceptions.
+   */
+  private fun handleNodeException(node: ContinuumWorkflowModel.Node, e: NodeRuntimeException): IContinuumNodeActivity.NodeActivityOutput {
+    LOGGER.error("Error executing node ${node.id} (${node.data.nodeModel})", e)
+
+    return if (!e.isRetriable) {
+      createErrorOutput(node.id, e.message)
+    } else {
+      throw e
+    }
+  }
+
+  /**
+   * Creates an error output for a node.
+   */
+  private fun createErrorOutput(nodeId: String, errorMessage: String): IContinuumNodeActivity.NodeActivityOutput {
+    return IContinuumNodeActivity.NodeActivityOutput(
+      nodeId = nodeId,
+      outputs = mapOf(
+        "\$error" to PortData(
+          tableSpec = emptyList(),
+          data = errorMessage,
+          contentType = "text/plain",
+          status = PortDataStatus.FAILED
+        )
       )
-      Pair(portId, portData)
-    }.associate { it }
+    )
   }
 }
