@@ -10,7 +10,7 @@ MEMORY OPTIMIZED: Uses streaming data loading to handle large parquet files
 with millions of rows without loading everything into memory.
 
 Requirements:
-    pip install pyarrow pandas datasets torch transformers peft trl accelerate
+    pip install pyarrow pandas datasets torch transformers peft trl accelerate hf_transfer
 
 For Unsloth acceleration (Linux + CUDA only):
     pip install "unsloth[colab-new] @ git+https://github.com/unslothai/unsloth.git"
@@ -66,6 +66,15 @@ from __future__ import annotations
 import sys
 import os
 
+# =============================================================================
+# ENABLE FAST HF_TRANSFER DOWNLOADS
+# =============================================================================
+# hf_transfer is a Rust-based download backend for HuggingFace Hub that provides
+# significantly faster downloads (up to 5-10x) by using parallel, chunked transfers.
+# This must be set BEFORE importing huggingface_hub for it to take effect.
+# If the hf_transfer package is not installed, the setting is silently ignored.
+os.environ["HF_HUB_ENABLE_HF_TRANSFER"] = "1"
+
 # Check if silent mode is requested by looking at command line arguments
 # We do this before argparse because we need to suppress output during imports
 _silent = "--silent" in sys.argv or "-s" in sys.argv
@@ -120,7 +129,7 @@ from typing import Any, Optional, Generator   # For type hints
 # =============================================================================
 
 # Version number - update this when making changes
-VERSION = "1.3.0"  # Added downloading_model stage for IPC progress
+VERSION = "1.4.0"  # Validate model cache integrity; clean up incomplete downloads
 
 # Default batch size for reading parquet files in chunks
 # This controls how many rows are read from disk at once
@@ -327,37 +336,191 @@ def check_dependencies() -> None:
         log(f"Install with: pip install {' '.join(missing)}")
         sys.exit(1)
 
+    # Check if hf_transfer is available for faster model downloads
+    try:
+        import hf_transfer  # noqa: F401
+        log("hf_transfer is available — fast model downloads enabled")
+    except ImportError:
+        log("hf_transfer not installed — using default download backend. "
+            "Install with: pip install hf_transfer")
 
-def is_model_cached(model_name: str) -> bool:
+
+def _get_model_snapshot_dir(model_name: str) -> Optional[Path]:
     """
-    Check if a HuggingFace model is already cached locally.
+    Locate the snapshot directory for a HuggingFace model in the local cache.
 
-    This function checks the HuggingFace cache directory to determine if
-    the model files have already been downloaded. This allows us to skip
-    the download stage and report appropriate progress to the user.
+    HuggingFace Hub stores downloaded models under:
+        <cache_dir>/models--<org>--<repo>/snapshots/<revision_hash>/
 
     Args:
         model_name: The HuggingFace model identifier (e.g., "microsoft/phi-2")
 
     Returns:
-        True if the model appears to be cached locally, False otherwise
+        Path to the latest snapshot directory, or None if not found.
+    """
+    try:
+        from huggingface_hub.constants import HUGGINGFACE_HUB_CACHE
+
+        # HuggingFace converts "org/repo" -> "models--org--repo"
+        repo_folder_name = "models--" + model_name.replace("/", "--")
+        model_cache_dir = Path(HUGGINGFACE_HUB_CACHE) / repo_folder_name
+
+        if not model_cache_dir.is_dir():
+            return None
+
+        snapshots_dir = model_cache_dir / "snapshots"
+        if not snapshots_dir.is_dir():
+            return None
+
+        # Get the most recent snapshot (there may be multiple revisions)
+        snapshot_dirs = sorted(snapshots_dir.iterdir(), key=lambda p: p.stat().st_mtime, reverse=True)
+        if not snapshot_dirs:
+            return None
+
+        return snapshot_dirs[0]
+    except Exception:
+        return None
+
+
+def _has_incomplete_downloads(model_name: str) -> bool:
+    """
+    Check if there are incomplete/partial download files in the model cache.
+
+    When HuggingFace Hub downloads files, it writes to temporary files with
+    an `.incomplete` suffix in the blobs directory. If a download was
+    interrupted, these leftover files indicate the model is not fully
+    downloaded and should be re-fetched.
+
+    Args:
+        model_name: The HuggingFace model identifier (e.g., "microsoft/phi-2")
+
+    Returns:
+        True if incomplete download artifacts were found, False otherwise.
+    """
+    try:
+        from huggingface_hub.constants import HUGGINGFACE_HUB_CACHE
+
+        repo_folder_name = "models--" + model_name.replace("/", "--")
+        model_cache_dir = Path(HUGGINGFACE_HUB_CACHE) / repo_folder_name
+
+        if not model_cache_dir.is_dir():
+            return False
+
+        # Check the blobs directory for .incomplete files
+        blobs_dir = model_cache_dir / "blobs"
+        if blobs_dir.is_dir():
+            for blob_file in blobs_dir.iterdir():
+                if blob_file.name.endswith(".incomplete"):
+                    return True
+
+        return False
+    except Exception:
+        return False
+
+
+def _clean_incomplete_model_cache(model_name: str) -> None:
+    """
+    Remove an incomplete/corrupt model cache so the next download starts fresh.
+
+    This deletes the entire model cache directory (blobs, snapshots, refs)
+    for the given model. HuggingFace Hub will re-download everything on the
+    next call to from_pretrained().
+
+    Args:
+        model_name: The HuggingFace model identifier (e.g., "microsoft/phi-2")
+    """
+    import shutil
+
+    try:
+        from huggingface_hub.constants import HUGGINGFACE_HUB_CACHE
+
+        repo_folder_name = "models--" + model_name.replace("/", "--")
+        model_cache_dir = Path(HUGGINGFACE_HUB_CACHE) / repo_folder_name
+
+        if model_cache_dir.is_dir():
+            log(f"Cleaning incomplete model cache: {model_cache_dir}")
+            shutil.rmtree(model_cache_dir, ignore_errors=True)
+            log("Incomplete cache removed — model will be re-downloaded")
+    except Exception as e:
+        log(f"Warning: Could not clean model cache: {e}")
+
+
+def is_model_cached(model_name: str) -> bool:
+    """
+    Check if a HuggingFace model is fully cached locally.
+
+    This function performs three checks to determine if the model is ready:
+      1. Verifies config.json is present in the cache (basic presence check).
+      2. Checks for .incomplete blob files left over from interrupted downloads.
+         If found, the entire model cache is cleaned so the next download
+         starts fresh instead of silently using a corrupt/partial model.
+      3. Verifies that at least one model-weight file (.safetensors or .bin)
+         exists in the snapshot directory. config.json alone is not sufficient
+         because it is one of the first files downloaded.
+
+    Args:
+        model_name: The HuggingFace model identifier (e.g., "microsoft/phi-2")
+
+    Returns:
+        True if the model appears to be fully cached locally, False otherwise
     """
     try:
         from huggingface_hub import try_to_load_from_cache, _CACHED_NO_EXIST
         from huggingface_hub.constants import HUGGINGFACE_HUB_CACHE
 
-        # Check if the config.json file is cached - this is always present for models
-        # If config.json is cached, the model has been downloaded
+        # -----------------------------------------------------------
+        # 1. Quick check: is config.json cached at all?
+        # -----------------------------------------------------------
         cached_path = try_to_load_from_cache(
             repo_id=model_name,
             filename="config.json",
             cache_dir=HUGGINGFACE_HUB_CACHE,
         )
 
-        # If cached_path is a string (path), the file is cached
-        # If it's _CACHED_NO_EXIST, the file was checked but doesn't exist
-        # If it's None, the file hasn't been cached yet
-        return cached_path is not None and cached_path != _CACHED_NO_EXIST
+        config_cached = cached_path is not None and cached_path != _CACHED_NO_EXIST
+
+        if not config_cached:
+            # Nothing cached yet — definitely needs downloading
+            return False
+
+        # -----------------------------------------------------------
+        # 2. Check for .incomplete blobs (interrupted download)
+        # -----------------------------------------------------------
+        if _has_incomplete_downloads(model_name):
+            log(
+                f"Model {model_name} has incomplete download artifacts — "
+                "previous download was likely interrupted"
+            )
+            _clean_incomplete_model_cache(model_name)
+            return False
+
+        # -----------------------------------------------------------
+        # 3. Verify model-weight files exist in the snapshot
+        # -----------------------------------------------------------
+        snapshot_dir = _get_model_snapshot_dir(model_name)
+        if snapshot_dir is None:
+            # Snapshot directory missing even though config was "cached"
+            log(f"Model {model_name}: snapshot directory not found, re-downloading")
+            _clean_incomplete_model_cache(model_name)
+            return False
+
+        # Look for at least one weight file (.safetensors or .bin)
+        weight_extensions = {".safetensors", ".bin"}
+        has_weights = any(
+            f.suffix in weight_extensions
+            for f in snapshot_dir.iterdir()
+            if f.is_file() or f.is_symlink()
+        )
+
+        if not has_weights:
+            log(
+                f"Model {model_name}: config.json cached but no weight files "
+                "(.safetensors / .bin) found — previous download may be incomplete"
+            )
+            _clean_incomplete_model_cache(model_name)
+            return False
+
+        return True
 
     except Exception:
         # If we can't check the cache, assume model needs downloading
@@ -802,6 +965,14 @@ def train(
     # Unsloth is a library that provides significant speedups for LLM training,
     # but it only works on Linux with NVIDIA GPUs (CUDA). On other platforms,
     # we fall back to standard HuggingFace transformers.
+
+    # Log whether a HuggingFace token is available for gated model access
+    # The HF_TOKEN env var is automatically read by huggingface_hub
+    if os.environ.get("HF_TOKEN"):
+        log("HuggingFace token detected — gated/private model downloads enabled")
+    else:
+        log("No HuggingFace token found — only public models can be downloaded. "
+            "Set HF_TOKEN for gated models (e.g., Llama, Gemma)")
 
     use_unsloth = False
 

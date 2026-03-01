@@ -277,6 +277,11 @@ class UnslothTrainerNodeModel(
           "default": 10000,
           "minimum": 100,
           "maximum": 100000
+        },
+        "hfToken": {
+          "type": "string",
+          "title": "HuggingFace Token",
+          "description": "Optional HuggingFace access token for downloading gated or private models (e.g., Llama, Gemma). Get yours at https://huggingface.co/settings/tokens"
         }
       },
       "required": ["model"]
@@ -405,6 +410,13 @@ class UnslothTrainerNodeModel(
             {
               "type": "Control",
               "scope": "#/properties/parquetBatchSize"
+            },
+            {
+              "type": "Control",
+              "scope": "#/properties/hfToken",
+              "options": {
+                "format": "password"
+              }
             }
           ]
         }
@@ -518,6 +530,7 @@ class UnslothTrainerNodeModel(
     val loggingSteps = (properties?.get("loggingSteps") as? Number)?.toInt() ?: 10
     val use4Bit = properties?.get("use4Bit") as? Boolean ?: true
     val parquetBatchSize = (properties?.get("parquetBatchSize") as? Number)?.toInt() ?: DEFAULT_PARQUET_BATCH_SIZE
+    val hfToken = properties?.get("hfToken")?.toString()?.takeIf { it.isNotBlank() }
 
     // Resolve and validate virtual environment path (configured via Spring properties)
     // venv is required for LLM training as it needs specific packages (torch, transformers, etc.)
@@ -569,15 +582,35 @@ class UnslothTrainerNodeModel(
     }
 
     // Build the process with venv activation if specified
-    val processBuilder = buildProcessBuilder(resolvedVenvPath, scriptPath, commandArgs)
+    val extraEnv = mutableMapOf<String, String>()
+    if (hfToken != null) {
+      extraEnv["HF_TOKEN"] = hfToken
+      LOGGER.info("HuggingFace token provided — will be used for model downloads")
+    }
+    val processBuilder = buildProcessBuilder(resolvedVenvPath, scriptPath, commandArgs, extraEnv)
     LOGGER.info("Executing training script with venv: $resolvedVenvPath")
-    LOGGER.debug("Command: ${processBuilder.command().joinToString(" ")}")
+    LOGGER.debug("Command: {}", processBuilder.command().joinToString(" "))
 
     val process = processBuilder.start()
+
+    // Register a shutdown hook to ensure the child process is killed before JVM exit
+    val shutdownHook = Thread {
+      if (process.isAlive) {
+        LOGGER.warn("JVM shutting down — destroying training child process")
+        process.destroyForcibly()
+        try {
+          process.waitFor(10, java.util.concurrent.TimeUnit.SECONDS)
+        } catch (_: InterruptedException) {
+          Thread.currentThread().interrupt()
+        }
+      }
+    }
+    Runtime.getRuntime().addShutdownHook(shutdownHook)
 
     // Read stdout for IPC progress messages (JSON format)
     val stdoutReader = BufferedReader(InputStreamReader(process.inputStream))
 
+    val exitCode: Int
     // Process IPC progress messages from stdout
     try {
       var line: String?
@@ -605,12 +638,26 @@ class UnslothTrainerNodeModel(
           }
         }
       }
+
+      // Wait for the process to complete
+      exitCode = process.waitFor()
+    } catch (e: Exception) {
+      // On any exception (including InterruptedException), kill the child process
+      if (process.isAlive) {
+        LOGGER.warn("Destroying training child process due to exception: ${e.message}")
+        process.destroyForcibly()
+        process.waitFor(10, java.util.concurrent.TimeUnit.SECONDS)
+      }
+      throw e
     } finally {
       stdoutReader.close()
+      // Remove the shutdown hook since the process has terminated (or been killed)
+      try {
+        Runtime.getRuntime().removeShutdownHook(shutdownHook)
+      } catch (_: IllegalStateException) {
+        // JVM is already shutting down — hook cannot be removed, which is fine
+      }
     }
-
-    // Wait for the process to complete
-    val exitCode = process.waitFor()
 
     if (exitCode != 0) {
       // Read stderr only on failure
@@ -711,7 +758,7 @@ class UnslothTrainerNodeModel(
    * @param args List of arguments to pass to the script
    * @return ProcessBuilder configured to run the command
    */
-  private fun buildProcessBuilder(venvPath: String, scriptPath: String, args: List<String>): ProcessBuilder {
+  private fun buildProcessBuilder(venvPath: String, scriptPath: String, args: List<String>, extraEnv: Map<String, String> = emptyMap()): ProcessBuilder {
     val isWindows = System.getProperty("os.name").lowercase().contains("windows")
 
     // Build command that activates venv and runs python
@@ -736,6 +783,12 @@ class UnslothTrainerNodeModel(
 
     // Inherit environment variables (needed for CUDA, etc.)
     processBuilder.environment().putAll(System.getenv())
+
+    // Enable hf_transfer for faster HuggingFace model downloads (Rust-based parallel chunked transfers)
+    processBuilder.environment()["HF_HUB_ENABLE_HF_TRANSFER"] = "1"
+
+    // Apply any extra environment variables (e.g., HF_TOKEN for gated model access)
+    processBuilder.environment().putAll(extraEnv)
 
     return processBuilder
   }

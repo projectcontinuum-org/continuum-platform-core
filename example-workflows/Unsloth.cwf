@@ -4,11 +4,11 @@
     "active": false,
     "nodes": [
         {
-            "id": "7",
+            "id": "8",
             "type": "BaseNode",
             "position": {
-                "x": 1336.3386042645916,
-                "y": 1147.952615435304
+                "x": 1308.6913820189104,
+                "y": 946.5039097499035
             },
             "data": {
                 "id": "com.continuum.feature.ai.node.UnslothTrainerNodeModel",
@@ -35,13 +35,13 @@
                     "inputColumn": "instruction",
                     "outputColumn": "response",
                     "epochs": 1,
-                    "batchSize": 2,
-                    "gradientAccumulation": 4,
+                    "batchSize": 16,
+                    "gradientAccumulation": 2,
                     "learningRate": 0.0002,
                     "maxSeqLength": 2048,
                     "loraR": 16,
-                    "loraAlpha": 16,
-                    "loraDropout": 0,
+                    "loraAlpha": 32,
+                    "loraDropout": 0.05,
                     "warmupSteps": 5,
                     "weightDecay": 0.01,
                     "seed": 42,
@@ -58,7 +58,7 @@
                             "title": "Base Model",
                             "description": "HuggingFace model identifier. Select from popular models or enter a custom model ID.",
                             "default": "unsloth/Phi-4",
-                            "examples": [
+                            "enum": [
                                 "unsloth/Phi-4",
                                 "unsloth/Phi-4-mini-instruct",
                                 "unsloth/mistral-7b-v0.3",
@@ -238,11 +238,7 @@
                             "elements": [
                                 {
                                     "type": "Control",
-                                    "scope": "#/properties/model",
-                                    "options": {
-                                        "autocomplete": true,
-                                        "freeSolo": true
-                                    }
+                                    "scope": "#/properties/model"
                                 }
                             ]
                         },
@@ -353,19 +349,19 @@
             },
             "width": 255,
             "height": 123,
-            "selected": true,
+            "selected": false,
+            "dragging": false,
             "positionAbsolute": {
-                "x": 1336.3386042645916,
-                "y": 1147.952615435304
-            },
-            "dragging": false
+                "x": 1308.6913820189104,
+                "y": 946.5039097499035
+            }
         },
         {
             "id": "3",
             "type": "BaseNode",
             "position": {
-                "x": 907.630561886278,
-                "y": 1072.215916742629
+                "x": 815.9348732154942,
+                "y": 857.167694502814
             },
             "data": {
                 "id": "com.continuum.base.node.CreateTableNodeModel",
@@ -383,7 +379,7 @@
                     }
                 },
                 "properties": {
-                    "jsonArrayString": "[\n<#-- Math Q&A examples -->\n<#list 1..1000 as i>\n  <#assign a = (i * 7) % 100 + 1>\n  <#assign b = (i * 13) % 100 + 1>\n  {\"instruction\": \"What is ${a} + ${b}?\", \"response\": \"The sum of ${a} and ${b} is ${a + b}.\"},\n</#list>\n\n<#-- Multiplication examples -->\n<#list 1..1000 as i>\n  <#assign a = (i % 12) + 1>\n  <#assign b = (i % 10) + 1>\n  {\"instruction\": \"Calculate ${a} × ${b}\", \"response\": \"${a} × ${b} = ${a * b}\"},\n</#list>\n\n<#-- Temperature conversion examples -->\n<#list 0..100 as celsius>\n  <#if celsius % 10 == 0>\n  <#assign fahrenheit = (celsius * 9 / 5) + 32>\n  {\"instruction\": \"Convert ${celsius}°C to Fahrenheit\", \"response\": \"${celsius}°C equals ${fahrenheit}°F. Formula: F = (C × 9/5) + 32\"},\n  </#if>\n</#list>\n\n<#-- Programming concepts -->\n<#assign concepts = [\n  {\"topic\": \"variable\", \"definition\": \"A named storage location in memory that holds a value which can be changed during program execution\"},\n  {\"topic\": \"function\", \"definition\": \"A reusable block of code that performs a specific task and can accept inputs (parameters) and return outputs\"},\n  {\"topic\": \"loop\", \"definition\": \"A control structure that repeats a block of code multiple times until a condition is met\"},\n  {\"topic\": \"array\", \"definition\": \"A data structure that stores a collection of elements, typically of the same type, in contiguous memory locations\"},\n  {\"topic\": \"class\", \"definition\": \"A blueprint for creating objects that defines properties (attributes) and behaviors (methods)\"},\n  {\"topic\": \"inheritance\", \"definition\": \"An OOP mechanism where a class can inherit properties and methods from a parent class\"},\n  {\"topic\": \"API\", \"definition\": \"Application Programming Interface - a set of protocols and tools that allows different software applications to communicate\"},\n  {\"topic\": \"recursion\", \"definition\": \"A programming technique where a function calls itself to solve smaller instances of the same problem\"}\n]>\n<#list concepts as concept>\n  {\"instruction\": \"What is a ${concept.topic} in programming?\", \"response\": \"${concept.definition}\"}<#if concept?has_next>,</#if>\n</#list>\n]"
+                    "jsonArrayString": "[\n<#-- Math Q&A examples -->\n<#list 1..50000 as i>\n  <#assign a = (i * 7) % 100 + 1>\n  <#assign b = (i * 13) % 100 + 1>\n  {\"instruction\": \"What is ${a} + ${b}?\", \"response\": \"The sum of ${a} and ${b} is ${a + b}.\"},\n</#list>\n\n<#-- Multiplication examples -->\n<#list 1..50000 as i>\n  <#assign a = (i % 12) + 1>\n  <#assign b = (i % 10) + 1>\n  {\"instruction\": \"Calculate ${a} × ${b}\", \"response\": \"${a} × ${b} = ${a * b}\"},\n</#list>\n\n<#-- Temperature conversion examples -->\n<#list 0..50000 as celsius>\n  <#if celsius % 10 == 0>\n  <#assign fahrenheit = (celsius * 9 / 5) + 32>\n  {\"instruction\": \"Convert ${celsius}°C to Fahrenheit\", \"response\": \"${celsius}°C equals ${fahrenheit}°F. Formula: F = (C × 9/5) + 32\"},\n  </#if>\n</#list>\n\n<#-- Programming concepts -->\n<#assign concepts = [\n  {\"topic\": \"variable\", \"definition\": \"A named storage location in memory that holds a value which can be changed during program execution\"},\n  {\"topic\": \"function\", \"definition\": \"A reusable block of code that performs a specific task and can accept inputs (parameters) and return outputs\"},\n  {\"topic\": \"loop\", \"definition\": \"A control structure that repeats a block of code multiple times until a condition is met\"},\n  {\"topic\": \"array\", \"definition\": \"A data structure that stores a collection of elements, typically of the same type, in contiguous memory locations\"},\n  {\"topic\": \"class\", \"definition\": \"A blueprint for creating objects that defines properties (attributes) and behaviors (methods)\"},\n  {\"topic\": \"inheritance\", \"definition\": \"An OOP mechanism where a class can inherit properties and methods from a parent class\"},\n  {\"topic\": \"API\", \"definition\": \"Application Programming Interface - a set of protocols and tools that allows different software applications to communicate\"},\n  {\"topic\": \"recursion\", \"definition\": \"A programming technique where a function calls itself to solve smaller instances of the same problem\"}\n]>\n<#list concepts as concept>\n  {\"instruction\": \"What is a ${concept.topic} in programming?\", \"response\": \"${concept.definition}\"}<#if concept?has_next>,</#if>\n</#list>\n]"
                 },
                 "propertiesSchema": {
                     "type": "object",
@@ -419,8 +415,8 @@
             "height": 100,
             "selected": false,
             "positionAbsolute": {
-                "x": 907.630561886278,
-                "y": 1072.215916742629
+                "x": 815.9348732154942,
+                "y": 857.167694502814
             },
             "dragging": false
         }
@@ -430,9 +426,9 @@
             "type": "BaseEdge",
             "source": "3",
             "sourceHandle": "data",
-            "target": "7",
+            "target": "8",
             "targetHandle": "training_data",
-            "id": "reactflow__edge-3data-7training_data"
+            "id": "reactflow__edge-3data-8training_data"
         }
     ]
 }
