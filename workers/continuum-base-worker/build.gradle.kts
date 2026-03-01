@@ -35,6 +35,7 @@ dependencies {
 
     // Node dependencies
     implementation(project(":continuum-base"))
+    implementation(project(":continuum-feature-ai"))
 
     // Test dependencies
     testImplementation("org.springframework.boot:spring-boot-starter-test")

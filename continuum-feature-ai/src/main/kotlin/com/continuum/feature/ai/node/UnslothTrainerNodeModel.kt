@@ -27,6 +27,15 @@ import java.nio.file.StandardCopyOption
  * - Unsloth acceleration on Linux+CUDA (2x faster, 60% less memory)
  * - Fallback to standard HuggingFace transformers on other platforms
  *
+ * ## Python Environment
+ * This node requires a Python virtual environment with the following packages:
+ * - pyarrow, pandas, datasets, torch, transformers, peft, trl, accelerate
+ * - For Unsloth acceleration: unsloth (Linux + CUDA only)
+ *
+ * Configure the virtual environment path via:
+ * - Property: `continuum.node.unsloth-trainer.venv-path`
+ * - Or set in node properties UI
+ *
  * ## Input Format
  * The input Parquet file should contain at least two columns:
  * - An instruction/input column (configurable, default: "instruction")
@@ -46,13 +55,17 @@ import java.nio.file.StandardCopyOption
  * - And many more...
  *
  * @property pythonExecutable Path to the Python executable (configurable via properties)
+ * @property defaultVenvPath Default path to Python virtual environment (configurable via properties)
  * @author Continuum Team
  * @since 1.0.0
  */
 @Component
 class UnslothTrainerNodeModel(
   @Value("\${continuum.node.unsloth-trainer.python-executable:python3}")
-  private val pythonExecutable: String
+  private val pythonExecutable: String,
+
+  @Value("\${continuum.node.unsloth-trainer.venv-path:/home/roushan/Projects/Continuum/unsloth-trainer/.venv}")
+  private val defaultVenvPath: String
 ) : ProcessNodeModel() {
 
   companion object {
@@ -95,6 +108,11 @@ class UnslothTrainerNodeModel(
     {
       "type": "object",
       "properties": {
+        "venvPath": {
+          "type": "string",
+          "title": "Python Virtual Environment",
+          "description": "Path to Python virtual environment directory (e.g., /path/to/venv or ~/.venvs/unsloth). Leave empty to use system Python."
+        },
         "model": {
           "type": "string",
           "title": "Base Model",
@@ -252,11 +270,21 @@ class UnslothTrainerNodeModel(
   private val propertiesUiSchema: Map<String, Any> = objectMapper.readValue(
     """
     {
-      "type": "VerticalLayout",
+      "type": "Categorization",
       "elements": [
         {
-          "type": "Group",
-          "label": "Model Configuration",
+          "type": "Category",
+          "label": "Environment",
+          "elements": [
+            {
+              "type": "Control",
+              "scope": "#/properties/venvPath"
+            }
+          ]
+        },
+        {
+          "type": "Category",
+          "label": "Model",
           "elements": [
             {
               "type": "Control",
@@ -269,21 +297,16 @@ class UnslothTrainerNodeModel(
           ]
         },
         {
-          "type": "Group",
-          "label": "Data Configuration",
+          "type": "Category",
+          "label": "Data",
           "elements": [
             {
-              "type": "HorizontalLayout",
-              "elements": [
-                {
-                  "type": "Control",
-                  "scope": "#/properties/inputColumn"
-                },
-                {
-                  "type": "Control",
-                  "scope": "#/properties/outputColumn"
-                }
-              ]
+              "type": "Control",
+              "scope": "#/properties/inputColumn"
+            },
+            {
+              "type": "Control",
+              "scope": "#/properties/outputColumn"
             },
             {
               "type": "Control",
@@ -296,110 +319,80 @@ class UnslothTrainerNodeModel(
           ]
         },
         {
-          "type": "Group",
-          "label": "Training Parameters",
+          "type": "Category",
+          "label": "Training",
           "elements": [
             {
-              "type": "HorizontalLayout",
-              "elements": [
-                {
-                  "type": "Control",
-                  "scope": "#/properties/epochs"
-                },
-                {
-                  "type": "Control",
-                  "scope": "#/properties/batchSize"
-                },
-                {
-                  "type": "Control",
-                  "scope": "#/properties/gradientAccumulation"
-                }
-              ]
+              "type": "Control",
+              "scope": "#/properties/epochs"
             },
             {
-              "type": "HorizontalLayout",
-              "elements": [
-                {
-                  "type": "Control",
-                  "scope": "#/properties/learningRate"
-                },
-                {
-                  "type": "Control",
-                  "scope": "#/properties/maxSeqLength"
-                }
-              ]
+              "type": "Control",
+              "scope": "#/properties/batchSize"
             },
             {
-              "type": "HorizontalLayout",
-              "elements": [
-                {
-                  "type": "Control",
-                  "scope": "#/properties/warmupSteps"
-                },
-                {
-                  "type": "Control",
-                  "scope": "#/properties/weightDecay"
-                }
-              ]
+              "type": "Control",
+              "scope": "#/properties/gradientAccumulation"
+            },
+            {
+              "type": "Control",
+              "scope": "#/properties/learningRate"
+            },
+            {
+              "type": "Control",
+              "scope": "#/properties/maxSeqLength"
+            },
+            {
+              "type": "Control",
+              "scope": "#/properties/warmupSteps"
+            },
+            {
+              "type": "Control",
+              "scope": "#/properties/weightDecay"
             }
           ]
         },
         {
-          "type": "Group",
-          "label": "LoRA Configuration",
+          "type": "Category",
+          "label": "LoRA",
           "elements": [
             {
-              "type": "HorizontalLayout",
-              "elements": [
-                {
-                  "type": "Control",
-                  "scope": "#/properties/loraR"
-                },
-                {
-                  "type": "Control",
-                  "scope": "#/properties/loraAlpha"
-                },
-                {
-                  "type": "Control",
-                  "scope": "#/properties/loraDropout"
-                }
-              ]
+              "type": "Control",
+              "scope": "#/properties/loraR"
+            },
+            {
+              "type": "Control",
+              "scope": "#/properties/loraAlpha"
+            },
+            {
+              "type": "Control",
+              "scope": "#/properties/loraDropout"
             }
           ]
         },
         {
-          "type": "Group",
-          "label": "Advanced Options",
+          "type": "Category",
+          "label": "Advanced",
           "elements": [
             {
-              "type": "HorizontalLayout",
-              "elements": [
-                {
-                  "type": "Control",
-                  "scope": "#/properties/seed"
-                },
-                {
-                  "type": "Control",
-                  "scope": "#/properties/saveSteps"
-                },
-                {
-                  "type": "Control",
-                  "scope": "#/properties/loggingSteps"
-                }
-              ]
+              "type": "Control",
+              "scope": "#/properties/seed"
             },
             {
-              "type": "HorizontalLayout",
-              "elements": [
-                {
-                  "type": "Control",
-                  "scope": "#/properties/use4Bit"
-                },
-                {
-                  "type": "Control",
-                  "scope": "#/properties/parquetBatchSize"
-                }
-              ]
+              "type": "Control",
+              "scope": "#/properties/saveSteps"
+            },
+            {
+              "type": "Control",
+              "scope": "#/properties/loggingSteps"
+            },
+            {
+              "type": "Control",
+              "scope": "#/properties/use4Bit"
+            },
+            {
+              "type": "Control",
+              "scope": "#/properties/parquetBatchSize"
             }
           ]
         }
@@ -510,14 +503,19 @@ class UnslothTrainerNodeModel(
     val use4Bit = properties?.get("use4Bit") as? Boolean ?: true
     val parquetBatchSize = (properties?.get("parquetBatchSize") as? Number)?.toInt() ?: DEFAULT_PARQUET_BATCH_SIZE
 
+    // Get venv path from properties or use default from configuration
+    val venvPath = properties?.get("venvPath")?.toString()?.takeIf { it.isNotBlank() }
+      ?: defaultVenvPath.takeIf { it.isNotBlank() }
+
+    // Resolve and validate virtual environment path
+    val resolvedVenvPath = resolveVenvPath(venvPath)
+
     // Get the train.py script from resources
     val scriptPath = getTrainScriptPath()
     LOGGER.info("Using train script: $scriptPath")
 
-    // Build the command
-    val command = mutableListOf(
-      pythonExecutable,
-      scriptPath,
+    // Build the command arguments
+    val commandArgs = mutableListOf(
       "--data", dataFilePath,
       "--model", model,
       "--output", outputPath,
@@ -537,22 +535,21 @@ class UnslothTrainerNodeModel(
       "--save-steps", saveSteps.toString(),
       "--logging-steps", loggingSteps.toString(),
       "--parquet-batch-size", parquetBatchSize.toString(),
+      "--silent",  // Suppress non-JSON output for cleaner IPC parsing
       "--ipc"  // Enable IPC mode for progress reporting
     )
 
     // Add optional parameters
     if (!systemPrompt.isNullOrBlank()) {
-      command.addAll(listOf("--system-prompt", systemPrompt))
+      commandArgs.addAll(listOf("--system-prompt", systemPrompt))
     }
     if (!use4Bit) {
-      command.add("--no-4bit")
+      commandArgs.add("--no-4bit")
     }
 
-    LOGGER.info("Executing command: ${command.joinToString(" ")}")
-
-    // Execute the training script
-    val processBuilder = ProcessBuilder(command)
-      .redirectErrorStream(false)
+    // Build the process with venv activation if specified
+    val processBuilder = buildProcessBuilder(resolvedVenvPath, scriptPath, commandArgs)
+    LOGGER.info("Executing training script with venv: ${resolvedVenvPath ?: "system python"}")
 
     val process = processBuilder.start()
 
@@ -638,6 +635,101 @@ class UnslothTrainerNodeModel(
     nodeOutputWriter.createOutputPortWriter("model_info").use { writer ->
       writer.write(0, modelInfo)
     }
+  }
+
+  /**
+   * Resolves the Python executable path based on the virtual environment configuration.
+   *
+   * If a virtual environment path is provided, this method will:
+   * 1. Expand ~ to the user's home directory
+   * 2. Validate that the virtual environment directory exists
+   * 3. Return the path to be used with shell activation
+   *
+   * If no virtual environment is specified, falls back to the configured pythonExecutable.
+   *
+   * @param venvPath Optional path to the Python virtual environment
+   * @return Expanded and validated virtual environment path, or null if not specified
+   * @throws NodeRuntimeException if venv is specified but directory doesn't exist
+   */
+  private fun resolveVenvPath(venvPath: String?): String? {
+    if (venvPath.isNullOrBlank()) {
+      LOGGER.info("No virtual environment specified, using system Python: $pythonExecutable")
+      return null
+    }
+
+    // Expand ~ to user home directory
+    val expandedVenvPath = if (venvPath.startsWith("~")) {
+      venvPath.replaceFirst("~", System.getProperty("user.home"))
+    } else {
+      venvPath
+    }
+
+    val venvDir = java.io.File(expandedVenvPath)
+    if (!venvDir.exists() || !venvDir.isDirectory) {
+      throw NodeRuntimeException(
+        workflowId = "",
+        nodeId = "",
+        message = "Virtual environment directory does not exist: $expandedVenvPath",
+        isRetriable = false
+      )
+    }
+
+    // Verify activation script exists
+    val isWindows = System.getProperty("os.name").lowercase().contains("windows")
+    val activateScript = if (isWindows) {
+      java.io.File(venvDir, "Scripts/activate.bat")
+    } else {
+      java.io.File(venvDir, "bin/activate")
+    }
+
+    if (!activateScript.exists()) {
+      throw NodeRuntimeException(
+        workflowId = "",
+        nodeId = "",
+        message = "Virtual environment activation script not found: ${activateScript.absolutePath}",
+        isRetriable = false
+      )
+    }
+
+    LOGGER.info("Using virtual environment: $expandedVenvPath")
+    return expandedVenvPath
+  }
+
+  /**
+   * Builds the command to execute the training script.
+   *
+   * If a virtual environment is specified, the command will be wrapped in a shell
+   * that first activates the virtual environment before running Python.
+   *
+   * @param venvPath Optional path to the Python virtual environment
+   * @param scriptPath Path to the train.py script
+   * @param args List of arguments to pass to the script
+   * @return ProcessBuilder configured to run the command
+   */
+  private fun buildProcessBuilder(venvPath: String?, scriptPath: String, args: List<String>): ProcessBuilder {
+    val isWindows = System.getProperty("os.name").lowercase().contains("windows")
+
+    return if (venvPath != null) {
+      // Build command that activates venv and runs python
+      val pythonCommand = listOf("python", scriptPath) + args
+      val pythonCommandStr = pythonCommand.joinToString(" ") { arg ->
+        // Quote arguments that contain spaces
+        if (arg.contains(" ")) "\"$arg\"" else arg
+      }
+
+      if (isWindows) {
+        // Windows: use cmd /c to run activate.bat && python ...
+        val activateScript = "$venvPath\\Scripts\\activate.bat"
+        ProcessBuilder("cmd", "/c", "$activateScript && $pythonCommandStr")
+      } else {
+        // Unix: use bash -c to source activate && python ...
+        val activateScript = "$venvPath/bin/activate"
+        ProcessBuilder("bash", "-c", "source \"$activateScript\" && $pythonCommandStr")
+      }
+    } else {
+      // No venv, run python directly
+      ProcessBuilder(listOf(pythonExecutable, scriptPath) + args)
+    }.redirectErrorStream(false)
   }
 
   /**

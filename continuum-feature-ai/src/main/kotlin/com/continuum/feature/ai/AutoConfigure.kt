@@ -28,5 +28,5 @@ import org.springframework.context.annotation.Configuration
  */
 @Configuration
 @ComponentScan(basePackages = ["com.continuum.feature.ai"])
-class ContinuumFeatureAiAutoConfiguration
+class AutoConfigure
 

@@ -115,7 +115,7 @@ from typing import Any, Optional, Generator   # For type hints
 # =============================================================================
 
 # Version number - update this when making changes
-VERSION = "1.2.0"  # Added IPC mode with NodeProgress format
+VERSION = "1.3.0"  # Added downloading_model stage for IPC progress
 
 # Default batch size for reading parquet files in chunks
 # This controls how many rows are read from disk at once
@@ -127,16 +127,18 @@ DEFAULT_PARQUET_BATCH_SIZE = 10000
 # =============================================================================
 # These are the stages reported in IPC mode, matching Continuum's NodeProgress format
 
-STAGE_INIT = "initialization"
-STAGE_LOAD_DATA = "loading_dataset"
-STAGE_LOAD_MODEL = "loading_model"
-STAGE_CONFIGURE_LORA = "configuring_lora"
-STAGE_TRAINING = "training"
-STAGE_SAVING = "saving_model"
+STAGE_INIT = "Initialization"
+STAGE_LOAD_DATA = "Loading Dataset"
+STAGE_DOWNLOAD_MODEL = "Downloading Model"
+STAGE_LOAD_MODEL = "Loading Model"
+STAGE_CONFIGURE_LORA = "Configuring LoRA"
+STAGE_TRAINING = "Training"
+STAGE_SAVING = "Saving Model"
 
 ALL_STAGES = [
     STAGE_INIT,
     STAGE_LOAD_DATA,
+    STAGE_DOWNLOAD_MODEL,
     STAGE_LOAD_MODEL,
     STAGE_CONFIGURE_LORA,
     STAGE_TRAINING,
@@ -319,6 +321,42 @@ def check_dependencies() -> None:
         log(f"Error: Missing dependencies: {', '.join(missing)}")
         log(f"Install with: pip install {' '.join(missing)}")
         sys.exit(1)
+
+
+def is_model_cached(model_name: str) -> bool:
+    """
+    Check if a HuggingFace model is already cached locally.
+
+    This function checks the HuggingFace cache directory to determine if
+    the model files have already been downloaded. This allows us to skip
+    the download stage and report appropriate progress to the user.
+
+    Args:
+        model_name: The HuggingFace model identifier (e.g., "microsoft/phi-2")
+
+    Returns:
+        True if the model appears to be cached locally, False otherwise
+    """
+    try:
+        from huggingface_hub import try_to_load_from_cache, _CACHED_NO_EXIST
+        from huggingface_hub.constants import HUGGINGFACE_HUB_CACHE
+
+        # Check if the config.json file is cached - this is always present for models
+        # If config.json is cached, the model has been downloaded
+        cached_path = try_to_load_from_cache(
+            repo_id=model_name,
+            filename="config.json",
+            cache_dir=HUGGINGFACE_HUB_CACHE,
+        )
+
+        # If cached_path is a string (path), the file is cached
+        # If it's _CACHED_NO_EXIST, the file was checked but doesn't exist
+        # If it's None, the file hasn't been cached yet
+        return cached_path is not None and cached_path != _CACHED_NO_EXIST
+
+    except Exception:
+        # If we can't check the cache, assume model needs downloading
+        return False
 
 
 # =============================================================================
@@ -841,14 +879,28 @@ def train(
         report_ipc_progress(STAGE_LOAD_DATA, "COMPLETED", 20, f"Dataset ready: {total_rows:,} rows")
 
     # =========================================================================
-    # STEP 3: Load Model and Tokenizer
+    # STEP 3: Download and Load Model and Tokenizer
     # =========================================================================
     # The approach differs based on whether Unsloth is available:
     # - With Unsloth: Use FastLanguageModel for optimized loading
     # - Without Unsloth: Use standard AutoModelForCausalLM
+    #
+    # We first check if the model is cached locally. If not, we report a
+    # "downloading" stage so the user knows the model is being fetched from
+    # the HuggingFace Hub, which can take significant time for large models.
 
-    if _ipc_mode:
-        report_ipc_progress(STAGE_LOAD_MODEL, "IN_PROGRESS", 25, f"Loading model: {model_name}")
+    # Check if model needs to be downloaded
+    model_is_cached = is_model_cached(model_name)
+
+    if model_is_cached:
+        log(f"Model {model_name} found in cache")
+        if _ipc_mode:
+            report_ipc_progress(STAGE_DOWNLOAD_MODEL, "SKIPPED", 22, f"Model already cached: {model_name}")
+            report_ipc_progress(STAGE_LOAD_MODEL, "IN_PROGRESS", 25, f"Loading model into memory: {model_name}")
+    else:
+        log(f"Model {model_name} not in cache, downloading from HuggingFace Hub...")
+        if _ipc_mode:
+            report_ipc_progress(STAGE_DOWNLOAD_MODEL, "IN_PROGRESS", 22, f"Downloading model: {model_name}")
 
     if use_unsloth:
         # ----- UNSLOTH PATH (Linux + CUDA) -----
@@ -868,10 +920,15 @@ def train(
             dtype=None,  # Auto-detect best dtype
         )
 
+        # Report download completed if model wasn't cached
+        if not model_is_cached and _ipc_mode:
+            report_ipc_progress(STAGE_DOWNLOAD_MODEL, "COMPLETED", 30, f"Model downloaded: {model_name}")
+            report_ipc_progress(STAGE_LOAD_MODEL, "IN_PROGRESS", 35, f"Loading model into memory: {model_name}")
+
         log("Configuring LoRA adapters...")
 
         if _ipc_mode:
-            report_ipc_progress(STAGE_LOAD_MODEL, "COMPLETED", 40, "Model loaded")
+            report_ipc_progress(STAGE_LOAD_MODEL, "COMPLETED", 40, "Model loaded into memory")
             report_ipc_progress(STAGE_CONFIGURE_LORA, "IN_PROGRESS", 45, "Configuring LoRA adapters")
 
         # Configure LoRA (Low-Rank Adaptation) for efficient fine-tuning
@@ -932,6 +989,11 @@ def train(
             device_map="auto" if device != "mps" else None,
         )
 
+        # Report download completed if model wasn't cached
+        if not model_is_cached and _ipc_mode:
+            report_ipc_progress(STAGE_DOWNLOAD_MODEL, "COMPLETED", 30, f"Model downloaded: {model_name}")
+            report_ipc_progress(STAGE_LOAD_MODEL, "IN_PROGRESS", 35, f"Loading model into memory: {model_name}")
+
         # For MPS, manually move model to the device
         if device == "mps":
             model = model.to(device)
@@ -939,7 +1001,7 @@ def train(
         log("Configuring LoRA adapters...")
 
         if _ipc_mode:
-            report_ipc_progress(STAGE_LOAD_MODEL, "COMPLETED", 40, "Model loaded")
+            report_ipc_progress(STAGE_LOAD_MODEL, "COMPLETED", 40, "Model loaded into memory")
             report_ipc_progress(STAGE_CONFIGURE_LORA, "IN_PROGRESS", 45, "Configuring LoRA adapters")
 
         # Configure LoRA using the PEFT library
