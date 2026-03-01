@@ -38,9 +38,9 @@ class ContinuumNodeActivity(
   private val processNodesModelProvider: ObjectProvider<ProcessNodeModel>,
   private val triggerNodeModelProvider: ObjectProvider<TriggerNodeModel>,
   private val s3TransferManager: S3TransferManager,
-  @Value("\${continuum.core.worker.cache-bucket-name}")
+  @Value("\${continuum.core.worker.storage.bucket-name}")
   private val cacheBucketName: String,
-  @Value("\${continuum.core.worker.cache-bucket-base-path}")
+  @Value("\${continuum.core.worker.storage.bucket-base-path}")
   private val cacheBucketBasePath: String,
   @Value("\${continuum.core.worker.cache-storage-path}")
   private val cacheStoragePath: Path

@@ -14,6 +14,22 @@ import software.amazon.awssdk.services.s3.model.HeadBucketRequest
 import software.amazon.awssdk.services.s3.model.NoSuchBucketException
 import java.net.URI
 
+/**
+ * Initializes the S3 bucket in MinIO on application startup.
+ *
+ * This component is only activated when the storage type is configured as "minio"
+ * via the property `continuum.core.api-server.storage.type`.
+ *
+ * It ensures that the required S3 bucket exists in MinIO, creating it if necessary.
+ *
+ * @property minioEndpoint The MinIO server endpoint URL
+ * @property minioAccessKey The access key for MinIO authentication
+ * @property minioSecretKey The secret key for MinIO authentication
+ * @property bucketName The name of the S3 bucket to initialize
+ * @property bucketRegion The AWS region to use for the bucket
+ * @author Continuum Team
+ * @since 1.0.0
+ */
 @Component
 @ConditionalOnProperty(name = ["continuum.core.api-server.storage.type"], havingValue = "minio")
 class S3BucketInitializer(
@@ -33,6 +49,16 @@ class S3BucketInitializer(
     private val LOGGER = LoggerFactory.getLogger(S3BucketInitializer::class.java)
   }
 
+  /**
+   * Initializes the S3 bucket in MinIO after the bean is constructed.
+   *
+   * This method creates a synchronous S3 client configured for MinIO with path-style access,
+   * checks if the specified bucket exists, and creates it if it doesn't.
+   *
+   * The S3 client is properly closed after the operation completes.
+   *
+   * @throws Exception if there is an error connecting to MinIO or creating the bucket
+   */
   @PostConstruct
   fun initializeBucket() {
     val s3Client = S3Client.builder()
