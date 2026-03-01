@@ -88,14 +88,19 @@ if _silent or _ipc_mode:
     os.environ["HF_DATASETS_DISABLE_PROGRESS_BARS"] = "1"  # Disable dataset progress bars
 
     # In IPC mode, preserve original stdout for JSON progress output
+    # and preserve stderr for error reporting
     if _ipc_mode:
         sys._original_stdout = sys.stdout  # type: ignore
+        sys._original_stderr = sys.stderr  # type: ignore
 
-    # Redirect stdout and stderr to /dev/null (null device)
+    # Redirect stdout to /dev/null (null device)
     # This catches any remaining output that libraries might produce
     _devnull = open(os.devnull, "w")
     sys.stdout = _devnull
-    sys.stderr = _devnull
+
+    # In silent mode, also redirect stderr; in IPC mode, keep stderr for errors
+    if _silent and not _ipc_mode:
+        sys.stderr = _devnull
 
 # =============================================================================
 # STANDARD IMPORTS

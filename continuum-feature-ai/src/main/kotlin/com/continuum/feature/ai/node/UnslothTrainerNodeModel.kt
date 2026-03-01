@@ -17,6 +17,7 @@ import java.io.BufferedReader
 import java.io.InputStreamReader
 import java.nio.file.Files
 import java.nio.file.StandardCopyOption
+import java.util.UUID
 
 /**
  * Continuum node for fine-tuning Large Language Models using the Unsloth trainer.
@@ -33,8 +34,7 @@ import java.nio.file.StandardCopyOption
  * - For Unsloth acceleration: unsloth (Linux + CUDA only)
  *
  * Configure the virtual environment path via:
- * - Property: `continuum.node.unsloth-trainer.venv-path`
- * - Or set in node properties UI
+ * - Property: `com.continuum.feature.ai.unsloth-trainer.venv-path`
  *
  * ## Input Format
  * The input Parquet file should contain at least two columns:
@@ -54,18 +54,17 @@ import java.nio.file.StandardCopyOption
  * - meta-llama/Llama-2-7b-hf
  * - And many more...
  *
- * @property pythonExecutable Path to the Python executable (configurable via properties)
  * @property defaultVenvPath Default path to Python virtual environment (configurable via properties)
+ * @property cacheStoragePath Base path for storing trained models (configurable via properties)
  * @author Continuum Team
  * @since 1.0.0
  */
 @Component
 class UnslothTrainerNodeModel(
-  @Value("\${continuum.node.unsloth-trainer.python-executable:python3}")
-  private val pythonExecutable: String,
-
-  @Value("\${continuum.node.unsloth-trainer.venv-path:/home/roushan/Projects/Continuum/unsloth-trainer/.venv}")
-  private val defaultVenvPath: String
+  @Value("\${com.continuum.feature.ai.unsloth-trainer.venv-path}")
+  private val defaultVenvPath: String,
+  @Value("\${com.continuum.feature.ai.unsloth-trainer.cache-storage-path:./.continuum-cache/workflow-data}")
+  private val cacheStoragePath: String
 ) : ProcessNodeModel() {
 
   companion object {
@@ -108,22 +107,45 @@ class UnslothTrainerNodeModel(
     {
       "type": "object",
       "properties": {
-        "venvPath": {
-          "type": "string",
-          "title": "Python Virtual Environment",
-          "description": "Path to Python virtual environment directory (e.g., /path/to/venv or ~/.venvs/unsloth). Leave empty to use system Python."
-        },
         "model": {
           "type": "string",
           "title": "Base Model",
-          "description": "HuggingFace model identifier (e.g., microsoft/phi-2, mistralai/Mistral-7B-v0.3)",
-          "default": "microsoft/phi-2"
-        },
-        "outputPath": {
-          "type": "string",
-          "title": "Output Directory",
-          "description": "Directory where the fine-tuned model will be saved",
-          "default": "./trained-model"
+          "description": "HuggingFace model identifier. Select from popular models or enter a custom model ID.",
+          "default": "unsloth/Phi-4",
+          "examples": [
+            "unsloth/Phi-4",
+            "unsloth/Phi-4-mini-instruct",
+            "unsloth/mistral-7b-v0.3",
+            "unsloth/mistral-7b-instruct-v0.3",
+            "unsloth/llama-3-8b",
+            "unsloth/llama-3-8b-instruct",
+            "unsloth/llama-3.1-8b",
+            "unsloth/llama-3.1-8b-instruct",
+            "unsloth/llama-3.2-1b",
+            "unsloth/llama-3.2-1b-instruct",
+            "unsloth/llama-3.2-3b",
+            "unsloth/llama-3.2-3b-instruct",
+            "unsloth/gemma-2-2b",
+            "unsloth/gemma-2-2b-it",
+            "unsloth/gemma-2-9b",
+            "unsloth/gemma-2-9b-it",
+            "unsloth/Qwen2.5-1.5B",
+            "unsloth/Qwen2.5-1.5B-Instruct",
+            "unsloth/Qwen2.5-7B",
+            "unsloth/Qwen2.5-7B-Instruct",
+            "microsoft/phi-2",
+            "microsoft/Phi-3-mini-4k-instruct",
+            "mistralai/Mistral-7B-v0.3",
+            "mistralai/Mistral-7B-Instruct-v0.3",
+            "meta-llama/Llama-2-7b-hf",
+            "meta-llama/Llama-2-7b-chat-hf",
+            "google/gemma-2b",
+            "google/gemma-7b",
+            "Qwen/Qwen2-7B",
+            "Qwen/Qwen2-7B-Instruct",
+            "tiiuae/falcon-7b",
+            "tiiuae/falcon-7b-instruct"
+          ]
         },
         "inputColumn": {
           "type": "string",
@@ -257,7 +279,7 @@ class UnslothTrainerNodeModel(
           "maximum": 100000
         }
       },
-      "required": ["model", "outputPath"]
+      "required": ["model"]
     }
     """.trimIndent(),
     object : TypeReference<Map<String, Any>>() {}
@@ -274,25 +296,15 @@ class UnslothTrainerNodeModel(
       "elements": [
         {
           "type": "Category",
-          "label": "Environment",
-          "elements": [
-            {
-              "type": "Control",
-              "scope": "#/properties/venvPath"
-            }
-          ]
-        },
-        {
-          "type": "Category",
           "label": "Model",
           "elements": [
             {
               "type": "Control",
-              "scope": "#/properties/model"
-            },
-            {
-              "type": "Control",
-              "scope": "#/properties/outputPath"
+              "scope": "#/properties/model",
+              "options": {
+                "autocomplete": true,
+                "freeSolo": true
+              }
             }
           ]
         },
@@ -420,8 +432,7 @@ class UnslothTrainerNodeModel(
     inputs = inputPorts,
     outputs = outputPorts,
     properties = mapOf(
-      "model" to "microsoft/phi-2",
-      "outputPath" to "./trained-model",
+      "model" to "unsloth/Phi-4",
       "inputColumn" to "instruction",
       "outputColumn" to "response",
       "epochs" to 1,
@@ -482,10 +493,15 @@ class UnslothTrainerNodeModel(
     LOGGER.info("Training data file: $dataFilePath")
 
     // Extract configuration from properties with defaults
-    val model = properties?.get("model")?.toString() ?: "microsoft/phi-2"
-    val outputPath = properties?.get("outputPath")?.toString() ?: "./trained-model"
+    val model = properties?.get("model")?.toString() ?: "unsloth/Phi-4"
     val inputColumn = properties?.get("inputColumn")?.toString() ?: "instruction"
     val outputColumn = properties?.get("outputColumn")?.toString() ?: "response"
+
+    // Generate unique output path: {cacheStoragePath}/unsloth/{uuid}
+    val modelId = UUID.randomUUID().toString()
+    val outputPath = java.io.File(cacheStoragePath, "unsloth/$modelId").absolutePath
+    LOGGER.info("Model will be saved to: $outputPath")
+
     val systemPrompt = properties?.get("systemPrompt")?.toString()
     val epochs = (properties?.get("epochs") as? Number)?.toInt() ?: 1
     val batchSize = (properties?.get("batchSize") as? Number)?.toInt() ?: 2
@@ -503,12 +519,17 @@ class UnslothTrainerNodeModel(
     val use4Bit = properties?.get("use4Bit") as? Boolean ?: true
     val parquetBatchSize = (properties?.get("parquetBatchSize") as? Number)?.toInt() ?: DEFAULT_PARQUET_BATCH_SIZE
 
-    // Get venv path from properties or use default from configuration
-    val venvPath = properties?.get("venvPath")?.toString()?.takeIf { it.isNotBlank() }
-      ?: defaultVenvPath.takeIf { it.isNotBlank() }
-
-    // Resolve and validate virtual environment path
-    val resolvedVenvPath = resolveVenvPath(venvPath)
+    // Resolve and validate virtual environment path (configured via Spring properties)
+    // venv is required for LLM training as it needs specific packages (torch, transformers, etc.)
+    if (defaultVenvPath.isBlank()) {
+      throw NodeRuntimeException(
+        workflowId = "",
+        nodeId = "",
+        message = "Python virtual environment path is required. Configure 'com.continuum.feature.ai.unsloth-trainer.venv-path' in application properties.",
+        isRetriable = false
+      )
+    }
+    val resolvedVenvPath = resolveVenvPath(defaultVenvPath)
 
     // Get the train.py script from resources
     val scriptPath = getTrainScriptPath()
@@ -549,16 +570,13 @@ class UnslothTrainerNodeModel(
 
     // Build the process with venv activation if specified
     val processBuilder = buildProcessBuilder(resolvedVenvPath, scriptPath, commandArgs)
-    LOGGER.info("Executing training script with venv: ${resolvedVenvPath ?: "system python"}")
+    LOGGER.info("Executing training script with venv: $resolvedVenvPath")
+    LOGGER.debug("Command: ${processBuilder.command().joinToString(" ")}")
 
     val process = processBuilder.start()
 
     // Read stdout for IPC progress messages (JSON format)
     val stdoutReader = BufferedReader(InputStreamReader(process.inputStream))
-    val stderrReader = BufferedReader(InputStreamReader(process.errorStream))
-
-    // Collect stderr for error reporting
-    val stderrCollector = StringBuilder()
 
     // Process IPC progress messages from stdout
     try {
@@ -587,22 +605,16 @@ class UnslothTrainerNodeModel(
           }
         }
       }
-
-      // Collect any stderr output
-      while (stderrReader.readLine().also { line = it } != null) {
-        stderrCollector.appendLine(line)
-        LOGGER.warn("train.py stderr: $line")
-      }
     } finally {
       stdoutReader.close()
-      stderrReader.close()
     }
 
     // Wait for the process to complete
     val exitCode = process.waitFor()
 
     if (exitCode != 0) {
-      val errorMessage = stderrCollector.toString().ifBlank { "Unknown error" }
+      // Read stderr only on failure
+      val errorMessage = process.errorStream.bufferedReader().use { it.readText() }.ifBlank { "Unknown error" }
       throw NodeRuntimeException(
         workflowId = "",
         nodeId = "",
@@ -638,25 +650,18 @@ class UnslothTrainerNodeModel(
   }
 
   /**
-   * Resolves the Python executable path based on the virtual environment configuration.
+   * Resolves and validates the Python virtual environment path.
    *
-   * If a virtual environment path is provided, this method will:
+   * This method will:
    * 1. Expand ~ to the user's home directory
    * 2. Validate that the virtual environment directory exists
-   * 3. Return the path to be used with shell activation
+   * 3. Validate that the activation script exists
    *
-   * If no virtual environment is specified, falls back to the configured pythonExecutable.
-   *
-   * @param venvPath Optional path to the Python virtual environment
-   * @return Expanded and validated virtual environment path, or null if not specified
-   * @throws NodeRuntimeException if venv is specified but directory doesn't exist
+   * @param venvPath Path to the Python virtual environment
+   * @return Expanded and validated virtual environment path
+   * @throws NodeRuntimeException if venv directory or activation script doesn't exist
    */
-  private fun resolveVenvPath(venvPath: String?): String? {
-    if (venvPath.isNullOrBlank()) {
-      LOGGER.info("No virtual environment specified, using system Python: $pythonExecutable")
-      return null
-    }
-
+  private fun resolveVenvPath(venvPath: String): String {
     // Expand ~ to user home directory
     val expandedVenvPath = if (venvPath.startsWith("~")) {
       venvPath.replaceFirst("~", System.getProperty("user.home"))
@@ -698,38 +703,41 @@ class UnslothTrainerNodeModel(
   /**
    * Builds the command to execute the training script.
    *
-   * If a virtual environment is specified, the command will be wrapped in a shell
-   * that first activates the virtual environment before running Python.
+   * The command will be wrapped in a shell that first activates the
+   * virtual environment before running Python.
    *
-   * @param venvPath Optional path to the Python virtual environment
+   * @param venvPath Path to the Python virtual environment
    * @param scriptPath Path to the train.py script
    * @param args List of arguments to pass to the script
    * @return ProcessBuilder configured to run the command
    */
-  private fun buildProcessBuilder(venvPath: String?, scriptPath: String, args: List<String>): ProcessBuilder {
+  private fun buildProcessBuilder(venvPath: String, scriptPath: String, args: List<String>): ProcessBuilder {
     val isWindows = System.getProperty("os.name").lowercase().contains("windows")
 
-    return if (venvPath != null) {
-      // Build command that activates venv and runs python
-      val pythonCommand = listOf("python", scriptPath) + args
-      val pythonCommandStr = pythonCommand.joinToString(" ") { arg ->
-        // Quote arguments that contain spaces
-        if (arg.contains(" ")) "\"$arg\"" else arg
-      }
+    // Build command that activates venv and runs python
+    val pythonCommand = listOf("python", scriptPath) + args
+    val pythonCommandStr = pythonCommand.joinToString(" ") { arg ->
+      // Quote arguments that contain spaces
+      if (arg.contains(" ")) "\"$arg\"" else arg
+    }
 
-      if (isWindows) {
-        // Windows: use cmd /c to run activate.bat && python ...
-        val activateScript = "$venvPath\\Scripts\\activate.bat"
-        ProcessBuilder("cmd", "/c", "$activateScript && $pythonCommandStr")
-      } else {
-        // Unix: use bash -c to source activate && python ...
-        val activateScript = "$venvPath/bin/activate"
-        ProcessBuilder("bash", "-c", "source \"$activateScript\" && $pythonCommandStr")
-      }
+    val processBuilder = if (isWindows) {
+      // Windows: use cmd /c to run activate.bat && python ...
+      val activateScript = "$venvPath\\Scripts\\activate.bat"
+      ProcessBuilder("cmd", "/c", "$activateScript && $pythonCommandStr")
     } else {
-      // No venv, run python directly
-      ProcessBuilder(listOf(pythonExecutable, scriptPath) + args)
-    }.redirectErrorStream(false)
+      // Unix: use bash -c to source activate && python ...
+      val activateScript = "$venvPath/bin/activate"
+      ProcessBuilder("bash", "-c", "source \"$activateScript\" && $pythonCommandStr")
+    }
+
+    // Ensure stderr is NOT merged with stdout so we can read them separately
+    processBuilder.redirectErrorStream(false)
+
+    // Inherit environment variables (needed for CUDA, etc.)
+    processBuilder.environment().putAll(System.getenv())
+
+    return processBuilder
   }
 
   /**
