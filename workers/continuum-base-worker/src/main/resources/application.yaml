@@ -74,3 +74,4 @@ logging:
     com.continuum.core.commons.node: info
     com.continuum.core: info
     com.continuum.feature.ai: debug
+    com.continuum.core.worker.activity: debug

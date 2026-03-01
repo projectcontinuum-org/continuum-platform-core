@@ -11,6 +11,7 @@ import com.continuum.core.commons.node.TriggerNodeModel
 import com.continuum.core.commons.prototol.progress.ContinuumNodeActivitySignal
 import com.continuum.core.commons.prototol.progress.NodeProgress
 import com.continuum.core.commons.prototol.progress.NodeProgressCallback
+import com.continuum.core.commons.prototol.progress.StageStatus
 import com.continuum.core.commons.utils.NodeInputReader
 import com.continuum.core.commons.utils.NodeOutputWriter
 import com.continuum.core.commons.workflow.IContinuumWorkflow
@@ -63,6 +64,7 @@ import kotlin.system.measureTimeMillis
  * @property cacheBucketName S3 bucket name for storing workflow data
  * @property cacheBucketBasePath Base path within the S3 bucket for workflow data
  * @property cacheStoragePath Local filesystem path for caching workflow data
+ * @property progressReportRateLimitMs Minimum milliseconds between progress reports to avoid bloating workflow history (default: 5000ms)
  * @author Continuum Team
  * @since 1.0.0
  * @see IContinuumNodeActivity
@@ -80,7 +82,9 @@ class ContinuumNodeActivity(
   @Value("\${continuum.core.worker.storage.bucket-base-path}")
   private val cacheBucketBasePath: String,
   @Value("\${continuum.core.worker.cache-storage-path}")
-  private val cacheStoragePath: Path
+  private val cacheStoragePath: Path,
+  @Value("\${continuum.core.worker.progress-report-rate-limit-ms:100}")
+  private val progressReportRateLimitMs: Long
 ) : IContinuumNodeActivity {
 
   /** Map of process node class names to their model instances */
@@ -136,11 +140,40 @@ class ContinuumNodeActivity(
     inputs: Map<String, PortData>
   ): IContinuumNodeActivity.NodeActivityOutput {
     // Create a callback to report progress updates to the parent workflow via Temporal signals
+    // Rate-limited to avoid bloating workflow history with too many signals
+    val lastReportTime = java.util.concurrent.atomic.AtomicLong(0)
+    val lastReportedStages = java.util.concurrent.atomic.AtomicReference<Map<String, StageStatus>?>(null)
+
     val nodeProgressCallback = object : NodeProgressCallback {
       /**
        * Reports detailed progress including percentage and message.
+       * Rate-limited to avoid bloating workflow history - only reports if:
+       * - Progress is 0% (start) or 100% (complete)
+       * - A stage status has changed (e.g., IN_PROGRESS -> COMPLETED)
+       * - Sufficient time has elapsed since the last report (configurable via progressReportRateLimitMs)
        */
       override fun report(nodeProgress: NodeProgress) {
+        val now = System.currentTimeMillis()
+        val lastTime = lastReportTime.get()
+
+        // Check if any stage status has changed
+        val currentStages = nodeProgress.stageStatus
+        val previousStages = lastReportedStages.get()
+        val stageChanged = currentStages != null && currentStages != previousStages
+
+        // Always report 0% (start), 100% (complete), or stage changes; rate-limit other updates
+        val shouldReport = nodeProgress.progressPercentage == 0 ||
+                           nodeProgress.progressPercentage == 100 ||
+                           stageChanged ||
+                           (now - lastTime) >= progressReportRateLimitMs
+
+        if (!shouldReport) {
+          LOGGER.debug("Skipping progress report (rate limited) - Node ID: ${node.id}, Progress: ${nodeProgress.progressPercentage}%")
+          return
+        }
+
+        lastReportTime.set(now)
+        lastReportedStages.set(currentStages)
         LOGGER.info("NodeProgressCallback report - Node ID: ${node.id}, Progress: ${nodeProgress.progressPercentage}%, Message: ${nodeProgress.message}")
         // Send progress signal to the parent workflow
         Activity.getExecutionContext().workflowClient.newWorkflowStub(
