@@ -94,7 +94,7 @@ class ContinuumWorkflow : IContinuumWorkflow {
     IContinuumNodeActivity::class.java,
     ActivityOptions {
       mergeActivityOptions(baseActivityOptions)
-//      setHeartbeatTimeout(Duration.ofMinutes(5))
+      setHeartbeatTimeout(Duration.ofMinutes(5))
     }
   )
 

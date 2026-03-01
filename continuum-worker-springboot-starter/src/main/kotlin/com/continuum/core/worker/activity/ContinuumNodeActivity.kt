@@ -30,6 +30,9 @@ import software.amazon.awssdk.transfer.s3.model.UploadFileRequest
 import software.amazon.awssdk.transfer.s3.progress.LoggingTransferListener
 import java.nio.file.Files
 import java.nio.file.Path
+import java.util.concurrent.Executors
+import java.util.concurrent.ScheduledExecutorService
+import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicLong
 import java.util.concurrent.atomic.AtomicReference
 import kotlin.io.path.listDirectoryEntries
@@ -67,6 +70,7 @@ import kotlin.system.measureTimeMillis
  * @property cacheBucketBasePath Base path within the S3 bucket for workflow data
  * @property cacheStoragePath Local filesystem path for caching workflow data
  * @property progressReportRateLimitMs Minimum milliseconds between progress reports to avoid bloating workflow history (default: 100ms)
+ * @property heartbeatIntervalMs Interval in milliseconds for background heartbeats to keep long-running activities alive (default: 60000ms)
  * @author Continuum Team
  * @since 1.0.0
  * @see IContinuumNodeActivity
@@ -79,14 +83,16 @@ class ContinuumNodeActivity(
   private val processNodesModelProvider: ObjectProvider<ProcessNodeModel>,
   private val triggerNodeModelProvider: ObjectProvider<TriggerNodeModel>,
   private val s3TransferManager: S3TransferManager,
-  @Value("\${continuum.core.worker.storage.bucket-name}")
+  @param:Value("\${continuum.core.worker.storage.bucket-name}")
   private val cacheBucketName: String,
-  @Value("\${continuum.core.worker.storage.bucket-base-path}")
+  @param:Value("\${continuum.core.worker.storage.bucket-base-path}")
   private val cacheBucketBasePath: String,
-  @Value("\${continuum.core.worker.cache-storage-path}")
+  @param:Value("\${continuum.core.worker.cache-storage-path}")
   private val cacheStoragePath: Path,
-  @Value("\${continuum.core.worker.progress-report-rate-limit-ms:100}")
-  private val progressReportRateLimitMs: Long
+  @param:Value("\${continuum.core.worker.progress-report-rate-limit-ms:1000}")
+  private val progressReportRateLimitMs: Long,
+  @param:Value("\${continuum.core.worker.heartbeat-interval-ms:60000}")
+  private val heartbeatIntervalMs: Long
 ) : IContinuumNodeActivity {
 
   companion object {
@@ -143,6 +149,13 @@ class ContinuumNodeActivity(
 
     val progressCallback = createProgressCallback(node.id)
 
+    // Start a background heartbeat scheduler to keep the activity alive even when
+    // the node doesn't call report() for extended periods (e.g., during long model
+    // downloads or training steps). Without this, Temporal would consider the activity
+    // dead after the heartbeat timeout and retry it unnecessarily.
+    val activityContext = Activity.getExecutionContext()
+    val heartbeatScheduler = startHeartbeatScheduler(node.id, activityContext)
+
     return try {
       when {
         processNodeMap.containsKey(nodeModel) -> executeProcessNode(node, inputs, progressCallback)
@@ -151,6 +164,8 @@ class ContinuumNodeActivity(
       }
     } catch (e: NodeRuntimeException) {
       handleNodeException(node, e)
+    } finally {
+      heartbeatScheduler.shutdownNow()
     }
   }
 
@@ -208,6 +223,47 @@ class ContinuumNodeActivity(
   }
 
   // ==========================================================================
+  // Heartbeat
+  // ==========================================================================
+
+  /**
+   * Starts a background scheduler that sends periodic heartbeats to Temporal.
+   *
+   * This ensures the activity stays alive even during long-running operations
+   * where the node doesn't call [NodeProgressCallback.report] for extended
+   * periods (e.g., downloading a large model, long training steps).
+   *
+   * The heartbeat interval is configured via [heartbeatIntervalMs] and should
+   * be less than the heartbeat timeout set on the activity options.
+   *
+   * The caller is responsible for calling [ScheduledExecutorService.shutdownNow]
+   * when the activity completes.
+   *
+   * @param nodeId The ID of the node being executed (for logging)
+   * @param activityContext The activity execution context captured on the activity thread
+   * @return The scheduler, which must be shut down when execution completes
+   */
+  private fun startHeartbeatScheduler(
+    nodeId: String,
+    activityContext: io.temporal.activity.ActivityExecutionContext
+  ): ScheduledExecutorService {
+    val scheduler = Executors.newSingleThreadScheduledExecutor { runnable ->
+      Thread(runnable, "heartbeat-$nodeId").apply { isDaemon = true }
+    }
+
+    scheduler.scheduleAtFixedRate({
+      try {
+        activityContext.heartbeat("heartbeat for node $nodeId")
+        LOGGER.debug("Background heartbeat sent for node: $nodeId")
+      } catch (e: Exception) {
+        LOGGER.warn("Failed to send background heartbeat for node $nodeId: ${e.message}")
+      }
+    }, heartbeatIntervalMs, heartbeatIntervalMs, TimeUnit.MILLISECONDS)
+
+    return scheduler
+  }
+
+  // ==========================================================================
   // Progress Callback
   // ==========================================================================
 
@@ -229,6 +285,11 @@ class ContinuumNodeActivity(
 
     return object : NodeProgressCallback {
       override fun report(nodeProgress: NodeProgress) {
+        // Always send a heartbeat to Temporal to keep the activity alive.
+        // This is independent of rate limiting - heartbeats are cheap and
+        // prevent Temporal from thinking the activity is dead.
+        Activity.getExecutionContext().heartbeat(nodeProgress)
+
         val now = System.currentTimeMillis()
         val lastTime = lastReportTime.get()
         val currentStages = nodeProgress.stageStatus
