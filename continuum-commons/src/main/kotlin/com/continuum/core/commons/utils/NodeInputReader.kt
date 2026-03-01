@@ -33,6 +33,22 @@ class NodeInputReader(
   private var closed = false
 
   /**
+   * Returns the path to the underlying Parquet file.
+   *
+   * This method is useful when the file path needs to be passed to external tools
+   * or scripts that process the Parquet file directly (e.g., Python scripts for
+   * machine learning training).
+   *
+   * **Use Cases:**
+   * - Passing the file path to external Python scripts for ML training
+   * - Copying or moving the file for archival purposes
+   * - Logging the file location for debugging
+   *
+   * @return The [Path] to the input Parquet file
+   */
+  fun getFilePath(): Path = inputFilePath
+
+  /**
    * Creates a new AvroParquetReader for the input file.
    *
    * @return A new ParquetReader instance
