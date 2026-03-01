@@ -1,12 +1,17 @@
 spring.application.name: continuum-api-server
 temporal:
   connection:
-    target: ${TEMPORAL_SERVER_ADDRESS}
+    target: ${TEMPORAL_SERVER_ADDRESS:localhost:7233}
     namespace: ${TEMPORAL_NAMESPACE:default}
 continuum.core:
   api-server:
-    aws-profile-name: ${CONTINUUM_AWS_PROFILE_NAME:app}
-    cache-bucket-name: ${CONTINUUM_CACHE_BUCKET_NAME}
-    cache-bucket-region: ${CONTINUUM_CACHE_BUCKET_REGION:us-east-2}
-    cache-bucket-base-path: ${CONTINUUM_CACHE_BUCKET_BASE_PATH:staging-data/test}
     cache-directory-base-path: ${CONTINUUM_CACHE_DIRECTORY:./.continuum-cache/workflow-data}
+    storage:
+      type: ${CONTINUUM_STORAGE_TYPE:minio}
+      bucket-name: ${CONTINUUM_CACHE_BUCKET_NAME:continuum-worker-storage}
+      bucket-region: ${CONTINUUM_CACHE_BUCKET_REGION:us-east-2}
+      bucket-base-path: ${CONTINUUM_CACHE_BUCKET_BASE_PATH:workflow-data}
+      minio:
+        endpoint: ${CONTINUUM_MINIO_ENDPOINT:http://localhost:39000}
+        access-key: ${CONTINUUM_MINIO_USERNAME:minioadmin}
+        secret-key: ${CONTINUUM_MINIO_PASSWORD:minioadmin}

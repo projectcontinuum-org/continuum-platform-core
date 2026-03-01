@@ -48,14 +48,20 @@ spring:
 continuum.core:
   worker:
 #    node-task-queue: BASE_WORKER_ACTIVITY_TASK_QUEUE
-    aws-profile-name: ${CONTINUUM_AWS_PROFILE_NAME:continuum-worker }
-    cache-bucket-name: ${CONTINUUM_CACHE_BUCKET_NAME:jarvis-dev-jarvis-stage-area-3a355f49}
-    cache-bucket-base-path: ${CONTINUUM_CACHE_BUCKET_BASE_PATH:staging-data/test}
+    #aws-profile-name: ${CONTINUUM_AWS_PROFILE_NAME:continuum-worker}
+    cache-bucket-name: ${CONTINUUM_CACHE_BUCKET_NAME:continuum-worker-storage}
+    cache-bucket-base-path: ${CONTINUUM_CACHE_BUCKET_BASE_PATH:workflow-data}
     cache-storage-path: ${CONTINUUM_CACHE_STORAGE_PATH:./.continuum-cache/workflow-data}
     knime:
       executable-path: ${CONTINUUM_KNIME_EXECUTABLE_PATH:/opt/knime/knime}
       workflow-storage-path: ${CONTINUUM_KNIME_WORKFLOW_STORAGE_PATH:./.continuum-cache/knime-workflows}
       workspace-storage-path: ${CONTINUUM_KNIME_WORKSPACE_STORAGE_PATH:./.continuum-cache/knime-workspaces}
+    storage:
+      type: ${CONTINUUM_STORAGE_TYPE:minio}
+      minio:
+        endpoint: ${CONTINUUM_MINIO_ENDPOINT:http://localhost:39000}
+        access-key: ${CONTINUUM_MINIO_USERNAME:minioadmin}
+        secret-key: ${CONTINUUM_MINIO_PASSWORD:minioadmin}
 logging:
   level:
     root: error

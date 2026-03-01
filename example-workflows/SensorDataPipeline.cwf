@@ -1,6 +1,6 @@
 {
-    "id": "78b022afb89389cf9eeaba68766b335fa6a31be002503d3490622063f1765418",
-    "name": "/Users/L001418/Projects/ContinuumWorkflow/example-workflows/SensorDataPipeline.cwf",
+    "id": "19a6b1c436c3e42486f70235e53af45dcfe1ae7d4fc654cf7f29a42c97db331f",
+    "name": "/home/roushan/Projects/Continuum/example-workflows/SensorDataPipeline.cwf",
     "active": false,
     "nodes": [
         {

@@ -166,6 +166,21 @@ services:
       - kafka2
       - kafka3
     restart: unless-stopped
+  minio:
+    image: minio/minio:latest
+    container_name: minio
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    command: server /data --console-address ":9001"
+    ports:
+      - "39000:9000"
+      - "39001:9001"
+    volumes:
+      - minio-data:/data
+    networks:
+      - temporal-network
+    restart: unless-stopped
 networks:
   temporal-network:
     driver: bridge
@@ -179,3 +194,4 @@ volumes:
   kafka-data-1:
   kafka-data-2:
   kafka-data-3:
+  minio-data:
