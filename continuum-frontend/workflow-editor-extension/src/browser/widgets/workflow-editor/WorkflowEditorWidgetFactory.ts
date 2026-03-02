@@ -8,6 +8,7 @@ import { FileDialogService } from "@theia/filesystem/lib/browser";
 import ContinuumNodeDialog from "../../dialog/node-dialog/ContinuumNodeDialog";
 import { ContextMenuRenderer } from "@theia/core/lib/browser/context-menu-renderer";
 import { ContextKeyService } from "@theia/core/lib/browser/context-key-service";
+import { WorkflowClipboardService } from "../../service/WorkflowClipboardService";
 
 @injectable()
 export default class WorkflowEditorWidgetFactory implements WidgetFactory {
@@ -40,7 +41,9 @@ export default class WorkflowEditorWidgetFactory implements WidgetFactory {
         @inject(ContextMenuRenderer)
         protected readonly contextMenuRenderer: ContextMenuRenderer,
         @inject(ContextKeyService)
-        protected readonly contextKeyService: ContextKeyService
+        protected readonly contextKeyService: ContextKeyService,
+        @inject(WorkflowClipboardService)
+        protected readonly clipboardService: WorkflowClipboardService
     ) {}
 
     createWidget(options: WorkflowEditorWidgetOptions): MaybePromise<Widget> {
@@ -78,7 +81,8 @@ export default class WorkflowEditorWidgetFactory implements WidgetFactory {
             this.messageService,
             this.continuumNodeDialog,
             this.contextMenuRenderer,
-            this.contextKeyService);
+            this.contextKeyService,
+            this.clipboardService);
         editor.initLabel();
         return editor;
     }

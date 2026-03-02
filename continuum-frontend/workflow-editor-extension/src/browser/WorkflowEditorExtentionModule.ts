@@ -22,10 +22,12 @@ import { MonacoLanguageRegistration } from './language/MonacoLanguageRegistratio
 import { WorkflowEditorCommandContribution } from './contribution/WorkflowEditorCommandContribution';
 import { WorkflowEditorMenuContribution } from './contribution/WorkflowEditorMenuContribution';
 import { WorkflowEditorKeybindingContribution } from './contribution/WorkflowEditorKeybindingContribution';
+import { WorkflowClipboardService } from './service/WorkflowClipboardService';
 
 export default new ContainerModule((bind) => {
     bind(ContinuumThemeService).toSelf().inSingletonScope();
     bind(MonacoLanguageRegistration).toSelf().inSingletonScope();
+    bind(WorkflowClipboardService).toSelf().inSingletonScope();
 
     // Commands
     bind(CreateNewWorkflowCommand).toSelf().inSingletonScope();

@@ -23,6 +23,7 @@ import ContinuumNodeDialog from '../../dialog/node-dialog/ContinuumNodeDialog';
 import { ContextMenuRenderer } from '@theia/core/lib/browser/context-menu-renderer';
 import { ContextKeyService, ContextKey } from '@theia/core/lib/browser/context-key-service';
 import { WORKFLOW_EDITOR_CONTEXT_MENU } from '../../menu/WorkflowEditorContextMenu';
+import { WorkflowClipboardService } from '../../service/WorkflowClipboardService';
 
 export const WorkflowEditorWidgetOptions = Symbol('WorkflowEditorWidgetOptions');
 export interface WorkflowEditorWidgetOptions {
@@ -38,7 +39,6 @@ export default class WorkflowEditorWidget extends ReactWidget implements Navigat
     protected containerRef = React.createRef<HTMLElement>();
     protected workflowDocument: WorkflowDocument;
     protected workflowEditorFocusKey: ContextKey<boolean>;
-    protected clipboard: { nodes: Node[], edges: any[] } | undefined;
     protected workflowEditorRef = React.createRef<WorkflowEditorRef>();
     protected pendingSelectedNodeId?: string;
     protected history: { nodes: Node[], edges: Edge[] }[] = [];
@@ -54,14 +54,32 @@ export default class WorkflowEditorWidget extends ReactWidget implements Navigat
         protected readonly messageService: MessageService,
         protected readonly continuumNodeDialog: ContinuumNodeDialog,
         protected readonly contextMenuRenderer: ContextMenuRenderer,
-        protected readonly contextKeyService: ContextKeyService
+        protected readonly contextKeyService: ContextKeyService,
+        protected readonly clipboardService: WorkflowClipboardService
     ) {
         super(options);
         this._uri = new URI(options.uri);
         console.log("WorkflowEditorWidget Constructing ", options);
         this.workflowDocument = new WorkflowDocument(remoteFileSystemProvider, this._uri);
         this.workflowEditorFocusKey = this.contextKeyService.createKey('workflowEditorFocus', false);
+
+        // Add focus/blur event listeners to properly track focus state
+        this.node.tabIndex = 0; // Make the widget focusable
+        this.node.addEventListener('focusin', this.handleFocusIn);
+        this.node.addEventListener('focusout', this.handleFocusOut);
+
         this.loadFileContent();
+    }
+
+    protected handleFocusIn = (): void => {
+        this.workflowEditorFocusKey.set(true);
+    }
+
+    protected handleFocusOut = (event: FocusEvent): void => {
+        // Only set to false if focus is leaving the widget entirely
+        if (!this.node.contains(event.relatedTarget as HTMLElement)) {
+            this.workflowEditorFocusKey.set(false);
+        }
     }
 
     async createHash(input: string) {
@@ -153,6 +171,9 @@ export default class WorkflowEditorWidget extends ReactWidget implements Navigat
     protected onAfterDetach(msg: Message): void {
         super.onAfterDetach(msg);
         this.workflowEditorFocusKey.set(false);
+        // Clean up event listeners
+        this.node.removeEventListener('focusin', this.handleFocusIn);
+        this.node.removeEventListener('focusout', this.handleFocusOut);
     }
 
     protected onResize(msg: Widget.ResizeMessage): void {
@@ -292,7 +313,7 @@ export default class WorkflowEditorWidget extends ReactWidget implements Navigat
         const selectedEdges = this.reactFlow.getEdges().filter(
             e => selectedNodeIds.includes(e.source) && selectedNodeIds.includes(e.target)
         );
-        this.clipboard = { nodes: selectedNodes, edges: selectedEdges };
+        this.clipboardService.copy(selectedNodes, selectedEdges);
     }
 
     cutSelectedNodes(): void {
@@ -301,12 +322,13 @@ export default class WorkflowEditorWidget extends ReactWidget implements Navigat
     }
 
     pasteNodes(): void {
-        if (!this.clipboard || !this.reactFlow) return;
+        const clipboard = this.clipboardService.paste();
+        if (!clipboard || !this.reactFlow) return;
 
         const offset = 50;
         const idMap = new Map<string, string>();
 
-        const newNodes = this.clipboard.nodes.map(node => {
+        const newNodes = clipboard.nodes.map(node => {
             const newId = (++this.maxNodeId).toString();
             idMap.set(node.id, newId);
             return {
@@ -320,7 +342,7 @@ export default class WorkflowEditorWidget extends ReactWidget implements Navigat
             };
         });
 
-        const newEdges = this.clipboard.edges.map(edge => ({
+        const newEdges = clipboard.edges.map(edge => ({
             ...edge,
             id: `${idMap.get(edge.source)}-${idMap.get(edge.target)}`,
             source: idMap.get(edge.source)!,
@@ -335,7 +357,7 @@ export default class WorkflowEditorWidget extends ReactWidget implements Navigat
     }
 
     hasClipboardContent(): boolean {
-        return this.clipboard !== undefined && this.clipboard.nodes.length > 0;
+        return this.clipboardService.hasContent();
     }
 
     deleteSelectedNodes(): void {

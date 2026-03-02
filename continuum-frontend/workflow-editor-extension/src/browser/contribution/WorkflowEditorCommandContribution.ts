@@ -3,13 +3,16 @@ import { CommandContribution, CommandRegistry } from "@theia/core";
 import { WorkflowEditorCommands } from "../command/WorkflowEditorCommands";
 import WorkflowEditorWidgetFactory from "../widgets/workflow-editor/WorkflowEditorWidgetFactory";
 import WorkflowEditorWidget from "../widgets/workflow-editor/WorkflowEditorWidget";
+import { WorkflowClipboardService } from "../service/WorkflowClipboardService";
 
 @injectable()
 export class WorkflowEditorCommandContribution implements CommandContribution {
 
     constructor(
         @inject(WorkflowEditorWidgetFactory)
-        protected readonly workflowEditorWidgetFactory: WorkflowEditorWidgetFactory
+        protected readonly workflowEditorWidgetFactory: WorkflowEditorWidgetFactory,
+        @inject(WorkflowClipboardService)
+        protected readonly clipboardService: WorkflowClipboardService
     ) {}
 
     registerCommands(registry: CommandRegistry): void {
@@ -83,7 +86,7 @@ export class WorkflowEditorCommandContribution implements CommandContribution {
     }
 
     protected hasClipboardContent(): boolean {
-        return this.getActiveWorkflowEditor()?.hasClipboardContent() ?? false;
+        return this.clipboardService.hasContent();
     }
 
     protected canUndo(): boolean {
