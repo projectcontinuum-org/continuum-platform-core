@@ -57,4 +57,11 @@ export namespace WorkflowEditorCommands {
         category: WORKFLOW_EDITOR_CATEGORY,
         iconClass: 'fa fa-redo'
     };
+
+    export const SETTINGS: Command = {
+        id: 'workflow-editor.settings',
+        label: 'Settings',
+        category: WORKFLOW_EDITOR_CATEGORY,
+        iconClass: 'fa fa-cog'
+    };
 }

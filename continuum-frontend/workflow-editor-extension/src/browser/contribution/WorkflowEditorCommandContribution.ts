@@ -71,6 +71,13 @@ export class WorkflowEditorCommandContribution implements CommandContribution {
             isEnabled: () => this.canRedo(),
             isVisible: () => this.hasActiveWorkflowEditor()
         });
+
+        // Settings
+        registry.registerCommand(WorkflowEditorCommands.SETTINGS, {
+            execute: () => this.getActiveWorkflowEditor()?.openNodeSettings(),
+            isEnabled: () => this.hasSelectedNodes(),
+            isVisible: () => this.hasActiveWorkflowEditor()
+        });
     }
 
     protected getActiveWorkflowEditor(): WorkflowEditorWidget | undefined {

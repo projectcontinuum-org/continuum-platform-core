@@ -34,6 +34,7 @@ export interface WorkflowEditorProps {
 
 export interface WorkflowEditorRef {
     runWorkflow: () => void;
+    openNodeSettings: () => void;
 }
 
 const WorkflowEditor = forwardRef<WorkflowEditorRef, WorkflowEditorProps>(({ workflow, onChange, onContextMenu, onHistoryChange }, ref) => {
@@ -126,11 +127,6 @@ const WorkflowEditor = forwardRef<WorkflowEditorRef, WorkflowEditorProps>(({ wor
         }
     }, [flowEdges, flowNodes, setIsActive]);
 
-    // Expose runWorkflow method via ref
-    useImperativeHandle(ref, () => ({
-        runWorkflow: onRun
-    }), [onRun]);
-
     const onNodeDialogClose = React.useCallback(()=>{
         setNodeDialogProps(null);
     }, [setNodeDialogProps]);
@@ -144,6 +140,27 @@ const WorkflowEditor = forwardRef<WorkflowEditorRef, WorkflowEditorProps>(({ wor
             setFlowNodes(flowNodes);
         }
     }, [setNodeDialogProps, selectedNode, flowNodes, setFlowNodes]);
+
+    const openNodeSettings = React.useCallback(() => {
+        const selected = flowNodes.find(n => n.selected);
+        if (selected) {
+            setNodeDialogProps({
+                open: true,
+                onClose: onNodeDialogClose,
+                onSave: onNodeDialogSaved,
+                initialData: selected.data.properties || {},
+                dataSchema: selected.data.propertiesSchema || {},
+                uiSchema: selected.data.propertiesUISchema || {}
+            });
+            setSelectedNode(selected);
+        }
+    }, [flowNodes, onNodeDialogClose, onNodeDialogSaved, setNodeDialogProps, setSelectedNode]);
+
+    // Expose methods via ref
+    useImperativeHandle(ref, () => ({
+        runWorkflow: onRun,
+        openNodeSettings
+    }), [onRun, openNodeSettings]);
 
     const onNodeDoubleClick = React.useCallback((event: React.MouseEvent, clickedNode: Node<IBaseNodeData>) => {
         console.log("onNodeDoubleClick", event, clickedNode);

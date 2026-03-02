@@ -7,4 +7,5 @@ export namespace WorkflowEditorContextMenu {
     export const CUT_COPY_PASTE = [...WORKFLOW_EDITOR_CONTEXT_MENU, '1_cut_copy_paste'];
     export const SELECTION = [...WORKFLOW_EDITOR_CONTEXT_MENU, '2_selection'];
     export const EXECUTION = [...WORKFLOW_EDITOR_CONTEXT_MENU, '3_execution'];
+    export const CONFIGURATION = [...WORKFLOW_EDITOR_CONTEXT_MENU, '4_configuration'];
 }

@@ -297,6 +297,10 @@ export default class WorkflowEditorWidget extends ReactWidget implements Navigat
         this.workflowEditorRef.current?.runWorkflow();
     }
 
+    openNodeSettings(): void {
+        this.workflowEditorRef.current?.openNodeSettings();
+    }
+
     hasSelectedNodes(): boolean {
         // Check pending selection first (for right-click selection)
         if (this.pendingSelectedNodeId !== undefined) {

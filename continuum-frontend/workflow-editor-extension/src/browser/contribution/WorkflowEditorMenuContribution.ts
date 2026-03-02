@@ -46,5 +46,11 @@ export class WorkflowEditorMenuContribution implements MenuContribution {
             commandId: WorkflowEditorCommands.RUN_WORKFLOW.id,
             order: '1'
         });
+
+        // Configuration group
+        registry.registerMenuAction(WorkflowEditorContextMenu.CONFIGURATION, {
+            commandId: WorkflowEditorCommands.SETTINGS.id,
+            order: '1'
+        });
     }
 }
