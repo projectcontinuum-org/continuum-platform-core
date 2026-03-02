@@ -16,6 +16,7 @@ import INodeRepoTreeItem from "./types/INodeRepoTreeItem.js"
 import INodePackageExport, {INodeModelExport} from "./types/INodePackageExport.js"
 import ITreeItem from "./types/ITreeItem.js"
 import IExecution from "./types/IExecution.js"
+import INodeExplorerTreeItem, { NodeExplorerItemType } from "./types/INodeExplorerTreeItem.js"
 
 export {
     MimeTypes,
@@ -44,5 +45,7 @@ export {
     type INodeModelExport,
     type ITreeItem,
     type IExecution,
-    type INodeProgress
+    type INodeProgress,
+    type INodeExplorerTreeItem,
+    type NodeExplorerItemType
 }

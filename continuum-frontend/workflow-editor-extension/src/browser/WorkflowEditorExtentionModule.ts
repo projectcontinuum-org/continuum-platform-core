@@ -1,5 +1,6 @@
-import { ContainerModule } from '@theia/core/shared/inversify';
+import { ContainerModule, interfaces } from '@theia/core/shared/inversify';
 import { FrontendApplicationContribution, KeybindingContribution, LabelProviderContribution, OpenHandler, WidgetFactory, bindViewContribution } from '@theia/core/lib/browser';
+import { Tree } from '@theia/core/lib/browser/tree';
 import WorkflowEditorOpenHandler from './handlers/WorkflowEditorOpenHandler';
 import WorkflowEditorWidgetFactory from './widgets/workflow-editor/WorkflowEditorWidgetFactory';
 import NodeRepoWidgetFactory from './widgets/node-repo/NodeRepoWidgetFactory';
@@ -23,6 +24,13 @@ import { WorkflowEditorCommandContribution } from './contribution/WorkflowEditor
 import { WorkflowEditorMenuContribution } from './contribution/WorkflowEditorMenuContribution';
 import { WorkflowEditorKeybindingContribution } from './contribution/WorkflowEditorKeybindingContribution';
 import { WorkflowClipboardService } from './service/WorkflowClipboardService';
+import NodeExplorerWidget from './widgets/node-explorer/NodeExplorerWidget';
+import NodeExplorerWidgetFactory from './widgets/node-explorer/NodeExplorerWidgetFactory';
+import { NodeExplorerViewContribution } from './widgets/node-explorer/NodeExplorerViewContribution';
+import { createNodeExplorerTreeContainer } from './tree/node-explorer/NodeExplorerTreeContainer';
+import { NodeExplorerTree } from './tree/node-explorer/NodeExplorerTree';
+import { NodeExplorerTreeWidget } from './tree/node-explorer/NodeExplorerTreeWidget';
+import NodeExplorerService from './service/NodeExplorerService';
 
 export default new ContainerModule((bind) => {
     bind(ContinuumThemeService).toSelf().inSingletonScope();
@@ -62,6 +70,31 @@ export default new ContainerModule((bind) => {
     bind(WorkflowStatusWidgetFactory).toSelf().inSingletonScope();
     bind(WidgetFactory).toService(WorkflowStatusWidgetFactory);
     bindViewContribution(bind, WorkflowStatusViewContribution);
+
+    // NodeExplorer widget - using Theia TreeWidget
+    bind(NodeExplorerService).toSelf().inSingletonScope();
+
+    // Create a SINGLE child container for all tree-related bindings
+    // This ensures Tree, Model, and Widget all share the same state
+    const NodeExplorerTreeContainer = Symbol('NodeExplorerTreeContainer');
+    bind(NodeExplorerTreeContainer).toDynamicValue((ctx: interfaces.Context) => {
+        return createNodeExplorerTreeContainer(ctx.container);
+    }).inSingletonScope();
+
+    bind(NodeExplorerTree).toDynamicValue((ctx: interfaces.Context) => {
+        const container = ctx.container.get<interfaces.Container>(NodeExplorerTreeContainer);
+        return container.get<NodeExplorerTree>(Tree);
+    }).inSingletonScope();
+
+    bind(NodeExplorerTreeWidget).toDynamicValue((ctx: interfaces.Context) => {
+        const container = ctx.container.get<interfaces.Container>(NodeExplorerTreeContainer);
+        return container.get<NodeExplorerTreeWidget>(NodeExplorerTreeWidget);
+    }).inSingletonScope();
+
+    bind(NodeExplorerWidget).toSelf().inSingletonScope();
+    bind(NodeExplorerWidgetFactory).toSelf().inSingletonScope();
+    bind(WidgetFactory).toService(NodeExplorerWidgetFactory);
+    bindViewContribution(bind, NodeExplorerViewContribution);
 
     // FrontendViewContribution
     bind(ContinuumFrontendApplicationContribution).toSelf().inSingletonScope();
