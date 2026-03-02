@@ -1,14 +1,14 @@
 {
-    "id": "19a6b1c436c3e42486f70235e53af45dcfe1ae7d4fc654cf7f29a42c97db331f",
-    "name": "/home/roushan/Projects/Continuum/example-workflows/SensorDataPipeline.cwf",
+    "id": "78b022afb89389cf9eeaba68766b335fa6a31be002503d3490622063f1765418",
+    "name": "/Users/L001418/Projects/ContinuumWorkflow/example-workflows/SensorDataPipeline.cwf",
     "active": false,
     "nodes": [
         {
             "id": "1",
             "type": "BaseNode",
             "position": {
-                "x": 0,
-                "y": 280
+                "x": -8.028764044943841,
+                "y": 293.38127340823974
             },
             "data": {
                 "id": "com.continuum.base.node.CreateTableNodeModel",
@@ -59,7 +59,13 @@
                 "nodeProgress": null
             },
             "width": 224,
-            "height": 100
+            "height": 100,
+            "selected": false,
+            "dragging": false,
+            "positionAbsolute": {
+                "x": -8.028764044943841,
+                "y": 293.38127340823974
+            }
         },
         {
             "id": "2",
@@ -141,7 +147,8 @@
                 "nodeProgress": null
             },
             "width": 255,
-            "height": 123
+            "height": 123,
+            "selected": false
         },
         {
             "id": "3",
@@ -214,7 +221,8 @@
                 "nodeProgress": null
             },
             "width": 255,
-            "height": 123
+            "height": 123,
+            "selected": false
         },
         {
             "id": "4",
@@ -273,7 +281,8 @@
                 "nodeProgress": null
             },
             "width": 255,
-            "height": 123
+            "height": 123,
+            "selected": false
         },
         {
             "id": "5",
@@ -538,7 +547,8 @@
                 "nodeProgress": null
             },
             "width": 224,
-            "height": 100
+            "height": 100,
+            "selected": false
         }
     ],
     "edges": [

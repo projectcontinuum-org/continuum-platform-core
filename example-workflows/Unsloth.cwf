@@ -1,14 +1,14 @@
 {
-    "id": "eda6a76168255602bf3571a2cd2dcd0bbcba6a52e7f2e1e0e612f4893565f13b",
-    "name": "/home/roushan/Projects/Continuum/example-workflows/Unsloth.cwf",
+    "id": "91823474c5b57564f97b6f46a05133e14970559681c5b4d0683b1de41dcd776c",
+    "name": "/Users/L001418/Projects/ContinuumWorkflow/example-workflows/Unsloth.cwf",
     "active": false,
     "nodes": [
         {
             "id": "8",
             "type": "BaseNode",
             "position": {
-                "x": 1308.6913820189104,
-                "y": 946.5039097499035
+                "x": 1569.753235331514,
+                "y": 1060.3291400725761
             },
             "data": {
                 "id": "com.continuum.feature.ai.node.UnslothTrainerNodeModel",
@@ -352,16 +352,16 @@
             "selected": false,
             "dragging": false,
             "positionAbsolute": {
-                "x": 1308.6913820189104,
-                "y": 946.5039097499035
+                "x": 1569.753235331514,
+                "y": 1060.3291400725761
             }
         },
         {
             "id": "3",
             "type": "BaseNode",
             "position": {
-                "x": 815.9348732154942,
-                "y": 857.167694502814
+                "x": 1141.1507923188974,
+                "y": 959.9508912653673
             },
             "data": {
                 "id": "com.continuum.base.node.CreateTableNodeModel",
@@ -415,8 +415,8 @@
             "height": 100,
             "selected": false,
             "positionAbsolute": {
-                "x": 815.9348732154942,
-                "y": 857.167694502814
+                "x": 1141.1507923188974,
+                "y": 959.9508912653673
             },
             "dragging": false
         }

@@ -1,5 +1,5 @@
 import { ContainerModule } from '@theia/core/shared/inversify';
-import { FrontendApplicationContribution, LabelProviderContribution, OpenHandler, WidgetFactory, bindViewContribution } from '@theia/core/lib/browser';
+import { FrontendApplicationContribution, KeybindingContribution, LabelProviderContribution, OpenHandler, WidgetFactory, bindViewContribution } from '@theia/core/lib/browser';
 import WorkflowEditorOpenHandler from './handlers/WorkflowEditorOpenHandler';
 import WorkflowEditorWidgetFactory from './widgets/workflow-editor/WorkflowEditorWidgetFactory';
 import NodeRepoWidgetFactory from './widgets/node-repo/NodeRepoWidgetFactory';
@@ -19,6 +19,9 @@ import ContinuumNodeDialog, { ContinuumNodeDialogProps } from './dialog/node-dia
 import WorkflowViewerWidgetFactory from './widgets/workflow-viewer/WorkflowViewerWidgetFactory';
 import WorkflowViewerOpenHandler from './handlers/WorkflowViewerOpenHandler';
 import { MonacoLanguageRegistration } from './language/MonacoLanguageRegistration';
+import { WorkflowEditorCommandContribution } from './contribution/WorkflowEditorCommandContribution';
+import { WorkflowEditorMenuContribution } from './contribution/WorkflowEditorMenuContribution';
+import { WorkflowEditorKeybindingContribution } from './contribution/WorkflowEditorKeybindingContribution';
 
 export default new ContainerModule((bind) => {
     bind(ContinuumThemeService).toSelf().inSingletonScope();
@@ -63,4 +66,9 @@ export default new ContainerModule((bind) => {
     bind(FrontendApplicationContribution).toService(ContinuumFrontendApplicationContribution);
     bind(CommandContribution).to(ContinuumCommandcontribution);
     bind(MenuContribution).to(ContinuumMenuContribution);
+
+    // WorkflowEditor context menu contributions
+    bind(CommandContribution).to(WorkflowEditorCommandContribution);
+    bind(MenuContribution).to(WorkflowEditorMenuContribution);
+    bind(KeybindingContribution).to(WorkflowEditorKeybindingContribution);
 });

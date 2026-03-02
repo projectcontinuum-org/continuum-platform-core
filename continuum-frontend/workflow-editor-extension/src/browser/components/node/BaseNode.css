@@ -12,7 +12,16 @@
   border-color: var(--mui-palette-secondary-main);
   border-width: 2px;
   border-style: solid;
+  background-color: color-mix(in srgb, var(--mui-palette-background-default, #1e1e1e) 50%, transparent);
+  backdrop-filter: blur(8px);
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
   /* box-shadow: var(--node-box-shadow); */
+}
+
+.react-flow__node.selected {
+  border-color: var(--mui-palette-primary-main, #90caf9);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--mui-palette-primary-main, #90caf9) 40%, transparent),
+              0 0 20px color-mix(in srgb, var(--mui-palette-primary-main, #90caf9) 30%, transparent);
 }
 
 .react-flow__node .body {
