@@ -123,11 +123,15 @@ export default class WorkflowEditorWidget extends ReactWidget implements Navigat
                         this.maxNodeId = parseInt(node.id);
                     }
                 });
+                // Initialize history with the loaded state
+                this.initializeHistory();
                 this.update();
             });
         } else {
             this.workflow = await this.createNewWorkflow(this._uri, UNTITLED_SCHEME);
             this.workflowDocument.setUnsavedWorkflow(this.workflow);
+            // Initialize history with the new empty state
+            this.initializeHistory();
             this.update();
         }
     }
@@ -252,6 +256,13 @@ export default class WorkflowEditorWidget extends ReactWidget implements Navigat
         this.workflow = wf;
     }
 
+    // Initialize history with the current workflow state
+    protected initializeHistory(): void {
+        if (!this.workflow) return;
+        this.history = [{ nodes: [...this.workflow.nodes], edges: [...this.workflow.edges] }];
+        this.historyIndex = 0;
+    }
+
     // Called when a significant change occurs (drag end, connect, delete)
     onHistoryChange = () => {
         if (!this.workflow || this.isUndoRedoAction) return;
@@ -358,6 +369,8 @@ export default class WorkflowEditorWidget extends ReactWidget implements Navigat
             nodes.map(n => ({ ...n, selected: false })).concat(newNodes)
         );
         this.reactFlow.addEdges(newEdges);
+        // Defer history recording to allow React state to update first
+        setTimeout(() => this.onHistoryChange(), 0);
     }
 
     hasClipboardContent(): boolean {
@@ -374,6 +387,8 @@ export default class WorkflowEditorWidget extends ReactWidget implements Navigat
         this.reactFlow.setEdges(edges => edges.filter(
             e => !selectedNodeIds.includes(e.source) && !selectedNodeIds.includes(e.target)
         ));
+        // Defer history recording to allow React state to update first
+        setTimeout(() => this.onHistoryChange(), 0);
     }
 
     selectAllNodes(): void {
