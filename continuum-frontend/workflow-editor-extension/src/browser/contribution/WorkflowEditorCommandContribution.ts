@@ -19,8 +19,8 @@ export class WorkflowEditorCommandContribution implements CommandContribution {
         // Run Workflow
         registry.registerCommand(WorkflowEditorCommands.RUN_WORKFLOW, {
             execute: () => this.getActiveWorkflowEditor()?.runWorkflow(),
-            isEnabled: () => this.hasActiveWorkflowEditor(),
-            isVisible: () => this.hasActiveWorkflowEditor()
+            isEnabled: () => this.hasActiveWorkflowEditor() && !this.hasSelectedNodes(),
+            isVisible: () => this.hasActiveWorkflowEditor() && !this.hasSelectedNodes()
         });
 
         // Copy Nodes

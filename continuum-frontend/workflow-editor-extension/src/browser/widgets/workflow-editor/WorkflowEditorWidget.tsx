@@ -45,6 +45,7 @@ export default class WorkflowEditorWidget extends ReactWidget implements Navigat
     protected historyIndex = -1;
     protected isUndoRedoAction = false;
     protected static readonly MAX_HISTORY_SIZE = 50;
+    protected lastMousePosition: { x: number, y: number } = { x: 0, y: 0 };
 
     constructor(
         private readonly options: Required<WorkflowEditorWidgetOptions> & Widget.IOptions,
@@ -67,6 +68,7 @@ export default class WorkflowEditorWidget extends ReactWidget implements Navigat
         this.node.tabIndex = 0; // Make the widget focusable
         this.node.addEventListener('focusin', this.handleFocusIn);
         this.node.addEventListener('focusout', this.handleFocusOut);
+        this.node.addEventListener('mousemove', this.handleMouseMove);
 
         this.loadFileContent();
     }
@@ -80,6 +82,10 @@ export default class WorkflowEditorWidget extends ReactWidget implements Navigat
         if (!this.node.contains(event.relatedTarget as HTMLElement)) {
             this.workflowEditorFocusKey.set(false);
         }
+    }
+
+    protected handleMouseMove = (event: MouseEvent): void => {
+        this.lastMousePosition = { x: event.clientX, y: event.clientY };
     }
 
     async createHash(input: string) {
@@ -178,6 +184,7 @@ export default class WorkflowEditorWidget extends ReactWidget implements Navigat
         // Clean up event listeners
         this.node.removeEventListener('focusin', this.handleFocusIn);
         this.node.removeEventListener('focusout', this.handleFocusOut);
+        this.node.removeEventListener('mousemove', this.handleMouseMove);
     }
 
     protected onResize(msg: Widget.ResizeMessage): void {
@@ -338,9 +345,23 @@ export default class WorkflowEditorWidget extends ReactWidget implements Navigat
 
     pasteNodes(): void {
         const clipboard = this.clipboardService.paste();
-        if (!clipboard || !this.reactFlow) return;
+        if (!clipboard || !this.reactFlow || clipboard.nodes.length === 0) return;
 
-        const offset = 50;
+        // Convert mouse screen position to flow position
+        const mouseFlowPosition = this.reactFlow.screenToFlowPosition(this.lastMousePosition);
+
+        // Calculate the center of copied nodes
+        const minX = Math.min(...clipboard.nodes.map(n => n.position.x));
+        const maxX = Math.max(...clipboard.nodes.map(n => n.position.x));
+        const minY = Math.min(...clipboard.nodes.map(n => n.position.y));
+        const maxY = Math.max(...clipboard.nodes.map(n => n.position.y));
+        const centerX = (minX + maxX) / 2;
+        const centerY = (minY + maxY) / 2;
+
+        // Calculate offset to move nodes to mouse position
+        const offsetX = mouseFlowPosition.x - centerX;
+        const offsetY = mouseFlowPosition.y - centerY;
+
         const idMap = new Map<string, string>();
 
         const newNodes = clipboard.nodes.map(node => {
@@ -350,8 +371,8 @@ export default class WorkflowEditorWidget extends ReactWidget implements Navigat
                 ...node,
                 id: newId,
                 position: {
-                    x: node.position.x + offset,
-                    y: node.position.y + offset
+                    x: node.position.x + offsetX,
+                    y: node.position.y + offsetY
                 },
                 selected: true
             };
