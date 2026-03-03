@@ -51,6 +51,7 @@ import UnfoldMoreIcon from '@mui/icons-material/UnfoldMore';
 import UnfoldLessIcon from '@mui/icons-material/UnfoldLess';
 import { ThemeProvider, experimental_extendTheme, Experimental_CssVarsProvider as CssVarsProvider } from '@mui/material';
 import { useMUIThemeStore } from '../../store/MUIThemeStore';
+import NodeDragOverlay from './NodeDragOverlay';
 
 /**
  * React component for the toolbar content.
@@ -136,10 +137,13 @@ class NodeExplorerToolbar extends ReactWidget {
 
     protected render(): React.ReactNode {
         return (
-            <NodeExplorerToolbarContent
-                onExpandAll={this.onExpandAll}
-                onCollapseAll={this.onCollapseAll}
-            />
+            <>
+                <NodeExplorerToolbarContent
+                    onExpandAll={this.onExpandAll}
+                    onCollapseAll={this.onCollapseAll}
+                />
+                <NodeDragOverlay />
+            </>
         );
     }
 }
@@ -213,6 +217,11 @@ export default class NodeExplorerWidget extends BaseWidget {
             this.handleNodeDoubleClick(node);
         });
 
+        // Wire up drag-end to add nodes to the active workflow
+        this.treeWidget.onNodeDragEnd(({ node, mouseEvent }) => {
+            this.handleNodeDragEnd(node, mouseEvent);
+        });
+
         this.update();
     }
 
@@ -266,6 +275,22 @@ export default class NodeExplorerWidget extends BaseWidget {
             };
             const syntheticEvent = new MouseEvent('dblclick');
             this.workflowEditorWidgetFactory.activeWidget?.addNewNode(syntheticEvent, nodeRepoItem);
+        }
+    }
+
+    /**
+     * Handle drag end on a leaf node to add it to the active workflow.
+     * Uses the actual mouse event position to place the node correctly.
+     */
+    protected handleNodeDragEnd(node: NodeExplorerLeafNode, mouseEvent: MouseEvent): void {
+        if (node.nodeData) {
+            console.log('[NodeExplorerWidget] handleNodeDragEnd at:', mouseEvent.clientX, mouseEvent.clientY);
+            const nodeRepoItem = {
+                id: node.id,
+                name: node.nodeData.title || node.id,
+                nodeInfo: node.nodeData
+            };
+            this.workflowEditorWidgetFactory.activeWidget?.addNewNode(mouseEvent, nodeRepoItem);
         }
     }
 

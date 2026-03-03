@@ -5,8 +5,17 @@ import { ContextMenuRenderer } from '@theia/core/lib/browser';
 import { injectable, inject, postConstruct } from '@theia/core/shared/inversify';
 import { NodeExplorerCategoryNode, NodeExplorerLeafNode, NodeExplorerNode } from './NodeExplorerTree';
 import { Emitter, Event } from '@theia/core/lib/common';
+import { useNodeDragStore } from '../../store/NodeDragStore';
 
 export const NODE_EXPLORER_CONTEXT_MENU: string[] = ['node-explorer-context-menu'];
+
+/**
+ * Event data for drag end events
+ */
+export interface NodeDragEndEvent {
+    node: NodeExplorerLeafNode;
+    mouseEvent: MouseEvent;
+}
 
 /**
  * Tree widget for Node Explorer.
@@ -20,6 +29,9 @@ export class NodeExplorerTreeWidget extends TreeWidget {
 
     protected readonly onNodeDoubleClickEmitter = new Emitter<NodeExplorerLeafNode>();
     readonly onNodeDoubleClick: Event<NodeExplorerLeafNode> = this.onNodeDoubleClickEmitter.event;
+
+    protected readonly onNodeDragEndEmitter = new Emitter<NodeDragEndEvent>();
+    readonly onNodeDragEnd: Event<NodeDragEndEvent> = this.onNodeDragEndEmitter.event;
 
     constructor(
         @inject(TreeProps) props: TreeProps,
@@ -79,9 +91,7 @@ export class NodeExplorerTreeWidget extends TreeWidget {
             return {
                 ...attributes,
                 style: { ...attributes.style as React.CSSProperties, ...baseStyle },
-                draggable: true,
-                onDragStart: (e: React.DragEvent) => this.handleDragStart(e, node),
-                onDragEnd: (e: React.DragEvent) => this.handleDragEnd(e, node)
+                onMouseDown: (e: React.MouseEvent) => this.handleMouseDown(e, node)
             };
         }
 
@@ -138,25 +148,55 @@ export class NodeExplorerTreeWidget extends TreeWidget {
     }
 
     /**
-     * Handle drag start for leaf nodes
+     * Handle mouse down - start custom drag tracking
      */
-    protected handleDragStart(event: React.DragEvent, node: NodeExplorerLeafNode): void {
-        event.dataTransfer.setData('application/json', JSON.stringify({
-            type: 'node-explorer-node',
-            nodeData: node.nodeData
-        }));
-        event.dataTransfer.effectAllowed = 'copy';
-    }
+    protected handleMouseDown(event: React.MouseEvent, node: NodeExplorerLeafNode): void {
+        // Only handle left mouse button
+        if (event.button !== 0) return;
 
-    /**
-     * Handle drag end
-     */
-    protected handleDragEnd(event: React.DragEvent, node: NodeExplorerLeafNode): void {
-        // Can add cleanup logic here if needed
+        const startX = event.clientX;
+        const startY = event.clientY;
+        let isDragging = false;
+        const dragThreshold = 5;
+
+        const handleMouseMove = (e: MouseEvent) => {
+            const deltaX = Math.abs(e.clientX - startX);
+            const deltaY = Math.abs(e.clientY - startY);
+
+            if (!isDragging && (deltaX > dragThreshold || deltaY > dragThreshold)) {
+                isDragging = true;
+                console.log('[NodeExplorerTreeWidget] Drag start:', node.nodeData);
+                if (node.nodeData) {
+                    useNodeDragStore.getState().startDrag(node.nodeData);
+                }
+            }
+
+            if (isDragging) {
+                useNodeDragStore.getState().updatePosition(e.clientX, e.clientY);
+            }
+        };
+
+        const handleMouseUp = (e: MouseEvent) => {
+            document.removeEventListener('mousemove', handleMouseMove);
+            document.removeEventListener('mouseup', handleMouseUp);
+
+            if (isDragging) {
+                console.log('[NodeExplorerTreeWidget] Drag end at:', e.clientX, e.clientY);
+                useNodeDragStore.getState().endDrag();
+                this.onNodeDragEndEmitter.fire({
+                    node,
+                    mouseEvent: e
+                });
+            }
+        };
+
+        document.addEventListener('mousemove', handleMouseMove);
+        document.addEventListener('mouseup', handleMouseUp);
     }
 
     dispose(): void {
         this.onNodeDoubleClickEmitter.dispose();
+        this.onNodeDragEndEmitter.dispose();
         super.dispose();
     }
 }
