@@ -152,7 +152,8 @@
             "positionAbsolute": {
                 "x": 350,
                 "y": 280
-            }
+            },
+            "dragging": false
         },
         {
             "id": "3",
@@ -230,7 +231,8 @@
             "positionAbsolute": {
                 "x": 700,
                 "y": 280
-            }
+            },
+            "dragging": false
         },
         {
             "id": "4",

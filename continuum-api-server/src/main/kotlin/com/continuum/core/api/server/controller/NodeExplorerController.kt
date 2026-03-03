@@ -20,4 +20,11 @@ class NodeExplorerController(
     ): List<NodeExplorerTreeItem> {
         return nodeExplorerService.getChildren(parentId)
     }
+
+    @GetMapping("/search")
+    fun search(
+        @RequestParam query: String
+    ): List<NodeExplorerTreeItem> {
+        return nodeExplorerService.search(query)
+    }
 }

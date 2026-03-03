@@ -10,7 +10,7 @@ export const NODE_EXPLORER_CONTEXT_MENU: string[] = ['node-explorer-context-menu
 
 /**
  * Tree widget for Node Explorer.
- * Provides custom rendering and double-click handling.
+ * Provides custom rendering, double-click handling, and auto-filtering on search.
  */
 @injectable()
 export class NodeExplorerTreeWidget extends TreeWidget {
@@ -40,6 +40,20 @@ export class NodeExplorerTreeWidget extends TreeWidget {
 
         // Add custom styles for larger tree items
         this.addClass('node-explorer-tree');
+
+        // Auto-enable filtering when search text changes
+        if (this.searchBox) {
+            this.toDispose.push(
+                this.searchBox.onTextChange(data => {
+                    // Enable filtering when there's text, disable when empty
+                    const shouldFilter = !!data && data.trim().length > 0;
+                    if (this.searchBox && this.searchBox.isFiltering !== shouldFilter) {
+                        // Access the protected method to toggle filtering
+                        (this.searchBox as any).doFireFilterToggle(shouldFilter);
+                    }
+                })
+            );
+        }
     }
 
     protected override createContainerAttributes(): React.HTMLAttributes<HTMLElement> {

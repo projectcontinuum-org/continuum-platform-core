@@ -12,6 +12,20 @@ class NodeExplorerService {
         return mockNodeTree[parentId] ?: emptyList()
     }
 
+    fun search(query: String): List<NodeExplorerTreeItem> {
+        if (query.isBlank()) return emptyList()
+        val lowerQuery = query.lowercase()
+        return getAllNodes()
+            .filter { it.name.lowercase().contains(lowerQuery) ||
+                      it.nodeInfo?.description?.lowercase()?.contains(lowerQuery) == true ||
+                      it.nodeInfo?.title?.lowercase()?.contains(lowerQuery) == true }
+    }
+
+    private fun getAllNodes(): List<NodeExplorerTreeItem> {
+        return mockNodeTree.values.flatten()
+            .filter { it.type == NodeExplorerItemType.NODE }
+    }
+
     // SVG icons from node models
     private object Icons {
         val REST = """
