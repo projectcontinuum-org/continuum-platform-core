@@ -6,7 +6,7 @@ import { useNodeDragStore } from '../../store/NodeDragStore';
 import DummyNode from '../../components/node/DummyNode';
 
 /**
- * Floating overlay that shows a DummyNode preview while dragging from Node Explorer.
+ * Floating overlay that shows a BaseNode preview while dragging from Node Explorer.
  * Uses Zustand store to track drag state and position.
  */
 export default function NodeDragOverlay() {
@@ -29,7 +29,9 @@ export default function NodeDragOverlay() {
                         position: 'fixed',
                         top: position.y - 50,
                         left: position.x - 100,
-                        pointerEvents: 'none'
+                        pointerEvents: 'none',
+                        transform: 'scale(1.5)',
+                        transformOrigin: 'top left'
                     }}>
                     <DummyNode {...draggedNodeData} />
                 </Box>
