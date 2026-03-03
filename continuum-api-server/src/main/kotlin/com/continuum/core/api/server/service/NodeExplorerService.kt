@@ -132,227 +132,189 @@ class NodeExplorerService {
     }
 
     private val mockNodeTree: Map<String, List<NodeExplorerTreeItem>> = mapOf(
-        // Root level categories
+        // Root level categories (matching actual node model categories)
         "" to listOf(
             NodeExplorerTreeItem(
-                id = "ml",
-                name = "Machine Learning",
+                id = "trigger",
+                name = "Trigger",
                 hasChildren = true,
                 type = NodeExplorerItemType.CATEGORY
             ),
             NodeExplorerTreeItem(
-                id = "io",
-                name = "IO Operations",
+                id = "table-data",
+                name = "Table & Data Structures",
+                hasChildren = true,
+                type = NodeExplorerItemType.CATEGORY
+            ),
+            NodeExplorerTreeItem(
+                id = "integration",
+                name = "Integration & API",
+                hasChildren = true,
+                type = NodeExplorerItemType.CATEGORY
+            ),
+            NodeExplorerTreeItem(
+                id = "filter",
+                name = "Filter & Select",
                 hasChildren = true,
                 type = NodeExplorerItemType.CATEGORY
             ),
             NodeExplorerTreeItem(
                 id = "transform",
-                name = "Data Transform",
+                name = "Transform",
                 hasChildren = true,
                 type = NodeExplorerItemType.CATEGORY
             ),
             NodeExplorerTreeItem(
-                id = "utils",
-                name = "Utilities",
+                id = "flow-control",
+                name = "Flow Control",
+                hasChildren = true,
+                type = NodeExplorerItemType.CATEGORY
+            ),
+            NodeExplorerTreeItem(
+                id = "aggregation",
+                name = "Aggregation & Grouping",
+                hasChildren = true,
+                type = NodeExplorerItemType.CATEGORY
+            ),
+            NodeExplorerTreeItem(
+                id = "processing",
+                name = "Processing",
+                hasChildren = true,
+                type = NodeExplorerItemType.CATEGORY
+            ),
+            NodeExplorerTreeItem(
+                id = "join-merge",
+                name = "Join & Merge",
+                hasChildren = true,
+                type = NodeExplorerItemType.CATEGORY
+            ),
+            NodeExplorerTreeItem(
+                id = "security",
+                name = "Security & Encryption",
+                hasChildren = true,
+                type = NodeExplorerItemType.CATEGORY
+            ),
+            NodeExplorerTreeItem(
+                id = "string-text",
+                name = "String & Text",
+                hasChildren = true,
+                type = NodeExplorerItemType.CATEGORY
+            ),
+            NodeExplorerTreeItem(
+                id = "json",
+                name = "JSON & Data Parsing",
+                hasChildren = true,
+                type = NodeExplorerItemType.CATEGORY
+            ),
+            NodeExplorerTreeItem(
+                id = "analysis",
+                name = "Analysis & Statistics",
                 hasChildren = true,
                 type = NodeExplorerItemType.CATEGORY
             )
         ),
 
-        // Machine Learning subcategories
-        "ml" to listOf(
+        // Trigger nodes
+        "trigger" to listOf(
             NodeExplorerTreeItem(
-                id = "ml/training",
-                name = "LLM Training",
-                hasChildren = true,
-                type = NodeExplorerItemType.CATEGORY
-            ),
-            NodeExplorerTreeItem(
-                id = "ml/inference",
-                name = "Inference",
-                hasChildren = true,
-                type = NodeExplorerItemType.CATEGORY
-            )
-        ),
-
-        // LLM Training nodes
-        "ml/training" to listOf(
-            NodeExplorerTreeItem(
-                id = "ml/training/finetune",
-                name = "Fine-tune Model",
+                id = "trigger/time-trigger",
+                name = "Start Node",
                 nodeInfo = createNodeData(
-                    "FineTuneNode",
-                    "Fine-tune Model",
-                    "Fine-tune an LLM model using LoRA or full fine-tuning",
-                    Icons.SCRIPT
+                    "com.continuum.base.node.TimeTriggerNodeModel",
+                    "Start Node",
+                    "Starts the workflow execution with the current time as the output",
+                    Icons.TIME
                 ),
                 hasChildren = false,
                 type = NodeExplorerItemType.NODE
-            ),
+            )
+        ),
+
+        // Table & Data Structures nodes
+        "table-data" to listOf(
             NodeExplorerTreeItem(
-                id = "ml/training/rlhf",
-                name = "RLHF Training",
+                id = "table-data/create-table",
+                name = "Create Table",
                 nodeInfo = createNodeData(
-                    "RLHFNode",
-                    "RLHF Training",
-                    "Reinforcement Learning from Human Feedback training",
-                    Icons.CHART
+                    "com.continuum.base.node.CreateTableNodeModel",
+                    "Create Table",
+                    "Creates a structured table from FreeMarker template configuration",
+                    Icons.TABLE
                 ),
                 hasChildren = false,
                 type = NodeExplorerItemType.NODE
             )
         ),
 
-        // Inference nodes
-        "ml/inference" to listOf(
+        // Integration & API nodes
+        "integration" to listOf(
             NodeExplorerTreeItem(
-                id = "ml/inference/predict",
-                name = "Model Inference",
+                id = "integration/rest-client",
+                name = "REST Client",
                 nodeInfo = createNodeData(
-                    "InferenceNode",
-                    "Model Inference",
-                    "Run inference using a trained model",
+                    "com.continuum.base.node.RestNodeModel",
+                    "REST Client",
+                    "Makes HTTP requests for each row using FreeMarker templated URLs and payloads",
                     Icons.REST
                 ),
                 hasChildren = false,
                 type = NodeExplorerItemType.NODE
-            ),
+            )
+        ),
+
+        // Filter & Select nodes
+        "filter" to listOf(
             NodeExplorerTreeItem(
-                id = "ml/inference/batch",
-                name = "Batch Prediction",
+                id = "filter/dynamic-row-filter",
+                name = "Dynamic Row Filter",
                 nodeInfo = createNodeData(
-                    "BatchPredictionNode",
-                    "Batch Prediction",
-                    "Run batch predictions on large datasets",
-                    Icons.BATCH
+                    "com.continuum.base.node.DynamicRowFilterNodeModel",
+                    "Dynamic Row Filter",
+                    "Filters rows where the specified column value is greater than the threshold",
+                    Icons.FILTER
                 ),
                 hasChildren = false,
                 type = NodeExplorerItemType.NODE
             )
         ),
 
-        // IO Operations nodes
-        "io" to listOf(
-            NodeExplorerTreeItem(
-                id = "io/file-read",
-                name = "File Reader",
-                nodeInfo = createNodeData(
-                    "FileReaderNode",
-                    "File Reader",
-                    "Read files from local disk or cloud storage",
-                    Icons.TABLE
-                ),
-                hasChildren = false,
-                type = NodeExplorerItemType.NODE
-            ),
-            NodeExplorerTreeItem(
-                id = "io/file-write",
-                name = "File Writer",
-                nodeInfo = createNodeData(
-                    "FileWriterNode",
-                    "File Writer",
-                    "Write files to local disk or cloud storage",
-                    Icons.TABLE
-                ),
-                hasChildren = false,
-                type = NodeExplorerItemType.NODE
-            ),
-            NodeExplorerTreeItem(
-                id = "io/http",
-                name = "HTTP Request",
-                nodeInfo = createNodeData(
-                    "HttpRequestNode",
-                    "HTTP Request",
-                    "Make HTTP/REST API requests",
-                    Icons.REST
-                ),
-                hasChildren = false,
-                type = NodeExplorerItemType.NODE
-            ),
-            NodeExplorerTreeItem(
-                id = "io/database",
-                name = "Database Query",
-                nodeInfo = createNodeData(
-                    "DatabaseQueryNode",
-                    "Database Query",
-                    "Execute SQL queries against databases",
-                    Icons.TABLE
-                ),
-                hasChildren = false,
-                type = NodeExplorerItemType.NODE
-            )
-        ),
-
-        // Data Transform nodes
+        // Transform nodes
         "transform" to listOf(
             NodeExplorerTreeItem(
-                id = "transform/join",
-                name = "Join Tables",
-                nodeInfo = createNodeData(
-                    "JoinTablesNode",
-                    "Join Tables",
-                    "Join two tables on specified columns",
-                    Icons.JOIN
-                ),
-                hasChildren = false,
-                type = NodeExplorerItemType.NODE
-            ),
-            NodeExplorerTreeItem(
-                id = "transform/pivot",
+                id = "transform/pivot-columns",
                 name = "Pivot Columns",
                 nodeInfo = createNodeData(
-                    "PivotColumnsNode",
+                    "com.continuum.base.node.PivotColumnsNodeModel",
                     "Pivot Columns",
-                    "Pivot table columns for data transformation",
+                    "Pivots table so pivot column values become new columns with value column as cell values",
                     Icons.PIVOT
                 ),
                 hasChildren = false,
                 type = NodeExplorerItemType.NODE
             ),
             NodeExplorerTreeItem(
-                id = "transform/filter",
-                name = "Filter Rows",
+                id = "transform/kotlin-script",
+                name = "Kotlin Script",
                 nodeInfo = createNodeData(
-                    "FilterRowsNode",
-                    "Filter Rows",
-                    "Filter table rows based on conditions",
-                    Icons.FILTER
+                    "com.continuum.base.node.KotlinScriptNodeModel",
+                    "Kotlin Script",
+                    "Run a Kotlin script for each row, adding script_result column",
+                    Icons.SCRIPT
                 ),
                 hasChildren = false,
                 type = NodeExplorerItemType.NODE
-            ),
+            )
+        ),
+
+        // Flow Control nodes
+        "flow-control" to listOf(
             NodeExplorerTreeItem(
-                id = "transform/aggregate",
-                name = "Aggregate",
-                nodeInfo = createNodeData(
-                    "AggregateNode",
-                    "Aggregate",
-                    "Perform aggregation operations (sum, avg, count)",
-                    Icons.TIME
-                ),
-                hasChildren = false,
-                type = NodeExplorerItemType.NODE
-            ),
-            NodeExplorerTreeItem(
-                id = "transform/json",
-                name = "JSON Exploder",
-                nodeInfo = createNodeData(
-                    "JsonExploderNode",
-                    "JSON Exploder",
-                    "Expand JSON columns into separate rows",
-                    Icons.JSON
-                ),
-                hasChildren = false,
-                type = NodeExplorerItemType.NODE
-            ),
-            NodeExplorerTreeItem(
-                id = "transform/split",
+                id = "flow-control/conditional-splitter",
                 name = "Conditional Splitter",
                 nodeInfo = createNodeData(
-                    "ConditionalSplitterNode",
+                    "com.continuum.base.node.ConditionalSplitterNodeModel",
                     "Conditional Splitter",
-                    "Split data flow based on conditions",
+                    "Splits rows into two outputs based on threshold comparison",
                     Icons.SPLIT
                 ),
                 hasChildren = false,
@@ -360,52 +322,148 @@ class NodeExplorerService {
             )
         ),
 
-        // Utilities nodes
-        "utils" to listOf(
+        // Aggregation & Grouping nodes
+        "aggregation" to listOf(
             NodeExplorerTreeItem(
-                id = "utils/hash",
+                id = "aggregation/batch-accumulator",
+                name = "Batch Accumulator",
+                nodeInfo = createNodeData(
+                    "com.continuum.base.node.BatchAccumulatorNodeModel",
+                    "Batch Accumulator",
+                    "Groups rows into batches and adds batch_id and row_count columns",
+                    Icons.BATCH
+                ),
+                hasChildren = false,
+                type = NodeExplorerItemType.NODE
+            ),
+            NodeExplorerTreeItem(
+                id = "aggregation/time-window",
+                name = "Time Window Aggregator",
+                nodeInfo = createNodeData(
+                    "com.continuum.base.node.TimeWindowAggregatorNodeModel",
+                    "Time Window Aggregator",
+                    "Aggregates values into time windows, summing by window buckets",
+                    Icons.TIME
+                ),
+                hasChildren = false,
+                type = NodeExplorerItemType.NODE
+            )
+        ),
+
+        // Processing nodes
+        "processing" to listOf(
+            NodeExplorerTreeItem(
+                id = "processing/joint-node",
+                name = "Joint Node",
+                nodeInfo = createNodeData(
+                    "com.continuum.base.node.JointNodeModel",
+                    "Joint Node",
+                    "Joint the input strings into one",
+                    Icons.JOIN
+                ),
+                hasChildren = false,
+                type = NodeExplorerItemType.NODE
+            ),
+            NodeExplorerTreeItem(
+                id = "processing/column-splitter",
+                name = "Column Splitter",
+                nodeInfo = createNodeData(
+                    "com.continuum.base.node.SplitNodeModel",
+                    "Column Splitter",
+                    "Split a column into two parts",
+                    Icons.SPLIT
+                ),
+                hasChildren = false,
+                type = NodeExplorerItemType.NODE
+            ),
+            NodeExplorerTreeItem(
+                id = "processing/column-join",
+                name = "Column Join Node",
+                nodeInfo = createNodeData(
+                    "com.continuum.base.node.ColumnJoinNodeModel",
+                    "Column Join Node",
+                    "Joins two columns from left and right tables into one output column",
+                    Icons.JOIN
+                ),
+                hasChildren = false,
+                type = NodeExplorerItemType.NODE
+            )
+        ),
+
+        // Join & Merge nodes
+        "join-merge" to listOf(
+            NodeExplorerTreeItem(
+                id = "join-merge/join-multiple-keys",
+                name = "Join on Multiple Keys",
+                nodeInfo = createNodeData(
+                    "com.continuum.base.node.JoinOnMultipleKeysNodeModel",
+                    "Join on Multiple Keys",
+                    "Performs inner join on two tables using two key columns from each table",
+                    Icons.JOIN
+                ),
+                hasChildren = false,
+                type = NodeExplorerItemType.NODE
+            )
+        ),
+
+        // Security & Encryption nodes
+        "security" to listOf(
+            NodeExplorerTreeItem(
+                id = "security/crypto-hasher",
                 name = "Crypto Hasher",
                 nodeInfo = createNodeData(
-                    "CryptoHasherNode",
+                    "com.continuum.base.node.CryptoHasherNodeModel",
                     "Crypto Hasher",
-                    "Generate cryptographic hashes (MD5, SHA256)",
+                    "Generates SHA-256 hash of column values",
                     Icons.CRYPTO
                 ),
                 hasChildren = false,
                 type = NodeExplorerItemType.NODE
-            ),
+            )
+        ),
+
+        // String & Text nodes
+        "string-text" to listOf(
             NodeExplorerTreeItem(
-                id = "utils/script",
-                name = "Kotlin Script",
-                nodeInfo = createNodeData(
-                    "KotlinScriptNode",
-                    "Kotlin Script",
-                    "Execute custom Kotlin scripts",
-                    Icons.SCRIPT
-                ),
-                hasChildren = false,
-                type = NodeExplorerItemType.NODE
-            ),
-            NodeExplorerTreeItem(
-                id = "utils/text",
+                id = "string-text/text-normalizer",
                 name = "Text Normalizer",
                 nodeInfo = createNodeData(
-                    "TextNormalizerNode",
+                    "com.continuum.base.node.TextNormalizerNodeModel",
                     "Text Normalizer",
-                    "Normalize and clean text data",
+                    "Normalizes text by trimming, lowercasing, and removing non-alphanumeric characters",
                     Icons.TEXT
                 ),
                 hasChildren = false,
                 type = NodeExplorerItemType.NODE
-            ),
+            )
+        ),
+
+        // JSON & Data Parsing nodes
+        "json" to listOf(
             NodeExplorerTreeItem(
-                id = "utils/delay",
-                name = "Delay",
+                id = "json/json-exploder",
+                name = "JSON Exploder",
                 nodeInfo = createNodeData(
-                    "DelayNode",
-                    "Delay",
-                    "Add a time delay between operations",
-                    Icons.TIME
+                    "com.continuum.base.node.JsonExploderNodeModel",
+                    "JSON Exploder",
+                    "Parses JSON strings and flattens keys into new columns",
+                    Icons.JSON
+                ),
+                hasChildren = false,
+                type = NodeExplorerItemType.NODE
+            )
+        ),
+
+        // Analysis & Statistics nodes
+        "analysis" to listOf(
+            NodeExplorerTreeItem(
+                id = "analysis/anomaly-detector",
+                name = "Anomaly Detector",
+                nodeInfo = createNodeData(
+                    "com.continuum.base.node.AnomalyDetectorZScoreNodeModel",
+                    "Anomaly Detector",
+                    "Detects outliers using Z-score method (flags values with |Z| > 2)",
+                    Icons.CHART
                 ),
                 hasChildren = false,
                 type = NodeExplorerItemType.NODE
