@@ -89,7 +89,7 @@ class ContinuumNodeActivity(
   private val cacheBucketBasePath: String,
   @param:Value("\${continuum.core.worker.cache-storage-path}")
   private val cacheStoragePath: Path,
-  @param:Value("\${continuum.core.worker.progress-report-rate-limit-ms:1000}")
+  @param:Value("\${continuum.core.worker.progress-report-rate-limit-ms:5000}")
   private val progressReportRateLimitMs: Long,
   @param:Value("\${continuum.core.worker.heartbeat-interval-ms:60000}")
   private val heartbeatIntervalMs: Long
@@ -147,7 +147,8 @@ class ContinuumNodeActivity(
     val nodeCachePath = cacheStoragePath.resolve("$workflowRunId/${node.id}")
     Files.createDirectories(nodeCachePath)
 
-    val progressCallback = createProgressCallback(node.id)
+    val executionStartTime = AtomicLong(0)
+    val progressCallback = createProgressCallback(node.id, executionStartTime)
 
     // Start a background heartbeat scheduler to keep the activity alive even when
     // the node doesn't call report() for extended periods (e.g., during long model
@@ -158,8 +159,8 @@ class ContinuumNodeActivity(
 
     return try {
       when {
-        processNodeMap.containsKey(nodeModel) -> executeProcessNode(node, inputs, progressCallback)
-        triggerNodeMap.containsKey(nodeModel) -> executeTriggerNode(node, progressCallback)
+        processNodeMap.containsKey(nodeModel) -> executeProcessNode(node, inputs, progressCallback, executionStartTime)
+        triggerNodeMap.containsKey(nodeModel) -> executeTriggerNode(node, progressCallback, executionStartTime)
         else -> createErrorOutput(node.id, "Node model '$nodeModel' not found")
       }
     } catch (e: NodeRuntimeException) {
@@ -179,7 +180,8 @@ class ContinuumNodeActivity(
   private fun executeProcessNode(
     node: ContinuumWorkflowModel.Node,
     inputs: Map<String, PortData>,
-    progressCallback: NodeProgressCallback
+    progressCallback: NodeProgressCallback,
+    executionStartTime: AtomicLong
   ): IContinuumNodeActivity.NodeActivityOutput {
     val workflowRunId = Activity.getExecutionContext().info.runId
     val nodeModel = node.data.nodeModel
@@ -189,6 +191,8 @@ class ContinuumNodeActivity(
     LOGGER.info("Input files downloaded for node ${node.id} ($nodeModel)")
 
     val nodeOutputWriter = NodeOutputWriter(cacheStoragePath.resolve("$workflowRunId/${node.id}"))
+
+    executionStartTime.set(System.currentTimeMillis())
 
     processNodeMap[nodeModel]!!.run(
       node = node,
@@ -211,10 +215,13 @@ class ContinuumNodeActivity(
    */
   private fun executeTriggerNode(
     node: ContinuumWorkflowModel.Node,
-    progressCallback: NodeProgressCallback
+    progressCallback: NodeProgressCallback,
+    executionStartTime: AtomicLong
   ): IContinuumNodeActivity.NodeActivityOutput {
     val workflowRunId = Activity.getExecutionContext().info.runId
     val nodeOutputWriter = NodeOutputWriter(cacheStoragePath.resolve("$workflowRunId/${node.id}"))
+
+    executionStartTime.set(System.currentTimeMillis())
 
     triggerNodeMap[node.data.nodeModel]!!.run(node, nodeOutputWriter = nodeOutputWriter)
 
@@ -285,16 +292,15 @@ class ContinuumNodeActivity(
    * @param nodeId The ID of the node being executed
    * @return A [NodeProgressCallback] instance
    */
-  private fun createProgressCallback(nodeId: String): NodeProgressCallback {
+  private fun createProgressCallback(nodeId: String, executionStartTime: AtomicLong): NodeProgressCallback {
     val lastReportTime = AtomicLong(0)
     val lastReportedStages = AtomicReference<Map<String, StageStatus>?>(null)
-    val startTime = AtomicLong(0)
 
     return object : NodeProgressCallback {
       override fun report(nodeProgress: NodeProgress) {
         val now = System.currentTimeMillis()
-        startTime.compareAndSet(0, now)
-        val elapsed = now - startTime.get()
+        val startTime = executionStartTime.get()
+        val elapsed = if (startTime > 0) now - startTime else 0
 
         // Preserve last known stage status when reporting 100% without stage info
         val effectiveStageStatus = if (nodeProgress.progressPercentage == 100 && nodeProgress.stageStatus == null) {
