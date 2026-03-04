@@ -2,7 +2,9 @@ package com.continuum.base.node
 
 import com.continuum.core.commons.exception.NodeRuntimeException
 import com.continuum.core.commons.model.ContinuumWorkflowModel
-import com.continuum.core.commons.node.TriggerNodeModel
+import com.continuum.core.commons.node.ProcessNodeModel
+import com.continuum.core.commons.prototol.progress.NodeProgressCallback
+import com.continuum.core.commons.utils.NodeInputReader
 import com.continuum.core.commons.utils.NodeOutputWriter
 import com.fasterxml.jackson.core.type.TypeReference
 import com.fasterxml.jackson.databind.ObjectMapper
@@ -16,7 +18,7 @@ import java.io.StringReader
 import java.io.StringWriter
 
 @Component
-class CreateTableNodeModel : TriggerNodeModel() {
+class CreateTableNodeModel : ProcessNodeModel() {
   companion object {
     private val LOGGER = LoggerFactory.getLogger(CreateTableNodeModel::class.java)
     private val objectMapper = ObjectMapper()
@@ -36,6 +38,8 @@ class CreateTableNodeModel : TriggerNodeModel() {
       contentType = TEXT_PLAIN_VALUE
     )
   )
+
+  override val inputPorts = emptyMap<String, ContinuumWorkflowModel.NodePort>()
 
   override val categories = listOf(
     "Table & Data Structures"
@@ -99,7 +103,9 @@ class CreateTableNodeModel : TriggerNodeModel() {
 
   override fun execute(
     properties: Map<String, Any>?,
-    nodeOutputWriter: NodeOutputWriter
+    inputs: Map<String, NodeInputReader>,
+    nodeOutputWriter: NodeOutputWriter,
+    nodeProgressCallback: NodeProgressCallback
   ) {
     val jsonArrayString = properties?.get("jsonArrayString") as String? ?: throw NodeRuntimeException(
       workflowId = "",
