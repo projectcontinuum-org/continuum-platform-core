@@ -62,11 +62,11 @@ continuum.core:
         endpoint: ${CONTINUUM_MINIO_ENDPOINT:http://localhost:39000}
         access-key: ${CONTINUUM_MINIO_USERNAME:minioadmin}
         secret-key: ${CONTINUUM_MINIO_PASSWORD:minioadmin}
-com.continuum:
-  feature:
-    ai:
-      unsloth-trainer:
-        venv-path: ${CONTINUUM_UNSLOTH_TRAINER_VENV_PATH:./unsloth-trainer/.venv}
+#com.continuum:
+#  feature:
+#    ai:
+#      unsloth-trainer:
+#        venv-path: ${CONTINUUM_UNSLOTH_TRAINER_VENV_PATH:./unsloth-trainer/.venv}
 logging:
   level:
     root: error

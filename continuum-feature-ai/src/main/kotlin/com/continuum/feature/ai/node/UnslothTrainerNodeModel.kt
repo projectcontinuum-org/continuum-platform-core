@@ -7,6 +7,7 @@ import com.continuum.core.commons.prototol.progress.NodeProgress
 import com.continuum.core.commons.prototol.progress.NodeProgressCallback
 import com.continuum.core.commons.utils.NodeInputReader
 import com.continuum.core.commons.utils.NodeOutputWriter
+import com.continuum.feature.ai.python.PythonEnvironmentManager
 import com.fasterxml.jackson.core.type.TypeReference
 import com.fasterxml.jackson.databind.ObjectMapper
 import org.slf4j.LoggerFactory
@@ -54,16 +55,15 @@ import java.util.UUID
  * - meta-llama/Llama-2-7b-hf
  * - And many more...
  *
- * @property defaultVenvPath Default path to Python virtual environment (configurable via properties)
+ * @property pythonEnvironmentManager Manages Python venv creation and resolution (auto-creates if missing at startup)
  * @property cacheStoragePath Base path for storing trained models (configurable via properties)
  * @author Continuum Team
  * @since 1.0.0
  */
 @Component
 class UnslothTrainerNodeModel(
-  @Value("\${com.continuum.feature.ai.unsloth-trainer.venv-path}")
-  private val defaultVenvPath: String,
-  @Value("\${com.continuum.feature.ai.unsloth-trainer.cache-storage-path:./.continuum-cache/workflow-data}")
+  private val pythonEnvironmentManager: PythonEnvironmentManager,
+  @param:Value("\${com.continuum.feature.ai.unsloth-trainer.cache-storage-path:./.continuum-cache/workflow-data}")
   private val cacheStoragePath: String
 ) : ProcessNodeModel() {
 
@@ -532,17 +532,9 @@ class UnslothTrainerNodeModel(
     val parquetBatchSize = (properties?.get("parquetBatchSize") as? Number)?.toInt() ?: DEFAULT_PARQUET_BATCH_SIZE
     val hfToken = properties?.get("hfToken")?.toString()?.takeIf { it.isNotBlank() }
 
-    // Resolve and validate virtual environment path (configured via Spring properties)
-    // venv is required for LLM training as it needs specific packages (torch, transformers, etc.)
-    if (defaultVenvPath.isBlank()) {
-      throw NodeRuntimeException(
-        workflowId = "",
-        nodeId = "",
-        message = "Python virtual environment path is required. Configure 'com.continuum.feature.ai.unsloth-trainer.venv-path' in application properties.",
-        isRetriable = false
-      )
-    }
-    val resolvedVenvPath = resolveVenvPath(defaultVenvPath)
+    // Get the resolved virtual environment path from PythonEnvironmentManager
+    // (venv is guaranteed to exist — created and packages installed at startup if missing)
+    val resolvedVenvPath = pythonEnvironmentManager.resolvedVenvPath
 
     // Get the train.py script from resources
     val scriptPath = getTrainScriptPath()
@@ -696,56 +688,6 @@ class UnslothTrainerNodeModel(
     }
   }
 
-  /**
-   * Resolves and validates the Python virtual environment path.
-   *
-   * This method will:
-   * 1. Expand ~ to the user's home directory
-   * 2. Validate that the virtual environment directory exists
-   * 3. Validate that the activation script exists
-   *
-   * @param venvPath Path to the Python virtual environment
-   * @return Expanded and validated virtual environment path
-   * @throws NodeRuntimeException if venv directory or activation script doesn't exist
-   */
-  private fun resolveVenvPath(venvPath: String): String {
-    // Expand ~ to user home directory
-    val expandedVenvPath = if (venvPath.startsWith("~")) {
-      venvPath.replaceFirst("~", System.getProperty("user.home"))
-    } else {
-      venvPath
-    }
-
-    val venvDir = java.io.File(expandedVenvPath)
-    if (!venvDir.exists() || !venvDir.isDirectory) {
-      throw NodeRuntimeException(
-        workflowId = "",
-        nodeId = "",
-        message = "Virtual environment directory does not exist: $expandedVenvPath",
-        isRetriable = false
-      )
-    }
-
-    // Verify activation script exists
-    val isWindows = System.getProperty("os.name").lowercase().contains("windows")
-    val activateScript = if (isWindows) {
-      java.io.File(venvDir, "Scripts/activate.bat")
-    } else {
-      java.io.File(venvDir, "bin/activate")
-    }
-
-    if (!activateScript.exists()) {
-      throw NodeRuntimeException(
-        workflowId = "",
-        nodeId = "",
-        message = "Virtual environment activation script not found: ${activateScript.absolutePath}",
-        isRetriable = false
-      )
-    }
-
-    LOGGER.info("Using virtual environment: $expandedVenvPath")
-    return expandedVenvPath
-  }
 
   /**
    * Builds the command to execute the training script.
