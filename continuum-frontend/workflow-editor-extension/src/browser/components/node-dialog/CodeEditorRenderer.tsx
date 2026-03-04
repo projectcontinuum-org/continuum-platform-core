@@ -56,7 +56,7 @@ const CodeEditorRenderer: React.FC<CodeEditorRendererProps> = (props) => {
     return null;
   }
 
-  if (!visible) {
+  if (visible === false) {
     return null;
   }
 
