@@ -1,7 +1,7 @@
 import "reactflow/dist/base.css";
 import './WorkflowEditor.css';
 
-import React from 'react';
+import React, { forwardRef, useImperativeHandle } from 'react';
 import { useRef, useCallback } from 'react';
 import ReactFlow, { Connection, Controls, EdgeChange, Node, NodeChange, Panel, addEdge, applyEdgeChanges, applyNodeChanges, getOutgoers } from 'reactflow';
 import BaseNode from '../node/BaseNode';
@@ -16,7 +16,7 @@ import SendIcon from '@mui/icons-material/Send';
 const workflowService = new WorkflowService();
 
 const nodeTypes = {
-    BaseNode,
+  BaseNode
 };
 const edgeTypes = {
     BaseEdge
@@ -27,11 +27,18 @@ const defaultEdgeOptions = {
 
 export interface WorkflowEditorProps {
     workflow: IWorkflow,
-    onChange: (workflow: IWorkflow)=>void
+    onChange: (workflow: IWorkflow)=>void,
+    onContextMenu?: (event: React.MouseEvent, selectedNodeId?: string)=>void,
+    onHistoryChange?: ()=>void
 }
 
-function WorkflowEditor({ workflow, onChange }: WorkflowEditorProps)  {
-    const ref = useRef<HTMLDivElement | null>(null);
+export interface WorkflowEditorRef {
+    runWorkflow: () => void;
+    openNodeSettings: () => void;
+}
+
+const WorkflowEditor = forwardRef<WorkflowEditorRef, WorkflowEditorProps>(({ workflow, onChange, onContextMenu, onHistoryChange }, ref) => {
+    const reactFlowRef = useRef<HTMLDivElement | null>(null);
     const [flowEdges, setFlowEdges] = React.useState(workflow.edges);
     const [flowNodes, setFlowNodes] = React.useState(workflow.nodes);
     const [isActive, setIsActive] = React.useState(workflow.active);
@@ -62,7 +69,24 @@ function WorkflowEditor({ workflow, onChange }: WorkflowEditorProps)  {
     const onNodeConnect = useCallback((connection: Connection) => {
         // console.log("onNodeConnect");
         setFlowEdges((edges) => addEdge(connection, edges));
-    },[setFlowEdges]);
+        // Record history when edge is added
+        onHistoryChange?.();
+    },[setFlowEdges, onHistoryChange]);
+
+    const onNodeDragStop = useCallback(() => {
+        // Record history when node drag ends
+        onHistoryChange?.();
+    }, [onHistoryChange]);
+
+    const onNodesDelete = useCallback(() => {
+        // Record history when nodes are deleted
+        onHistoryChange?.();
+    }, [onHistoryChange]);
+
+    const onEdgesDelete = useCallback(() => {
+        // Record history when edges are deleted
+        onHistoryChange?.();
+    }, [onHistoryChange]);
 
     const hasCycle = React.useCallback((connection: Connection, node: Node, visited = new Set()): boolean => {
         if (visited.has(node.id)) return false;
@@ -117,6 +141,27 @@ function WorkflowEditor({ workflow, onChange }: WorkflowEditorProps)  {
         }
     }, [setNodeDialogProps, selectedNode, flowNodes, setFlowNodes]);
 
+    const openNodeSettings = React.useCallback(() => {
+        const selected = flowNodes.find(n => n.selected);
+        if (selected) {
+            setNodeDialogProps({
+                open: true,
+                onClose: onNodeDialogClose,
+                onSave: onNodeDialogSaved,
+                initialData: selected.data.properties || {},
+                dataSchema: selected.data.propertiesSchema || {},
+                uiSchema: selected.data.propertiesUISchema || {}
+            });
+            setSelectedNode(selected);
+        }
+    }, [flowNodes, onNodeDialogClose, onNodeDialogSaved, setNodeDialogProps, setSelectedNode]);
+
+    // Expose methods via ref
+    useImperativeHandle(ref, () => ({
+        runWorkflow: onRun,
+        openNodeSettings
+    }), [onRun, openNodeSettings]);
+
     const onNodeDoubleClick = React.useCallback((event: React.MouseEvent, clickedNode: Node<IBaseNodeData>) => {
         console.log("onNodeDoubleClick", event, clickedNode);
         setNodeDialogProps({
@@ -129,6 +174,21 @@ function WorkflowEditor({ workflow, onChange }: WorkflowEditorProps)  {
         });
         setSelectedNode(clickedNode);
     }, [setNodeDialogProps, onNodeDialogSaved, onNodeDialogClose, setSelectedNode]);
+
+    const onNodeContextMenu = React.useCallback((event: React.MouseEvent, node: Node<IBaseNodeData>) => {
+        // Select the node that was right-clicked
+        setFlowNodes((nodes) => nodes.map((n) => ({
+            ...n,
+            selected: n.id === node.id
+        })));
+        // Then trigger the context menu with the selected node id
+        onContextMenu?.(event, node.id);
+    }, [setFlowNodes, onContextMenu]);
+
+    const onPaneContextMenu = React.useCallback((event: React.MouseEvent | MouseEvent) => {
+        // Right-click on empty canvas - no node selected
+        onContextMenu?.(event as React.MouseEvent, undefined);
+    }, [onContextMenu]);
 
     return (
         <Box
@@ -145,11 +205,16 @@ function WorkflowEditor({ workflow, onChange }: WorkflowEditorProps)  {
                 top: 0
             }}>
             <ReactFlow
-                ref={ref}
+                ref={reactFlowRef}
                 nodes={flowNodes}
                 edges={flowEdges}
                 onNodesChange={!isActive ? onNodesChange : undefined}
                 onNodeDoubleClick={onNodeDoubleClick}
+                onNodeContextMenu={onNodeContextMenu}
+                onPaneContextMenu={onPaneContextMenu}
+                onNodeDragStop={onNodeDragStop}
+                onNodesDelete={onNodesDelete}
+                onEdgesDelete={onEdgesDelete}
                 onEdgesChange={!isActive ? onEdgesChange : undefined}
                 onConnect={!isActive ? onNodeConnect: undefined}
                 isValidConnection={isValidConnection}
@@ -175,6 +240,6 @@ function WorkflowEditor({ workflow, onChange }: WorkflowEditorProps)  {
                 readOnly={isActive}/>}
         </Box>
     );
-}
+});
 
 export default WorkflowEditor;

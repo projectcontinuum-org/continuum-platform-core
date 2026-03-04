@@ -22,7 +22,23 @@ export interface IBaseNodeData {
     credentials?: {[key: string]: any};
     nodeModel: string;
     status?: "ACTIVE" | "CONFIGURED" | "BUSY" | "SUCCESS" | "FAILED" | "WARNING" | "PRE-PROCESSING" | "POST-PROCESSING";
-    progressPercentage?: number;
+    nodeProgress?: INodeProgress;
+}
+
+export interface INodeProgress {
+  progressPercentage: number;
+  message?: string;
+  stageStatus?: {[key: string]: StageStatus};
+  stageDurationMs?: number;
+  totalDurationMs?: number;
+}
+
+export enum StageStatus {
+    PENDING = "PENDING",
+    IN_PROGRESS = "IN_PROGRESS",
+    COMPLETED = "COMPLETED",
+    FAILED = "FAILED",
+    SKIPPED = "SKIPPED"
 }
 
 export interface IPortProps {

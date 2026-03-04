@@ -73,6 +73,10 @@ export function TableOutputView({outputData}: TableOutputViewProps) {
                                 }}
                             />;
                         }
+                        // Handle boolean values explicitly (they don't render as text by default)
+                        if (typeof params.value === 'boolean') {
+                            return params.value ? 'true' : 'false';
+                        }
                         return params.value;
                     }
                 })));

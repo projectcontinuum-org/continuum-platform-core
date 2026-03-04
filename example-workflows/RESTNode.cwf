@@ -1,0 +1,195 @@
+{
+    "id": "fb5607f3406536dc8e529a5f7a63dcbbf49958f93ec27d3eafb9606ea7fb950e",
+    "name": "/Users/L001418/Projects/ContinuumWorkflow/example-workflows/RESTNode.cwf",
+    "active": false,
+    "nodes": [
+        {
+            "id": "24",
+            "type": "BaseNode",
+            "position": {
+                "x": 482.79859619219434,
+                "y": 65.34724807827729
+            },
+            "data": {
+                "id": "com.continuum.base.node.RestNodeModel",
+                "description": "Makes HTTP requests for each row using FreeMarker templated URLs and payloads",
+                "title": "REST Client",
+                "subTitle": "Invoke REST APIs",
+                "icon": "<svg xmlns=\"http://www.w3.org/2000/svg\" fill=\"none\" stroke=\"currentColor\" strokeWidth={1.5} viewBox=\"0 0 24 24\">\n    <path strokeLinecap=\"round\" strokeLinejoin=\"round\" d=\"M12 21a9.004 9.004 0 008.716-6.747M12 21a9.004 9.004 0 01-8.716-6.747M12 21c2.485 0 4.5-4.03 4.5-9S14.485 3 12 3m0 18c-2.485 0-4.5-4.03-4.5-9S9.515 3 12 3m0 0a8.997 8.997 0 017.843 4.582M12 3a8.997 8.997 0 00-7.843 4.582m15.686 0A11.953 11.953 0 0112 10.5c-2.998 0-5.74-1.1-7.843-2.918m15.686 0A8.959 8.959 0 0121 12c0 .778-.099 1.533-.284 2.253m0 0A17.919 17.919 0 0112 16.5c-3.162 0-6.133-.815-8.716-2.247m0 0A9.015 9.015 0 013 12c0-1.605.42-3.113 1.157-4.418\" />\n</svg>",
+                "nodeModel": "com.continuum.base.node.RestNodeModel",
+                "busy": null,
+                "inputs": {
+                    "data": {
+                        "name": "input table",
+                        "contentType": "text/plain"
+                    }
+                },
+                "outputs": {
+                    "data": {
+                        "name": "table with responses",
+                        "contentType": "text/plain"
+                    }
+                },
+                "properties": {
+                    "method": "GET",
+                    "url": "https://json-placeholder.mock.beeceptor.com/posts/${row.id}",
+                    "payload": ""
+                },
+                "propertiesSchema": {
+                    "type": "object",
+                    "properties": {
+                        "method": {
+                            "type": "string",
+                            "title": "HTTP Method",
+                            "description": "HTTP method to use",
+                            "enum": [
+                                "GET",
+                                "POST",
+                                "PUT",
+                                "DELETE"
+                            ],
+                            "default": "GET"
+                        },
+                        "url": {
+                            "type": "string",
+                            "title": "URL Template",
+                            "description": "FreeMarker template for URL (e.g., https://api.example.com?id=${row.id})"
+                        },
+                        "payload": {
+                            "type": "string",
+                            "title": "Payload Template",
+                            "description": "FreeMarker template for request body (e.g., {\"name\": \"${row.name}\"})"
+                        }
+                    },
+                    "required": [
+                        "method",
+                        "url"
+                    ]
+                },
+                "propertiesUISchema": {
+                    "type": "VerticalLayout",
+                    "elements": [
+                        {
+                            "type": "Control",
+                            "scope": "#/properties/method"
+                        },
+                        {
+                            "type": "Control",
+                            "scope": "#/properties/url",
+                            "options": {
+                                "format": "code",
+                                "language": "freemarker2",
+                                "rows": 1
+                            }
+                        },
+                        {
+                            "type": "Control",
+                            "scope": "#/properties/payload",
+                            "options": {
+                                "format": "code",
+                                "language": "freemarker2",
+                                "rows": 10
+                            },
+                            "rule": {
+                                "effect": "HIDE",
+                                "condition": {
+                                    "scope": "#/properties/method",
+                                    "schema": {
+                                        "enum": [
+                                            "GET",
+                                            "DELETE"
+                                        ]
+                                    }
+                                }
+                            }
+                        }
+                    ]
+                },
+                "status": null,
+                "nodeProgress": null
+            },
+            "width": 224,
+            "height": 100,
+            "selected": false,
+            "dragging": false,
+            "positionAbsolute": {
+                "x": 482.79859619219434,
+                "y": 65.34724807827729
+            }
+        },
+        {
+            "id": "23",
+            "type": "BaseNode",
+            "position": {
+                "x": 118.50012339858978,
+                "y": 67.05064919768716
+            },
+            "data": {
+                "id": "com.continuum.base.node.CreateTableNodeModel",
+                "description": "Creates a structured table from FreeMarker template configuration",
+                "title": "Create Table",
+                "subTitle": "Generate table rows from template",
+                "icon": "<svg xmlns=\"http://www.w3.org/2000/svg\" fill=\"none\" stroke=\"currentColor\" strokeWidth={1.5} viewBox=\"0 0 24 24\">\n\t<path d=\"M21.5 2h-19a.5.5 0 0 0-.5.5v19a.5.5 0 0 0 .5.5h19a.5.5 0 0 0 .5-.5v-19a.5.5 0 0 0-.5-.5zm-13 19H3v-5.5h5.5V21zm0-6.5H3v-5h5.5v5zm0-6H3V3h5.5v5.5zm6 12.5h-5v-5.5h5V21zm0-6.5h-5v-5h5v5zm0-6h-5V3h5v5.5zM21 21h-5.5v-5.5H21V21zm0-6.5h-5.5v-5H21v5zm0-6h-5.5V3H21v5.5z\" fill=\"currentColor\"/>\n</svg>",
+                "nodeModel": "com.continuum.base.node.CreateTableNodeModel",
+                "busy": null,
+                "inputs": null,
+                "outputs": {
+                    "data": {
+                        "name": "output table",
+                        "contentType": "text/plain"
+                    }
+                },
+                "properties": {
+                    "jsonArrayString": "[\n  {\n    \"userId\": 1,\n    \"id\": 1,\n    \"title\": \"Introduction to Artificial Intelligence\",\n    \"body\": \"Learn the basics of Artificial Intelligence and its applications in various industries.\",\n    \"link\": \"https://example.com/article1\",\n    \"comment_count\": 8\n  },\n  {\n    \"userId\": 2,\n    \"id\": 2,\n    \"title\": \"Web Development with React\",\n    \"body\": \"Build modern web applications using React.js and explore its powerful features.\",\n    \"link\": \"https://example.com/article2\",\n    \"comment_count\": 12\n  },\n  {\n    \"userId\": 3,\n    \"id\": 3,\n    \"title\": \"Data Science Fundamentals\",\n    \"body\": \"Dive into the world of Data Science and discover how to analyze and interpret data.\",\n    \"link\": \"https://example.com/article3\",\n    \"comment_count\": 5\n  },\n  {\n    \"userId\": 4,\n    \"id\": 4,\n    \"title\": \"Machine Learning Algorithms\",\n    \"body\": \"Explore various Machine Learning algorithms and understand their workings.\",\n    \"link\": \"https://example.com/article4\",\n    \"comment_count\": 17\n  },\n  {\n    \"userId\": 5,\n    \"id\": 5,\n    \"title\": \"Introduction to Blockchain\",\n    \"body\": \"Learn about Blockchain technology, its use-cases, and how it ensures secure transactions.\",\n    \"link\": \"https://example.com/article5\",\n    \"comment_count\": 3\n  },\n  {\n    \"userId\": 6,\n    \"id\": 6,\n    \"title\": \"iOS App Development\",\n    \"body\": \"Get started with iOS app development using Swift and create feature-rich applications.\",\n    \"link\": \"https://example.com/article6\",\n    \"comment_count\": 10\n  },\n  {\n    \"userId\": 7,\n    \"id\": 7,\n    \"title\": \"Python for Data Analysis\",\n    \"body\": \"Utilize Python libraries like Pandas and NumPy for data manipulation and analysis.\",\n    \"link\": \"https://example.com/article7\",\n    \"comment_count\": 15\n  },\n  {\n    \"userId\": 8,\n    \"id\": 8,\n    \"title\": \"Cybersecurity Best Practices\",\n    \"body\": \"Learn essential cybersecurity practices to safeguard your digital assets.\",\n    \"link\": \"https://example.com/article8\",\n    \"comment_count\": 6\n  },\n  {\n    \"userId\": 9,\n    \"id\": 9,\n    \"title\": \"Cloud Computing Essentials\",\n    \"body\": \"Understand the fundamentals of Cloud Computing and its benefits for businesses.\",\n    \"link\": \"https://example.com/article9\",\n    \"comment_count\": 9\n  },\n  {\n    \"userId\": 10,\n    \"id\": 10,\n    \"title\": \"Introduction to UX Design\",\n    \"body\": \"Discover the principles of User Experience (UX) design and create intuitive user interfaces.\",\n    \"link\": \"https://example.com/article10\",\n    \"comment_count\": 21\n  }\n]"
+                },
+                "propertiesSchema": {
+                    "type": "object",
+                    "properties": {
+                        "jsonArrayString": {
+                            "type": "string",
+                            "title": "JSON Array",
+                            "description": "JSON array string where each object becomes a table row"
+                        }
+                    },
+                    "required": [
+                        "jsonArrayString"
+                    ]
+                },
+                "propertiesUISchema": {
+                    "type": "VerticalLayout",
+                    "elements": [
+                        {
+                            "type": "Control",
+                            "scope": "#/properties/jsonArrayString",
+                            "options": {
+                                "format": "code",
+                                "language": "freemarker",
+                                "rows": 15
+                            }
+                        }
+                    ]
+                },
+                "status": null,
+                "nodeProgress": null
+            },
+            "width": 255,
+            "height": 100,
+            "selected": false,
+            "dragging": false,
+            "positionAbsolute": {
+                "x": 118.50012339858978,
+                "y": 67.05064919768716
+            }
+        }
+    ],
+    "edges": [
+        {
+            "type": "BaseEdge",
+            "source": "23",
+            "sourceHandle": "data",
+            "target": "24",
+            "targetHandle": "data",
+            "id": "reactflow__edge-23data-24data"
+        }
+    ]
+}

@@ -1,0 +1,434 @@
+{
+    "id": "eda6a76168255602bf3571a2cd2dcd0bbcba6a52e7f2e1e0e612f4893565f13b",
+    "name": "/home/roushan/Projects/Continuum/example-workflows/Unsloth.cwf",
+    "active": false,
+    "nodes": [
+        {
+            "id": "8",
+            "type": "BaseNode",
+            "position": {
+                "x": 1569.753235331514,
+                "y": 1060.3291400725761
+            },
+            "data": {
+                "id": "com.continuum.feature.ai.node.UnslothTrainerNodeModel",
+                "description": "Fine-tune Large Language Models using LoRA with Unsloth acceleration",
+                "title": "LLM Trainer (Unsloth)",
+                "subTitle": "Fine-tune LLMs with LoRA adapters",
+                "icon": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.5\">\n  <path stroke-linecap=\"round\" stroke-linejoin=\"round\" d=\"M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 00-2.456 2.456zM16.894 20.567L16.5 21.75l-.394-1.183a2.25 2.25 0 00-1.423-1.423L13.5 18.75l1.183-.394a2.25 2.25 0 001.423-1.423l.394-1.183.394 1.183a2.25 2.25 0 001.423 1.423l1.183.394-1.183.394a2.25 2.25 0 00-1.423 1.423z\" />\n</svg>",
+                "nodeModel": "com.continuum.feature.ai.node.UnslothTrainerNodeModel",
+                "busy": null,
+                "inputs": {
+                    "training_data": {
+                        "name": "Training Data",
+                        "contentType": "application/octet-stream"
+                    }
+                },
+                "outputs": {
+                    "model_info": {
+                        "name": "Model Info",
+                        "contentType": "application/json"
+                    }
+                },
+                "properties": {
+                    "model": "microsoft/phi-2",
+                    "inputColumn": "instruction",
+                    "outputColumn": "response",
+                    "epochs": 1,
+                    "batchSize": 16,
+                    "gradientAccumulation": 2,
+                    "learningRate": 0.0002,
+                    "maxSeqLength": 2048,
+                    "loraR": 16,
+                    "loraAlpha": 32,
+                    "loraDropout": 0.05,
+                    "warmupSteps": 5,
+                    "weightDecay": 0.01,
+                    "seed": 42,
+                    "saveSteps": 100,
+                    "loggingSteps": 10,
+                    "use4Bit": true,
+                    "parquetBatchSize": 10000
+                },
+                "propertiesSchema": {
+                    "type": "object",
+                    "properties": {
+                        "model": {
+                            "type": "string",
+                            "title": "Base Model",
+                            "description": "HuggingFace model identifier. Select from popular models or enter a custom model ID.",
+                            "default": "unsloth/Phi-4",
+                            "enum": [
+                                "unsloth/Phi-4",
+                                "unsloth/Phi-4-mini-instruct",
+                                "unsloth/mistral-7b-v0.3",
+                                "unsloth/mistral-7b-instruct-v0.3",
+                                "unsloth/llama-3-8b",
+                                "unsloth/llama-3-8b-instruct",
+                                "unsloth/llama-3.1-8b",
+                                "unsloth/llama-3.1-8b-instruct",
+                                "unsloth/llama-3.2-1b",
+                                "unsloth/llama-3.2-1b-instruct",
+                                "unsloth/llama-3.2-3b",
+                                "unsloth/llama-3.2-3b-instruct",
+                                "unsloth/gemma-2-2b",
+                                "unsloth/gemma-2-2b-it",
+                                "unsloth/gemma-2-9b",
+                                "unsloth/gemma-2-9b-it",
+                                "unsloth/Qwen2.5-1.5B",
+                                "unsloth/Qwen2.5-1.5B-Instruct",
+                                "unsloth/Qwen2.5-7B",
+                                "unsloth/Qwen2.5-7B-Instruct",
+                                "microsoft/phi-2",
+                                "microsoft/Phi-3-mini-4k-instruct",
+                                "mistralai/Mistral-7B-v0.3",
+                                "mistralai/Mistral-7B-Instruct-v0.3",
+                                "meta-llama/Llama-2-7b-hf",
+                                "meta-llama/Llama-2-7b-chat-hf",
+                                "google/gemma-2b",
+                                "google/gemma-7b",
+                                "Qwen/Qwen2-7B",
+                                "Qwen/Qwen2-7B-Instruct",
+                                "tiiuae/falcon-7b",
+                                "tiiuae/falcon-7b-instruct"
+                            ]
+                        },
+                        "inputColumn": {
+                            "type": "string",
+                            "title": "Input Column",
+                            "description": "Column name containing instruction/input text",
+                            "default": "instruction"
+                        },
+                        "outputColumn": {
+                            "type": "string",
+                            "title": "Output Column",
+                            "description": "Column name containing response/output text",
+                            "default": "response"
+                        },
+                        "systemPrompt": {
+                            "type": "string",
+                            "title": "System Prompt",
+                            "description": "Optional system prompt to prepend to all training examples"
+                        },
+                        "epochs": {
+                            "type": "integer",
+                            "title": "Epochs",
+                            "description": "Number of training epochs (full passes through data)",
+                            "default": 1,
+                            "minimum": 1,
+                            "maximum": 100
+                        },
+                        "batchSize": {
+                            "type": "integer",
+                            "title": "Batch Size",
+                            "description": "Number of samples per training step (higher = more memory, faster)",
+                            "default": 2,
+                            "minimum": 1,
+                            "maximum": 64
+                        },
+                        "gradientAccumulation": {
+                            "type": "integer",
+                            "title": "Gradient Accumulation Steps",
+                            "description": "Accumulate gradients over N steps (simulates larger batch size)",
+                            "default": 4,
+                            "minimum": 1,
+                            "maximum": 128
+                        },
+                        "learningRate": {
+                            "type": "number",
+                            "title": "Learning Rate",
+                            "description": "Step size for optimizer (too high = unstable, too low = slow)",
+                            "default": 0.0002,
+                            "minimum": 1e-7,
+                            "maximum": 0.1
+                        },
+                        "maxSeqLength": {
+                            "type": "integer",
+                            "title": "Max Sequence Length",
+                            "description": "Maximum token sequence length (longer = more memory)",
+                            "default": 2048,
+                            "minimum": 128,
+                            "maximum": 32768
+                        },
+                        "loraR": {
+                            "type": "integer",
+                            "title": "LoRA Rank (r)",
+                            "description": "Rank of LoRA matrices (higher = more capacity but slower)",
+                            "default": 16,
+                            "minimum": 1,
+                            "maximum": 256
+                        },
+                        "loraAlpha": {
+                            "type": "integer",
+                            "title": "LoRA Alpha",
+                            "description": "LoRA scaling factor (typically set equal to LoRA rank)",
+                            "default": 16,
+                            "minimum": 1,
+                            "maximum": 256
+                        },
+                        "loraDropout": {
+                            "type": "number",
+                            "title": "LoRA Dropout",
+                            "description": "Dropout rate for LoRA layers (0.0 = no dropout)",
+                            "default": 0,
+                            "minimum": 0,
+                            "maximum": 0.5
+                        },
+                        "warmupSteps": {
+                            "type": "integer",
+                            "title": "Warmup Steps",
+                            "description": "Gradually increase learning rate for N steps at start",
+                            "default": 5,
+                            "minimum": 0,
+                            "maximum": 1000
+                        },
+                        "weightDecay": {
+                            "type": "number",
+                            "title": "Weight Decay",
+                            "description": "L2 regularization to prevent overfitting",
+                            "default": 0.01,
+                            "minimum": 0,
+                            "maximum": 1
+                        },
+                        "seed": {
+                            "type": "integer",
+                            "title": "Random Seed",
+                            "description": "Random seed for reproducibility",
+                            "default": 42
+                        },
+                        "saveSteps": {
+                            "type": "integer",
+                            "title": "Save Steps",
+                            "description": "Save checkpoint every N steps",
+                            "default": 100,
+                            "minimum": 1
+                        },
+                        "loggingSteps": {
+                            "type": "integer",
+                            "title": "Logging Steps",
+                            "description": "Log metrics every N steps",
+                            "default": 10,
+                            "minimum": 1
+                        },
+                        "use4Bit": {
+                            "type": "boolean",
+                            "title": "Use 4-bit Quantization",
+                            "description": "Use 4-bit quantization to reduce memory usage (recommended)",
+                            "default": true
+                        },
+                        "parquetBatchSize": {
+                            "type": "integer",
+                            "title": "Parquet Batch Size",
+                            "description": "Rows to read at once from parquet file (lower = less memory)",
+                            "default": 10000,
+                            "minimum": 100,
+                            "maximum": 100000
+                        }
+                    },
+                    "required": [
+                        "model"
+                    ]
+                },
+                "propertiesUISchema": {
+                    "type": "Categorization",
+                    "elements": [
+                        {
+                            "type": "Category",
+                            "label": "Model",
+                            "elements": [
+                                {
+                                    "type": "Control",
+                                    "scope": "#/properties/model"
+                                }
+                            ]
+                        },
+                        {
+                            "type": "Category",
+                            "label": "Data",
+                            "elements": [
+                                {
+                                    "type": "Control",
+                                    "scope": "#/properties/inputColumn"
+                                },
+                                {
+                                    "type": "Control",
+                                    "scope": "#/properties/outputColumn"
+                                },
+                                {
+                                    "type": "Control",
+                                    "scope": "#/properties/systemPrompt",
+                                    "options": {
+                                        "multi": true,
+                                        "rows": 3
+                                    }
+                                }
+                            ]
+                        },
+                        {
+                            "type": "Category",
+                            "label": "Training",
+                            "elements": [
+                                {
+                                    "type": "Control",
+                                    "scope": "#/properties/epochs"
+                                },
+                                {
+                                    "type": "Control",
+                                    "scope": "#/properties/batchSize"
+                                },
+                                {
+                                    "type": "Control",
+                                    "scope": "#/properties/gradientAccumulation"
+                                },
+                                {
+                                    "type": "Control",
+                                    "scope": "#/properties/learningRate"
+                                },
+                                {
+                                    "type": "Control",
+                                    "scope": "#/properties/maxSeqLength"
+                                },
+                                {
+                                    "type": "Control",
+                                    "scope": "#/properties/warmupSteps"
+                                },
+                                {
+                                    "type": "Control",
+                                    "scope": "#/properties/weightDecay"
+                                }
+                            ]
+                        },
+                        {
+                            "type": "Category",
+                            "label": "LoRA",
+                            "elements": [
+                                {
+                                    "type": "Control",
+                                    "scope": "#/properties/loraR"
+                                },
+                                {
+                                    "type": "Control",
+                                    "scope": "#/properties/loraAlpha"
+                                },
+                                {
+                                    "type": "Control",
+                                    "scope": "#/properties/loraDropout"
+                                }
+                            ]
+                        },
+                        {
+                            "type": "Category",
+                            "label": "Advanced",
+                            "elements": [
+                                {
+                                    "type": "Control",
+                                    "scope": "#/properties/seed"
+                                },
+                                {
+                                    "type": "Control",
+                                    "scope": "#/properties/saveSteps"
+                                },
+                                {
+                                    "type": "Control",
+                                    "scope": "#/properties/loggingSteps"
+                                },
+                                {
+                                    "type": "Control",
+                                    "scope": "#/properties/use4Bit"
+                                },
+                                {
+                                    "type": "Control",
+                                    "scope": "#/properties/parquetBatchSize"
+                                }
+                            ]
+                        }
+                    ]
+                },
+                "status": null,
+                "nodeProgress": null
+            },
+            "width": 255,
+            "height": 123,
+            "selected": false,
+            "dragging": false,
+            "positionAbsolute": {
+                "x": 1569.753235331514,
+                "y": 1060.3291400725761
+            }
+        },
+        {
+            "id": "3",
+            "type": "BaseNode",
+            "position": {
+                "x": 1168.7096342623379,
+                "y": 976.8236516389022
+            },
+            "data": {
+                "id": "com.continuum.base.node.CreateTableNodeModel",
+                "description": "Creates a structured table from FreeMarker template configuration",
+                "title": "Create Table",
+                "subTitle": "Generate table rows from template",
+                "icon": "<svg xmlns=\"http://www.w3.org/2000/svg\" fill=\"none\" stroke=\"currentColor\" strokeWidth={1.5} viewBox=\"0 0 24 24\">\n\t<path d=\"M21.5 2h-19a.5.5 0 0 0-.5.5v19a.5.5 0 0 0 .5.5h19a.5.5 0 0 0 .5-.5v-19a.5.5 0 0 0-.5-.5zm-13 19H3v-5.5h5.5V21zm0-6.5H3v-5h5.5v5zm0-6H3V3h5.5v5.5zm6 12.5h-5v-5.5h5V21zm0-6.5h-5v-5h5v5zm0-6h-5V3h5v5.5zM21 21h-5.5v-5.5H21V21zm0-6.5h-5.5v-5H21v5zm0-6h-5.5V3H21v5.5z\" fill=\"currentColor\"/>\n</svg>",
+                "nodeModel": "com.continuum.base.node.CreateTableNodeModel",
+                "busy": null,
+                "inputs": null,
+                "outputs": {
+                    "data": {
+                        "name": "output table",
+                        "contentType": "text/plain"
+                    }
+                },
+                "properties": {
+                    "jsonArrayString": "[\n<#-- Math Q&A examples -->\n<#list 1..50000 as i>\n  <#assign a = (i * 7) % 100 + 1>\n  <#assign b = (i * 13) % 100 + 1>\n  {\"instruction\": \"What is ${a} + ${b}?\", \"response\": \"The sum of ${a} and ${b} is ${a + b}.\"},\n</#list>\n\n<#-- Multiplication examples -->\n<#list 1..50000 as i>\n  <#assign a = (i % 12) + 1>\n  <#assign b = (i % 10) + 1>\n  {\"instruction\": \"Calculate ${a} × ${b}\", \"response\": \"${a} × ${b} = ${a * b}\"},\n</#list>\n\n<#-- Temperature conversion examples -->\n<#list 0..50000 as celsius>\n  <#if celsius % 10 == 0>\n  <#assign fahrenheit = (celsius * 9 / 5) + 32>\n  {\"instruction\": \"Convert ${celsius}°C to Fahrenheit\", \"response\": \"${celsius}°C equals ${fahrenheit}°F. Formula: F = (C × 9/5) + 32\"},\n  </#if>\n</#list>\n\n<#-- Programming concepts -->\n<#assign concepts = [\n  {\"topic\": \"variable\", \"definition\": \"A named storage location in memory that holds a value which can be changed during program execution\"},\n  {\"topic\": \"function\", \"definition\": \"A reusable block of code that performs a specific task and can accept inputs (parameters) and return outputs\"},\n  {\"topic\": \"loop\", \"definition\": \"A control structure that repeats a block of code multiple times until a condition is met\"},\n  {\"topic\": \"array\", \"definition\": \"A data structure that stores a collection of elements, typically of the same type, in contiguous memory locations\"},\n  {\"topic\": \"class\", \"definition\": \"A blueprint for creating objects that defines properties (attributes) and behaviors (methods)\"},\n  {\"topic\": \"inheritance\", \"definition\": \"An OOP mechanism where a class can inherit properties and methods from a parent class\"},\n  {\"topic\": \"API\", \"definition\": \"Application Programming Interface - a set of protocols and tools that allows different software applications to communicate\"},\n  {\"topic\": \"recursion\", \"definition\": \"A programming technique where a function calls itself to solve smaller instances of the same problem\"}\n]>\n<#list concepts as concept>\n  {\"instruction\": \"What is a ${concept.topic} in programming?\", \"response\": \"${concept.definition}\"}<#if concept?has_next>,</#if>\n</#list>\n]"
+                },
+                "propertiesSchema": {
+                    "type": "object",
+                    "properties": {
+                        "jsonArrayString": {
+                            "type": "string",
+                            "title": "JSON Array",
+                            "description": "JSON array string where each object becomes a table row"
+                        }
+                    },
+                    "required": [
+                        "jsonArrayString"
+                    ]
+                },
+                "propertiesUISchema": {
+                    "type": "VerticalLayout",
+                    "elements": [
+                        {
+                            "type": "Control",
+                            "scope": "#/properties/jsonArrayString",
+                            "options": {
+                                "format": "code",
+                                "language": "freemarker",
+                                "rows": 15
+                            }
+                        }
+                    ]
+                },
+                "status": null,
+                "nodeProgress": null
+            },
+            "width": 255,
+            "height": 100,
+            "selected": false,
+            "positionAbsolute": {
+                "x": 1168.7096342623379,
+                "y": 976.8236516389022
+            },
+            "dragging": false
+        }
+    ],
+    "edges": [
+        {
+            "type": "BaseEdge",
+            "source": "3",
+            "sourceHandle": "data",
+            "target": "8",
+            "targetHandle": "training_data",
+            "id": "reactflow__edge-3data-8training_data"
+        }
+    ]
+}

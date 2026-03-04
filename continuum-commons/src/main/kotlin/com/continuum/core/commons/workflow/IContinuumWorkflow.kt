@@ -3,8 +3,11 @@ package com.continuum.core.commons.workflow
 import com.continuum.core.commons.model.ContinuumWorkflowModel
 import com.continuum.core.commons.model.PortData
 import com.continuum.core.commons.model.WorkflowSnapshot
+import com.continuum.core.commons.prototol.progress.ContinuumNodeActivitySignal
+import com.continuum.core.commons.prototol.progress.NodeProgress
 import io.temporal.common.SearchAttributeKey
 import io.temporal.workflow.QueryMethod
+import io.temporal.workflow.SignalMethod
 import io.temporal.workflow.WorkflowInterface
 import io.temporal.workflow.WorkflowMethod
 
@@ -22,6 +25,11 @@ interface IContinuumWorkflow {
 
   @QueryMethod
   fun getWorkflowSnapshot(): WorkflowSnapshot
+
+  @SignalMethod
+  fun updateNodeProgressSignal(
+    continuumNodeActivitySignal: ContinuumNodeActivitySignal
+  )
 }
 
 

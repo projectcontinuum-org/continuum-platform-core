@@ -1,6 +1,7 @@
 package com.continuum.core.commons.node
 
 import com.continuum.core.commons.model.ContinuumWorkflowModel
+import com.continuum.core.commons.prototol.progress.NodeProgressCallback
 import com.continuum.core.commons.utils.NodeInputReader
 import com.continuum.core.commons.utils.NodeOutputWriter
 import com.continuum.core.commons.utils.ValidationHelper
@@ -31,7 +32,8 @@ abstract class ProcessNodeModel : ContinuumNodeModel {
   open fun run(
     node: ContinuumWorkflowModel.Node,
     inputs: Map<String, NodeInputReader>,
-    nodeOutputWriter: NodeOutputWriter
+    nodeOutputWriter: NodeOutputWriter,
+    nodeProgressCallback: NodeProgressCallback
   ) {
     // Validate properties
     ValidationHelper.validateJsonWithSchema(
@@ -42,13 +44,19 @@ abstract class ProcessNodeModel : ContinuumNodeModel {
     execute(
       node.data.properties,
       inputs,
-      nodeOutputWriter
+      nodeOutputWriter,
+      nodeProgressCallback
     )
   }
 
   abstract fun execute(
     properties: Map<String, Any>?,
     inputs: Map<String, NodeInputReader>,
-    nodeOutputWriter: NodeOutputWriter
+    nodeOutputWriter: NodeOutputWriter,
+    nodeProgressCallback: NodeProgressCallback = object : NodeProgressCallback {
+      override fun report(nodeProgress: com.continuum.core.commons.prototol.progress.NodeProgress) {}
+      override fun report(progressPercentage: Int) {}
+    }
   )
+
 }

@@ -3,6 +3,7 @@ package com.continuum.base.node
 import com.continuum.core.commons.exception.NodeRuntimeException
 import com.continuum.core.commons.model.ContinuumWorkflowModel
 import com.continuum.core.commons.node.ProcessNodeModel
+import com.continuum.core.commons.prototol.progress.NodeProgressCallback
 import com.continuum.core.commons.utils.NodeInputReader
 import com.continuum.core.commons.utils.NodeOutputWriter
 import com.continuum.knime.base.node.org.knime.base.node.preproc.filter.row.RowFilterNodeModel
@@ -131,7 +132,8 @@ class SplitNodeModel : ProcessNodeModel() {
   override fun execute(
     properties: Map<String, Any>?,
     inputs: Map<String, NodeInputReader>,
-    nodeOutputWriter: NodeOutputWriter
+    nodeOutputWriter: NodeOutputWriter,
+    nodeProgressCallback: NodeProgressCallback
   ) {
     LOGGER.info("Splitting the input: ${objectMapper.writeValueAsString(inputs)}")
     // Wait for random seconds

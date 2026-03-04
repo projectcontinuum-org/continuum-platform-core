@@ -10,12 +10,12 @@ spring:
           environment:
             spring.cloud.stream.kafka:
               binder:
-                brokers: ${CONTINUUM_KAFKA_MAIN_BROKER_LIST}
+                brokers: ${CONTINUUM_KAFKA_MAIN_BROKER_LIST:localhost:39092,localhost:39093,localhost:39094}
                 consumer-properties:
                   key.deserializer: org.apache.kafka.common.serialization.StringDeserializer
                   # value.deserializer: io.confluent.kafka.serializers.KafkaAvroDeserializer
                   value.deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
-                  schema.registry.url: ${CONTINUUM_KAFKA_MAIN_SCHEMA_REGISTRY}
+                  schema.registry.url: ${CONTINUUM_KAFKA_MAIN_SCHEMA_REGISTRY:http://localhost:38080} # Not required yet
                   specific.avro.reader: true
                   auto.offset.reset: latest
                   fetch.max.wait.ms: 40000
@@ -24,13 +24,13 @@ spring:
                   key.serializer: org.apache.kafka.common.serialization.StringSerializer
                   # value.serializer: io.confluent.kafka.serializers.KafkaAvroSerializer
                   value.serializer: org.springframework.kafka.support.serializer.JsonSerializer
-                  schema.registry.url: ${CONTINUUM_KAFKA_MAIN_SCHEMA_REGISTRY}
+                  schema.registry.url: ${CONTINUUM_KAFKA_MAIN_SCHEMA_REGISTRY:http://localhost:38080} # Not required yet
                   max.request.size: 104857600
                 dlq-producer-properties:
                   key.serializer: org.apache.kafka.common.serialization.StringSerializer
                   # value.serializer: io.confluent.kafka.serializers.KafkaAvroSerializer
                   value.serializer: org.springframework.kafka.support.serializer.JsonSerializer
-                  schema.registry.url: ${CONTINUUM_KAFKA_MAIN_SCHEMA_REGISTRY}
+                  schema.registry.url: ${CONTINUUM_KAFKA_MAIN_SCHEMA_REGISTRY:http://localhost:38080} # Not required yet
                   max.request.size: 104857600
       bindings:
         continuum-core-event-WorkflowExecutionSnapshot-output:
@@ -42,22 +42,36 @@ spring:
   temporal:
     namespace: ${TEMPORAL_NAMESPACE:default}
     connection:
-      target: ${TEMPORAL_SERVER_ADDRESS}
+      target: ${TEMPORAL_SERVER_ADDRESS:localhost:7233}
     workersAutoDiscovery:
       packages: com.continuum.core.worker
 continuum.core:
   worker:
 #    node-task-queue: BASE_WORKER_ACTIVITY_TASK_QUEUE
-    aws-profile-name: ${CONTINUUM_AWS_PROFILE_NAME:continuum-worker }
-    cache-bucket-name: ${CONTINUUM_CACHE_BUCKET_NAME:jarvis-dev-jarvis-stage-area-3a355f49}
-    cache-bucket-base-path: ${CONTINUUM_CACHE_BUCKET_BASE_PATH:staging-data/test}
     cache-storage-path: ${CONTINUUM_CACHE_STORAGE_PATH:./.continuum-cache/workflow-data}
     knime:
       executable-path: ${CONTINUUM_KNIME_EXECUTABLE_PATH:/opt/knime/knime}
       workflow-storage-path: ${CONTINUUM_KNIME_WORKFLOW_STORAGE_PATH:./.continuum-cache/knime-workflows}
       workspace-storage-path: ${CONTINUUM_KNIME_WORKSPACE_STORAGE_PATH:./.continuum-cache/knime-workspaces}
+    storage:
+      type: ${CONTINUUM_STORAGE_TYPE:minio}
+      bucket-name: ${CONTINUUM_CACHE_BUCKET_NAME:continuum-worker-storage}
+      bucket-region: ${CONTINUUM_CACHE_BUCKET_REGION:us-east-2}
+      bucket-base-path: ${CONTINUUM_CACHE_BUCKET_BASE_PATH:workflow-data}
+      minio:
+        endpoint: ${CONTINUUM_MINIO_ENDPOINT:http://localhost:39000}
+        access-key: ${CONTINUUM_MINIO_USERNAME:minioadmin}
+        secret-key: ${CONTINUUM_MINIO_PASSWORD:minioadmin}
+#com.continuum:
+#  feature:
+#    ai:
+#      unsloth-trainer:
+#        venv-path: ${CONTINUUM_UNSLOTH_TRAINER_VENV_PATH:./unsloth-trainer/.venv}
 logging:
   level:
     root: error
     com.continuum.core.worker: info
     com.continuum.core.commons.node: info
+    com.continuum.core: info
+    com.continuum.feature.ai: debug
+    com.continuum.core.worker.activity: debug

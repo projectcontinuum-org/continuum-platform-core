@@ -1,14 +1,126 @@
 import * as React from 'react';
 import DialogTitle from '@mui/material/DialogTitle';
 import Dialog from '@mui/material/Dialog';
-import { Box, Button, DialogActions, DialogContent, IconButton, Typography, styled } from '@mui/material';
+import { Box, Button, DialogActions, DialogContent, IconButton, Typography, styled, Tabs, Tab } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
 import MaximizeIcon from '@mui/icons-material/Fullscreen';
 import RestoreIcon from '@mui/icons-material/FullscreenExit';
-import { JsonForms } from '@jsonforms/react';
-import { materialCells, materialRenderers } from '@jsonforms/material-renderers';
-import { JsonFormsCore, JsonSchema, UISchemaElement } from '@jsonforms/core';
+import { JsonForms, JsonFormsDispatch, withJsonFormsLayoutProps } from '@jsonforms/react';
+import {
+  materialCells,
+  materialRenderers
+} from '@jsonforms/material-renderers';
+import {
+  JsonFormsCore,
+  JsonSchema,
+  UISchemaElement,
+  rankWith,
+  uiTypeIs,
+  and,
+  categorizationHasCategory,
+  Categorization,
+  Category,
+  LayoutProps
+} from '@jsonforms/core';
 import CodeEditorControl, { codeEditorTester } from './CodeEditorRenderer';
+
+/**
+ * Custom Tab Panel component for categorization layout
+ */
+interface TabPanelProps {
+  children?: React.ReactNode;
+  index: number;
+  value: number;
+}
+
+function TabPanel(props: TabPanelProps) {
+  const { children, value, index, ...other } = props;
+  return (
+    <div
+      role="tabpanel"
+      hidden={value !== index}
+      id={`categorization-tabpanel-${index}`}
+      aria-labelledby={`categorization-tab-${index}`}
+      {...other}
+    >
+      {value === index && <Box sx={{ pt: 2 }}>{children}</Box>}
+    </div>
+  );
+}
+
+/**
+ * Custom Material Categorization Layout Renderer
+ * Renders categories as MUI Tabs with proper tab panel content
+ */
+const MaterialCategorizationLayoutRenderer = (props: LayoutProps) => {
+  const { uischema, schema, path, visible, renderers, cells } = props;
+  const [activeTab, setActiveTab] = React.useState(0);
+
+  const categorization = uischema as Categorization;
+  // Get all Category elements from the categorization
+  const categories = (categorization.elements || []).filter(
+    (el): el is Category => el.type === 'Category'
+  );
+
+  const handleTabChange = (_event: React.SyntheticEvent, newValue: number) => {
+    setActiveTab(newValue);
+  };
+
+  if (!visible) {
+    return null;
+  }
+
+  return (
+    <Box sx={{ width: '100%' }}>
+      <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
+        <Tabs
+          value={activeTab}
+          onChange={handleTabChange}
+          variant="scrollable"
+          scrollButtons="auto"
+        >
+          {categories.map((category: Category, index: number) => (
+            <Tab
+              key={index}
+              label={category.label || `Tab ${index + 1}`}
+              id={`categorization-tab-${index}`}
+              aria-controls={`categorization-tabpanel-${index}`}
+            />
+          ))}
+        </Tabs>
+      </Box>
+      {categories.map((category: Category, index: number) => (
+        <TabPanel key={index} value={activeTab} index={index}>
+          {category.elements?.map((element, elementIndex) => (
+            <JsonFormsDispatch
+              key={`${path}-${index}-${elementIndex}`}
+              uischema={element}
+              schema={schema}
+              path={path}
+              renderers={renderers}
+              cells={cells}
+            />
+          ))}
+        </TabPanel>
+      ))}
+    </Box>
+  );
+};
+
+// Wrap with JSON Forms HOC to inject props
+const MaterialCategorizationLayout = withJsonFormsLayoutProps(MaterialCategorizationLayoutRenderer);
+
+/**
+ * Custom tester for Categorization layout.
+ * Checks if the UI schema is a Categorization with at least one Category element.
+ */
+const categorizationTester = rankWith(
+  6, // Higher rank than default renderers
+  and(
+    uiTypeIs('Categorization'),
+    categorizationHasCategory
+  )
+);
 
 interface StyledDialogProps {
     customWidth?: number;
@@ -68,6 +180,7 @@ const MIN_DIALOG_HEIGHT = 300;
 
 const customRenderers = [
   { tester: codeEditorTester, renderer: CodeEditorControl },
+  { tester: categorizationTester, renderer: MaterialCategorizationLayout },
   ...materialRenderers,
 ];
 
@@ -189,11 +302,37 @@ export default function NodeDialog({ onClose, onSave, readOnly=false, open, init
                 }}>
                 <CloseIcon />
             </IconButton>
-            <DialogContent dividers>
+            <DialogContent dividers sx={{ display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
                 <Box sx={{
                     minWidth: "500px",
-                    minHeight: "500px",
-                    p: 5}}>
+                    flex: 1,
+                    display: 'flex',
+                    flexDirection: 'column',
+                    overflow: 'auto',
+                    p: 2,
+                    // Ensure JsonForms categorization layout takes full space
+                    '& > div': {
+                      display: 'flex',
+                      flexDirection: 'column',
+                      flex: 1,
+                    },
+                    // Style MUI Tabs for the categorization
+                    '& .MuiTabs-root': {
+                      minHeight: 'auto',
+                      borderBottom: 1,
+                      borderColor: 'divider',
+                    },
+                    // Ensure tab panels display correctly
+                    '& .MuiBox-root[role="tabpanel"]': {
+                      flex: 1,
+                      overflow: 'auto',
+                      pt: 2,
+                    },
+                    // Fix for hidden tab panels
+                    '& .MuiBox-root[role="tabpanel"][hidden]': {
+                      display: 'none',
+                    },
+                  }}>
                     <JsonForms
                         schema={dataSchema}
                         uischema={uiSchema}

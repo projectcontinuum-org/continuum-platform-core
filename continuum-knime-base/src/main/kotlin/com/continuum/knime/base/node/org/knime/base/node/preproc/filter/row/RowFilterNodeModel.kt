@@ -2,6 +2,7 @@ package com.continuum.knime.base.node.org.knime.base.node.preproc.filter.row
 
 import com.continuum.core.commons.model.ContinuumWorkflowModel
 import com.continuum.core.commons.node.KnimeNodeModel
+import com.continuum.core.commons.prototol.progress.NodeProgressCallback
 import com.continuum.core.commons.utils.NodeInputReader
 import com.continuum.core.commons.utils.NodeOutputWriter
 import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
@@ -88,7 +89,8 @@ class RowFilterNodeModel(
   override fun execute(
     properties: Map<String, Any>?,
     inputs: Map<String, NodeInputReader>,
-    nodeOutputWriter: NodeOutputWriter
+    nodeOutputWriter: NodeOutputWriter,
+    nodeProgressCallback: NodeProgressCallback
   ) {
     // Do nothing
   }

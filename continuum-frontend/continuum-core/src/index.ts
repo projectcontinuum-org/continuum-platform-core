@@ -1,6 +1,6 @@
 import IWorkflowExecutionContext from "./types/IWorkflowExecutionContext.js"
 import { MimeTypes } from "./model/MimeTypes.js";
-import IBaseNodeModel, { IBaseNodeData, IData, INodeInputs, INodeOutputs, IPortProps, IPorts } from "./types/IBaseNode.js"
+import IBaseNodeModel, { IBaseNodeData, IData, INodeInputs, INodeOutputs, IPortProps, IPorts, INodeProgress, StageStatus } from "./types/IBaseNode.js"
 import Workflow from "./model/Workflow.js"
 import INodeToOutputsMap from "./types/INodeToOutputsMap.js"
 import IJobData from "./types/IJobData.js"
@@ -16,12 +16,14 @@ import INodeRepoTreeItem from "./types/INodeRepoTreeItem.js"
 import INodePackageExport, {INodeModelExport} from "./types/INodePackageExport.js"
 import ITreeItem from "./types/ITreeItem.js"
 import IExecution from "./types/IExecution.js"
+import INodeExplorerTreeItem, { NodeExplorerItemType } from "./types/INodeExplorerTreeItem.js"
 
 export {
     MimeTypes,
     Workflow,
     AbstractBaseNodeModel,
     AbstractTriggerNodeModel,
+    StageStatus,
     type IBaseNodeModel,
     type ITriggerNodeModel,
     type IWorkflowExecutionContext,
@@ -42,5 +44,8 @@ export {
     type INodePackageExport,
     type INodeModelExport,
     type ITreeItem,
-    type IExecution
+    type IExecution,
+    type INodeProgress,
+    type INodeExplorerTreeItem,
+    type NodeExplorerItemType
 }

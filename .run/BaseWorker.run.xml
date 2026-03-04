@@ -1,8 +1,6 @@
 <component name="ProjectRunConfigurationManager">
   <configuration default="false" name="BaseWorker" type="SpringBootApplicationConfigurationType" factoryName="Spring Boot">
     <envs>
-      <env name="CONTINUUM_AWS_PROFILE_NAME" value="jarvis-dev" />
-      <env name="CONTINUUM_CACHE_BUCKET_NAME" value="jarvis-replication-test-bucket" />
       <env name="CONTINUUM_KAFKA_MAIN_BROKER_LIST" value="localhost:39092,localhost:39093,localhost:39094" />
       <env name="TEMPORAL_SERVER_ADDRESS" value="localhost:7233" />
     </envs>

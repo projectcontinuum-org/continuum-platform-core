@@ -94,7 +94,7 @@ class CreateTableNodeModelTest {
         val rowCaptor = argumentCaptor<Map<String, Any>>()
 
         // Act
-        nodeModel.execute(properties, mockOutputWriter)
+        nodeModel.execute(properties, emptyMap(), mockOutputWriter)
 
         // Assert
         verify(mockPortWriter, org.mockito.kotlin.times(2)).write(any(), rowCaptor.capture())
@@ -114,7 +114,7 @@ class CreateTableNodeModelTest {
         val rowCaptor = argumentCaptor<Map<String, Any>>()
 
         // Act
-        nodeModel.execute(properties, mockOutputWriter)
+        nodeModel.execute(properties, emptyMap(), mockOutputWriter)
 
         // Assert
         verify(mockPortWriter).write(any(), rowCaptor.capture())
@@ -132,7 +132,7 @@ class CreateTableNodeModelTest {
         val rowCaptor = argumentCaptor<Map<String, Any>>()
 
         // Act
-        nodeModel.execute(properties, mockOutputWriter)
+        nodeModel.execute(properties, emptyMap(), mockOutputWriter)
 
         // Assert
         verify(mockPortWriter, org.mockito.kotlin.times(3)).write(any(), rowCaptor.capture())
@@ -152,7 +152,7 @@ class CreateTableNodeModelTest {
         val rowCaptor = argumentCaptor<Map<String, Any>>()
 
         // Act
-        nodeModel.execute(properties, mockOutputWriter)
+        nodeModel.execute(properties, emptyMap(), mockOutputWriter)
 
         // Assert
         verify(mockPortWriter, org.mockito.kotlin.times(2)).write(any(), rowCaptor.capture())
@@ -170,7 +170,7 @@ class CreateTableNodeModelTest {
         val rowCaptor = argumentCaptor<Map<String, Any>>()
 
         // Act
-        nodeModel.execute(properties, mockOutputWriter)
+        nodeModel.execute(properties, emptyMap(), mockOutputWriter)
 
         // Assert
         verify(mockPortWriter).write(any(), rowCaptor.capture())
@@ -191,7 +191,7 @@ class CreateTableNodeModelTest {
         val rowCaptor = argumentCaptor<Map<String, Any>>()
 
         // Act
-        nodeModel.execute(properties, mockOutputWriter)
+        nodeModel.execute(properties, emptyMap(), mockOutputWriter)
 
         // Assert
         verify(mockPortWriter, org.mockito.kotlin.times(2)).write(any(), rowCaptor.capture())
@@ -219,7 +219,7 @@ class CreateTableNodeModelTest {
         val rowCaptor = argumentCaptor<Map<String, Any>>()
 
         // Act
-        nodeModel.execute(properties, mockOutputWriter)
+        nodeModel.execute(properties, emptyMap(), mockOutputWriter)
 
         // Assert
         verify(mockPortWriter).write(any(), rowCaptor.capture())
@@ -238,7 +238,7 @@ class CreateTableNodeModelTest {
         val rowCaptor = argumentCaptor<Map<String, Any>>()
 
         // Act
-        nodeModel.execute(properties, mockOutputWriter)
+        nodeModel.execute(properties, emptyMap(), mockOutputWriter)
 
         // Assert
         verify(mockPortWriter).write(any(), rowCaptor.capture())
@@ -257,7 +257,7 @@ class CreateTableNodeModelTest {
         val indexCaptor = argumentCaptor<Long>()
 
         // Act
-        nodeModel.execute(properties, mockOutputWriter)
+        nodeModel.execute(properties, emptyMap(), mockOutputWriter)
 
         // Assert
         verify(mockPortWriter, org.mockito.kotlin.times(3)).write(indexCaptor.capture(), any())
@@ -276,7 +276,7 @@ class CreateTableNodeModelTest {
         val rowCaptor = argumentCaptor<Map<String, Any>>()
 
         // Act
-        nodeModel.execute(properties, mockOutputWriter)
+        nodeModel.execute(properties, emptyMap(), mockOutputWriter)
 
         // Assert
         verify(mockPortWriter, org.mockito.kotlin.times(100)).write(any(), rowCaptor.capture())
@@ -294,7 +294,7 @@ class CreateTableNodeModelTest {
         val rowCaptor = argumentCaptor<Map<String, Any>>()
 
         // Act
-        nodeModel.execute(properties, mockOutputWriter)
+        nodeModel.execute(properties, emptyMap(), mockOutputWriter)
 
         // Assert
         verify(mockPortWriter).write(any(), rowCaptor.capture())
@@ -311,7 +311,7 @@ class CreateTableNodeModelTest {
         val rowCaptor = argumentCaptor<Map<String, Any>>()
 
         // Act
-        nodeModel.execute(properties, mockOutputWriter)
+        nodeModel.execute(properties, emptyMap(), mockOutputWriter)
 
         // Assert
         verify(mockPortWriter, org.mockito.kotlin.times(2)).write(any(), rowCaptor.capture())
@@ -329,7 +329,7 @@ class CreateTableNodeModelTest {
 
         // Act & Assert
         val exception = assertThrows<NodeRuntimeException> {
-            nodeModel.execute(properties, mockOutputWriter)
+            nodeModel.execute(properties, emptyMap(), mockOutputWriter)
         }
         assertEquals("jsonArrayString is not provided", exception.message)
     }
@@ -342,7 +342,7 @@ class CreateTableNodeModelTest {
 
         // Act & Assert
         val exception = assertThrows<NodeRuntimeException> {
-            nodeModel.execute(properties, mockOutputWriter)
+            nodeModel.execute(properties, emptyMap(), mockOutputWriter)
         }
         assertEquals("jsonArrayString is not provided", exception.message)
     }
@@ -353,7 +353,7 @@ class CreateTableNodeModelTest {
         val properties = mapOf("jsonArrayString" to "")
 
         // Act
-        nodeModel.execute(properties, mockOutputWriter)
+        nodeModel.execute(properties, emptyMap(), mockOutputWriter)
 
         // Assert
         verify(mockPortWriter, org.mockito.kotlin.never()).write(any(), any())
@@ -365,7 +365,7 @@ class CreateTableNodeModelTest {
         val properties = mapOf("jsonArrayString" to "   \n\t  ")
 
         // Act
-        nodeModel.execute(properties, mockOutputWriter)
+        nodeModel.execute(properties, emptyMap(), mockOutputWriter)
 
         // Assert
         verify(mockPortWriter, org.mockito.kotlin.never()).write(any(), any())
@@ -380,7 +380,7 @@ class CreateTableNodeModelTest {
 
         // Act & Assert
         val exception = assertThrows<NodeRuntimeException> {
-            nodeModel.execute(properties, mockOutputWriter)
+            nodeModel.execute(properties, emptyMap(), mockOutputWriter)
         }
         @Suppress("UNNECESSARY_NOT_NULL_ASSERTION")
         assertTrue(exception.message!!.contains("Template rendering failed"))
@@ -395,7 +395,7 @@ class CreateTableNodeModelTest {
 
         // Act & Assert
         val exception = assertThrows<NodeRuntimeException> {
-            nodeModel.execute(properties, mockOutputWriter)
+            nodeModel.execute(properties, emptyMap(), mockOutputWriter)
         }
         @Suppress("UNNECESSARY_NOT_NULL_ASSERTION")
         assertTrue(exception.message!!.contains("Invalid JSON array format"))
@@ -410,7 +410,7 @@ class CreateTableNodeModelTest {
 
         // Act & Assert
         val exception = assertThrows<NodeRuntimeException> {
-            nodeModel.execute(properties, mockOutputWriter)
+            nodeModel.execute(properties, emptyMap(), mockOutputWriter)
         }
         @Suppress("UNNECESSARY_NOT_NULL_ASSERTION")
         assertTrue(exception.message!!.contains("Invalid JSON array format"))
@@ -425,7 +425,7 @@ class CreateTableNodeModelTest {
 
         // Act & Assert
         val exception = assertThrows<NodeRuntimeException> {
-            nodeModel.execute(properties, mockOutputWriter)
+            nodeModel.execute(properties, emptyMap(), mockOutputWriter)
         }
         @Suppress("UNNECESSARY_NOT_NULL_ASSERTION")
         assertTrue(exception.message!!.contains("Invalid JSON array format"))
@@ -439,7 +439,7 @@ class CreateTableNodeModelTest {
         )
 
         // Act
-        nodeModel.execute(properties, mockOutputWriter)
+        nodeModel.execute(properties, emptyMap(), mockOutputWriter)
 
         // Assert
         verify(mockPortWriter, org.mockito.kotlin.never()).write(any(), any())
@@ -453,7 +453,7 @@ class CreateTableNodeModelTest {
         )
 
         // Act
-        nodeModel.execute(properties, mockOutputWriter)
+        nodeModel.execute(properties, emptyMap(), mockOutputWriter)
 
         // Assert
         verify(mockPortWriter, org.mockito.kotlin.never()).write(any(), any())
@@ -468,7 +468,7 @@ class CreateTableNodeModelTest {
 
         // Act & Assert
         val exception = assertThrows<NodeRuntimeException> {
-            nodeModel.execute(properties, mockOutputWriter)
+            nodeModel.execute(properties, emptyMap(), mockOutputWriter)
         }
         @Suppress("UNNECESSARY_NOT_NULL_ASSERTION")
         assertTrue(exception.message!!.contains("Template rendering failed"))
@@ -484,7 +484,7 @@ class CreateTableNodeModelTest {
 
         // Act & Assert
         val exception = assertThrows<NodeRuntimeException> {
-            nodeModel.execute(properties, mockOutputWriter)
+            nodeModel.execute(properties, emptyMap(), mockOutputWriter)
         }
         @Suppress("UNNECESSARY_NOT_NULL_ASSERTION")
         assertTrue(exception.message!!.contains("Invalid JSON array format"))
@@ -498,7 +498,7 @@ class CreateTableNodeModelTest {
 
         // Act & Assert
         val exception = assertThrows<NodeRuntimeException> {
-            nodeModel.execute(properties, mockOutputWriter)
+            nodeModel.execute(properties, emptyMap(), mockOutputWriter)
         }
         assertEquals(false, exception.isRetriable)
     }
@@ -515,7 +515,7 @@ class CreateTableNodeModelTest {
         val rowCaptor = argumentCaptor<Map<String, Any>>()
 
         // Act
-        nodeModel.execute(properties, mockOutputWriter)
+        nodeModel.execute(properties, emptyMap(), mockOutputWriter)
 
         // Assert
         verify(mockPortWriter).write(any(), rowCaptor.capture())
@@ -532,7 +532,7 @@ class CreateTableNodeModelTest {
         val rowCaptor = argumentCaptor<Map<String, Any>>()
 
         // Act
-        nodeModel.execute(properties, mockOutputWriter)
+        nodeModel.execute(properties, emptyMap(), mockOutputWriter)
 
         // Assert
         verify(mockPortWriter).write(any(), rowCaptor.capture())
@@ -549,7 +549,7 @@ class CreateTableNodeModelTest {
         val rowCaptor = argumentCaptor<Map<String, Any>>()
 
         // Act
-        nodeModel.execute(properties, mockOutputWriter)
+        nodeModel.execute(properties, emptyMap(), mockOutputWriter)
 
         // Assert
         verify(mockPortWriter).write(any(), rowCaptor.capture())
@@ -567,7 +567,7 @@ class CreateTableNodeModelTest {
         val rowCaptor = argumentCaptor<Map<String, Any>>()
 
         // Act
-        nodeModel.execute(properties, mockOutputWriter)
+        nodeModel.execute(properties, emptyMap(), mockOutputWriter)
 
         // Assert
         verify(mockPortWriter, org.mockito.kotlin.times(2)).write(any(), rowCaptor.capture())
@@ -583,7 +583,7 @@ class CreateTableNodeModelTest {
         val rowCaptor = argumentCaptor<Map<String, Any>>()
 
         // Act
-        nodeModel.execute(properties, mockOutputWriter)
+        nodeModel.execute(properties, emptyMap(), mockOutputWriter)
 
         // Assert
         // Should have 3 rows
@@ -600,7 +600,7 @@ class CreateTableNodeModelTest {
         )
 
         // Act
-        nodeModel.execute(properties, mockOutputWriter)
+        nodeModel.execute(properties, emptyMap(), mockOutputWriter)
 
         // Assert
         verify(mockPortWriter).close()
@@ -616,7 +616,7 @@ class CreateTableNodeModelTest {
 
         // Act & Assert
         assertThrows<NodeRuntimeException> {
-            nodeModel.execute(properties, mockOutputWriter)
+            nodeModel.execute(properties, emptyMap(), mockOutputWriter)
         }
     }
 
@@ -629,7 +629,7 @@ class CreateTableNodeModelTest {
         val rowCaptor = argumentCaptor<Map<String, Any>>()
 
         // Act
-        nodeModel.execute(properties, mockOutputWriter)
+        nodeModel.execute(properties, emptyMap(), mockOutputWriter)
 
         // Assert
         verify(mockPortWriter, org.mockito.kotlin.times(3)).write(any(), rowCaptor.capture())

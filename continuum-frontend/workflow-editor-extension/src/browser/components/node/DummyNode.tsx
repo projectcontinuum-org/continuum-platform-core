@@ -3,103 +3,186 @@ import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import CancelIcon from '@mui/icons-material/Cancel';
 import WarningAmberIcon from '@mui/icons-material/WarningAmber';
 import { IBaseNodeData } from "@continuum/core";
-import "./BaseNode.css"
-import { Box, CircularProgress, Grid, Typography } from "@mui/material";
+import "./BaseNode.css";
+import { Box, CircularProgress, Grid, Tooltip, Typography } from "@mui/material";
 import Bolt from "@mui/icons-material/Bolt";
+import DynamicIcon from "../utils/DynamicIcon";
 
+const getStatusColor = (status: IBaseNodeData['status']) => {
+    switch (status) {
+        case 'SUCCESS':
+            return 'success.main';
+        case 'FAILED':
+            return 'error.main';
+        case 'WARNING':
+            return 'warning.main';
+        case 'BUSY':
+        case 'PRE-PROCESSING':
+        case 'POST-PROCESSING':
+            return 'info.main';
+        case 'ACTIVE':
+            return 'warning.main';
+        default:
+            return 'text.secondary';
+    }
+};
+
+/**
+ * A lightweight version of BaseNode without ReactFlow Handle components.
+ * Used for drag preview overlay where ReactFlow context is not available.
+ */
 export default function DummyNode(props: IBaseNodeData) {
-
     return (
-        <Grid container
+        <Grid
+            container
             direction="row"
             justifyContent="space-between"
             alignItems="center"
+            className="node-body"
+            position="relative"
             sx={{
-                display: "flex",
-                flexDirection: "row",
-                justifyContent: "space-between",
-                alignItems: "center",
-                borderColor: "secondary.main",
-                borderStyle: "solid",
-                borderWidth: "2px",
-                borderRadius: "10px",
-                width: "200px",
-                height: "100px",
-                padding: "0px",
-                bgcolor: "background.default"
+                borderRadius: '10px',
+                display: 'flex',
+                flexDirection: 'row',
+                justifyContent: 'space-between',
+                minHeight: '100px',
+                minWidth: '200px',
+                fontFamily: '"Fira Mono", Monospace',
+                fontWeight: 500,
+                letterSpacing: '-0.2px',
+                borderColor: 'secondary.main',
+                borderWidth: '2px',
+                borderStyle: 'solid',
+                bgcolor: 'background.default',
+                backdropFilter: 'blur(8px)',
             }}
-            position="relative">
-            <Grid item className="target-port-group" sx={{
-                position: "absolute",
-                width: "10px",
-                height: "100%",
-                display: "flex",
-                flexDirection: "column",
-                justifyContent: "center",
-                alignItems: "center",}}>
-                {
-                    props.inputs && Object.entries(props.inputs).map(([portId])=><Box key={portId} sx={{
-                        background: "transparent",
-                        borderColor: "secondary.main",
-                        borderStyle: "solid",
-                        borderWidth: "2px",
-                        borderRadius: "50%",
-                        minWidth: "10px",
-                        minHeight: "10px",
-                        top: "0px",
-                        marginTop: "10px",
-                        position: "relative",
-                        left: "-15px"
-                    }} />)
-                }
+        >
+            <Grid
+                container
+                direction="column"
+                justifyContent="space-around"
+                alignItems="center"
+                className="target-port-group"
+                sx={{
+                    position: 'absolute',
+                    left: 0,
+                    height: "100%",
+                    width: "10px",
+                }}
+            >
+                {props.inputs &&
+                    Object.entries(props.inputs).map(([portId]) => (
+                        <Box
+                            key={portId}
+                            sx={{
+                                background: 'transparent',
+                                borderStyle: 'solid',
+                                borderWidth: '2px',
+                                borderRadius: '50%',
+                                borderColor: 'secondary.main',
+                                minWidth: '10px',
+                                minHeight: '10px',
+                                marginTop: '10px',
+                                position: 'relative',
+                                left: '-15px',
+                            }}
+                        />
+                    ))}
             </Grid>
             <Grid className="node-content">
-                <Grid className="inner">
-                    <Grid className="body">
-                        <Grid className="text" sx={{paddingLeft: "10px"}}>
-                            <Typography variant="h6" sx={{
-                                fontSize: "16px",
-                                marginBottom: "2px",
-                                lineHeight: 1
-                            }}>{props.title}</Typography>
-                            {props.subTitle && <Typography sx={{
-                                fontSize: "12px",
-                                color: "#777"
-                            }} variant="h6">{props.subTitle}</Typography>}
-                        </Grid>
-                        {props.status == "BUSY" && 
-                            <Grid className="progress">
-                                <CircularProgress size={30} color="secondary" />
-                            </Grid>
-                        }
-                        {props.status != "BUSY" && 
-                            <Grid className="status-badge">
-                                {props.status == "SUCCESS" && <CheckCircleIcon color="success"/>}
-                                {props.status == "FAILED" && <CancelIcon color="error"/>}
-                                {props.status == "WARNING" && <WarningAmberIcon color="warning"/>}
-                                {props.status == "ACTIVE" && <Bolt color="warning"/>}
-                            </Grid>
-                        }
-                    </Grid>
-                </Grid>
+                <Box className="inner">
+                    <Box className="body" sx={{
+                        display: 'flex',
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        gap: '8px',
+                        minWidth: '200px',
+                        minHeight: '80px',
+                        padding: '10px',
+                    }}>
+                        {props.icon && (
+                            <DynamicIcon icon={props.icon} fontSize="large" />
+                        )}
+                        <Box className="text">
+                            <Typography variant="h6">{props.title}</Typography>
+                            {props.subTitle && (
+                                <Tooltip title={props.subTitle} placement="top">
+                                    <Typography className="subline" variant="body2">
+                                        {props.subTitle}
+                                    </Typography>
+                                </Tooltip>
+                            )}
+                            {props.status && (
+                                <Typography
+                                    variant="caption"
+                                    sx={{ display: 'block', color: getStatusColor(props.status), fontWeight: 500 }}
+                                >
+                                    {props.status}
+                                </Typography>
+                            )}
+                        </Box>
+
+                        {props.status == "BUSY" && (
+                            <Box className="progress">
+                                <CircularProgress
+                                    size={28}
+                                    color="secondary"
+                                    sx={{
+                                        animationDuration: "200ms",
+                                    }}
+                                />
+                            </Box>
+                        )}
+
+                        {props.status != "BUSY" && (
+                            <Box className="status-badge">
+                                {props.status == "SUCCESS" && (
+                                    <CheckCircleIcon color="success" />
+                                )}
+                                {props.status == "FAILED" && (
+                                    <CancelIcon color="error" />
+                                )}
+                                {props.status == "WARNING" && (
+                                    <WarningAmberIcon color="warning" />
+                                )}
+                                {props.status == "ACTIVE" && <Bolt color="warning" />}
+                            </Box>
+                        )}
+                    </Box>
+                </Box>
             </Grid>
-            <Grid item className="source-port-group">
-                {
-                    props.outputs && Object.entries(props.outputs).map(([portId])=><Box key={portId} sx={{
-                        background: "transparent",
-                        borderColor: "primary.main",
-                        borderStyle: "solid",
-                        borderWidth: "2px",
-                        borderRadius: "50%",
-                        minWidth: "10px",
-                        minHeight: "10px",
-                        marginTop: "10px",
-                        position: "relative",
-                        right: "-15px"
-                    }} />)
-                }
+            <Grid
+                container
+                direction="column"
+                justifyContent="space-around"
+                alignItems="center"
+                className="source-port-group"
+                sx={{
+                    position: 'absolute',
+                    right: 0,
+                    height: "100%",
+                    width: "10px",
+                }}
+            >
+                {props.outputs &&
+                    Object.entries(props.outputs).map(([portId]) => (
+                        <Box
+                            key={portId}
+                            sx={{
+                                background: 'transparent',
+                                borderStyle: 'solid',
+                                borderWidth: '2px',
+                                borderRadius: '50%',
+                                borderColor: 'primary.main',
+                                minWidth: '10px',
+                                minHeight: '10px',
+                                marginTop: '10px',
+                                position: 'relative',
+                                right: '-15px',
+                            }}
+                        />
+                    ))}
             </Grid>
         </Grid>
     );
-    
 }

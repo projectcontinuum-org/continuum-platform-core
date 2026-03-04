@@ -3,6 +3,7 @@ package com.continuum.base.node
 import com.continuum.core.commons.exception.NodeRuntimeException
 import com.continuum.core.commons.model.ContinuumWorkflowModel
 import com.continuum.core.commons.node.ProcessNodeModel
+import com.continuum.core.commons.prototol.progress.NodeProgressCallback
 import com.continuum.core.commons.utils.NodeInputReader
 import com.continuum.core.commons.utils.NodeOutputWriter
 import com.fasterxml.jackson.core.type.TypeReference
@@ -10,11 +11,12 @@ import com.fasterxml.jackson.databind.ObjectMapper
 import freemarker.template.Configuration
 import freemarker.template.Template
 import freemarker.template.TemplateExceptionHandler
+import io.temporal.activity.Activity
 import org.slf4j.LoggerFactory
-import org.springframework.http.MediaType.TEXT_PLAIN_VALUE
 import org.springframework.http.HttpEntity
 import org.springframework.http.HttpHeaders
 import org.springframework.http.HttpMethod
+import org.springframework.http.MediaType.TEXT_PLAIN_VALUE
 import org.springframework.http.ResponseEntity
 import org.springframework.stereotype.Component
 import org.springframework.web.client.RestTemplate
@@ -37,6 +39,9 @@ class RestNodeModel(
       fallbackOnNullLoopVariable = false
       numberFormat = "computer"  // Outputs: 1000, 100, not 1,000, 1,00
     }
+
+    // Progress reporting interval in milliseconds (report every 5 seconds)
+    private const val PROGRESS_REPORT_INTERVAL_MS = 500L
   }
 
   final override val inputPorts = mapOf(
@@ -131,8 +136,8 @@ class RestNodeModel(
   override val metadata = ContinuumWorkflowModel.NodeData(
     id = this.javaClass.name,
     description = "Makes HTTP requests for each row using FreeMarker templated URLs and payloads",
-    title = "REST Node",
-    subTitle = "HTTP client with FreeMarker templates",
+    title = "REST Client",
+    subTitle = "Invoke REST APIs",
     nodeModel = this.javaClass.name,
     icon = """
             <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" strokeWidth={1.5} viewBox="0 0 24 24">
@@ -167,10 +172,26 @@ class RestNodeModel(
     }
   }
 
+  /**
+   * Calculates the progress percentage based on the number of rows processed.
+   *
+   * @param rowsProcessed The number of rows that have been processed
+   * @param totalRows The total number of rows to process
+   * @return Progress percentage (0-99), capped at 99 during processing to ensure 100% is only reported at completion
+   */
+  private fun calculateProgressPercentage(rowsProcessed: Long, totalRows: Long?): Int {
+    return if (totalRows != null && totalRows > 0) {
+      (rowsProcessed * 100 / totalRows).toInt().coerceAtMost(99)
+    } else {
+      0
+    }
+  }
+
   override fun execute(
     properties: Map<String, Any>?,
     inputs: Map<String, NodeInputReader>,
-    nodeOutputWriter: NodeOutputWriter
+    nodeOutputWriter: NodeOutputWriter,
+    nodeProgressCallback: NodeProgressCallback
   ) {
     val method = properties?.get("method") as String? ?: throw NodeRuntimeException(
       workflowId = "",
@@ -184,14 +205,18 @@ class RestNodeModel(
     )
     val payloadTemplate = properties["payload"] as String? ?: ""
 
-    LOGGER.info("REST Node: method=$method, urlTemplate=$urlTemplate")
+    var lastProgressReportTime = System.currentTimeMillis()
 
+    LOGGER.info("REST Node: method=$method, urlTemplate=$urlTemplate")
+    val totalRowCount = inputs["data"]?.getRowCount()
     nodeOutputWriter.createOutputPortWriter("data").use { writer ->
       inputs["data"]?.use { reader ->
         var row = reader.read()
         var rowNumber = 0L
 
         while (row != null) {
+          // Fake random delay
+          // Thread.sleep((10..100).random().toLong())
           try {
             // Render templates
             val url = renderTemplate(urlTemplate, row)
@@ -240,13 +265,12 @@ class RestNodeModel(
             // Add response to row
             val newRow = row.toMutableMap().apply {
               this["response"] = mapOf(
-                "status" to response.statusCode.value(),
+                "status" to response.statusCodeValue,
                 "body" to response.body
               )
             }
 
             writer.write(rowNumber, newRow)
-            rowNumber++
 
           } catch (e: Exception) {
             LOGGER.error("Failed to make HTTP request for row $rowNumber: ${e.message}")
@@ -276,12 +300,24 @@ class RestNodeModel(
             }
 
             writer.write(rowNumber, newRow)
-            rowNumber++
+          }
+
+          rowNumber++
+
+          // Report progress only every X seconds
+          val currentTime = System.currentTimeMillis()
+          if (currentTime - lastProgressReportTime >= PROGRESS_REPORT_INTERVAL_MS) {
+            val progressPercentage = calculateProgressPercentage(rowNumber, totalRowCount)
+            nodeProgressCallback.report(progressPercentage)
+            lastProgressReportTime = currentTime
+            LOGGER.debug("Progress: $progressPercentage% ($rowNumber/$totalRowCount rows processed)")
           }
 
           row = reader.read()
         }
 
+        // Report final progress (100%)
+        nodeProgressCallback.report(100)
         LOGGER.info("Processed $rowNumber HTTP requests")
       }
     }

@@ -9,9 +9,9 @@ import React, { useEffect } from "react";
 import { MessageService, UNTITLED_SCHEME, URI } from "@theia/core";
 import { RemoteFileSystemProvider } from '@theia/filesystem/lib/common/remote-file-system-provider';
 import { INodeRepoTreeItem, IWorkflow, Workflow } from '@continuum/core';
-import WorkflowEditor from '../../components/workflow-editor/WorkflowEditor';
+import WorkflowEditor, { WorkflowEditorRef } from '../../components/workflow-editor/WorkflowEditor';
 import { ThemeProvider } from '@mui/material/styles';
-import { Node, ReactFlowInstance, ReactFlowProvider, useReactFlow } from 'reactflow';
+import { Node, Edge, ReactFlowInstance, ReactFlowProvider, useReactFlow } from 'reactflow';
 import { DraggableEvent } from 'react-draggable';
 import { CssBaseline } from '@mui/material';
 import {Experimental_CssVarsProvider as CssVarsProvider, experimental_extendTheme} from "@mui/material"
@@ -20,6 +20,10 @@ import { useMUIThemeStore } from '../../store/MUIThemeStore';
 import WorkflowDocument from './WorkflowDocument';
 import { FileDialogService } from '@theia/filesystem/lib/browser';
 import ContinuumNodeDialog from '../../dialog/node-dialog/ContinuumNodeDialog';
+import { ContextMenuRenderer } from '@theia/core/lib/browser/context-menu-renderer';
+import { ContextKeyService, ContextKey } from '@theia/core/lib/browser/context-key-service';
+import { WORKFLOW_EDITOR_CONTEXT_MENU } from '../../menu/WorkflowEditorContextMenu';
+import { WorkflowClipboardService } from '../../service/WorkflowClipboardService';
 
 export const WorkflowEditorWidgetOptions = Symbol('WorkflowEditorWidgetOptions');
 export interface WorkflowEditorWidgetOptions {
@@ -34,6 +38,14 @@ export default class WorkflowEditorWidget extends ReactWidget implements Navigat
     protected maxNodeId = 1;
     protected containerRef = React.createRef<HTMLElement>();
     protected workflowDocument: WorkflowDocument;
+    protected workflowEditorFocusKey: ContextKey<boolean>;
+    protected workflowEditorRef = React.createRef<WorkflowEditorRef>();
+    protected pendingSelectedNodeId?: string;
+    protected history: { nodes: Node[], edges: Edge[] }[] = [];
+    protected historyIndex = -1;
+    protected isUndoRedoAction = false;
+    protected static readonly MAX_HISTORY_SIZE = 50;
+    protected lastMousePosition: { x: number, y: number } = { x: 0, y: 0 };
 
     constructor(
         private readonly options: Required<WorkflowEditorWidgetOptions> & Widget.IOptions,
@@ -41,13 +53,39 @@ export default class WorkflowEditorWidget extends ReactWidget implements Navigat
         protected readonly colorRegistry: ColorRegistry,
         protected readonly fileDialogService: FileDialogService,
         protected readonly messageService: MessageService,
-        protected readonly continuumNodeDialog: ContinuumNodeDialog
+        protected readonly continuumNodeDialog: ContinuumNodeDialog,
+        protected readonly contextMenuRenderer: ContextMenuRenderer,
+        protected readonly contextKeyService: ContextKeyService,
+        protected readonly clipboardService: WorkflowClipboardService
     ) {
         super(options);
         this._uri = new URI(options.uri);
         console.log("WorkflowEditorWidget Constructing ", options);
         this.workflowDocument = new WorkflowDocument(remoteFileSystemProvider, this._uri);
+        this.workflowEditorFocusKey = this.contextKeyService.createKey('workflowEditorFocus', false);
+
+        // Add focus/blur event listeners to properly track focus state
+        this.node.tabIndex = 0; // Make the widget focusable
+        this.node.addEventListener('focusin', this.handleFocusIn);
+        this.node.addEventListener('focusout', this.handleFocusOut);
+        this.node.addEventListener('mousemove', this.handleMouseMove);
+
         this.loadFileContent();
+    }
+
+    protected handleFocusIn = (): void => {
+        this.workflowEditorFocusKey.set(true);
+    }
+
+    protected handleFocusOut = (event: FocusEvent): void => {
+        // Only set to false if focus is leaving the widget entirely
+        if (!this.node.contains(event.relatedTarget as HTMLElement)) {
+            this.workflowEditorFocusKey.set(false);
+        }
+    }
+
+    protected handleMouseMove = (event: MouseEvent): void => {
+        this.lastMousePosition = { x: event.clientX, y: event.clientY };
     }
 
     async createHash(input: string) {
@@ -91,11 +129,15 @@ export default class WorkflowEditorWidget extends ReactWidget implements Navigat
                         this.maxNodeId = parseInt(node.id);
                     }
                 });
+                // Initialize history with the loaded state
+                this.initializeHistory();
                 this.update();
             });
         } else {
             this.workflow = await this.createNewWorkflow(this._uri, UNTITLED_SCHEME);
             this.workflowDocument.setUnsavedWorkflow(this.workflow);
+            // Initialize history with the new empty state
+            this.initializeHistory();
             this.update();
         }
     }
@@ -123,6 +165,26 @@ export default class WorkflowEditorWidget extends ReactWidget implements Navigat
     protected onActivateRequest(message: Message): void {
         super.onActivateRequest(message)
         this.node.focus();
+        this.workflowEditorFocusKey.set(true);
+    }
+
+    protected onAfterShow(msg: Message): void {
+        super.onAfterShow(msg);
+        this.workflowEditorFocusKey.set(true);
+    }
+
+    protected onBeforeHide(msg: Message): void {
+        super.onBeforeHide(msg);
+        this.workflowEditorFocusKey.set(false);
+    }
+
+    protected onAfterDetach(msg: Message): void {
+        super.onAfterDetach(msg);
+        this.workflowEditorFocusKey.set(false);
+        // Clean up event listeners
+        this.node.removeEventListener('focusin', this.handleFocusIn);
+        this.node.removeEventListener('focusout', this.handleFocusOut);
+        this.node.removeEventListener('mousemove', this.handleMouseMove);
     }
 
     protected onResize(msg: Widget.ResizeMessage): void {
@@ -201,14 +263,206 @@ export default class WorkflowEditorWidget extends ReactWidget implements Navigat
         this.workflow = wf;
     }
 
+    // Initialize history with the current workflow state
+    protected initializeHistory(): void {
+        if (!this.workflow) return;
+        this.history = [{ nodes: [...this.workflow.nodes], edges: [...this.workflow.edges] }];
+        this.historyIndex = 0;
+    }
+
+    // Called when a significant change occurs (drag end, connect, delete)
+    onHistoryChange = () => {
+        if (!this.workflow || this.isUndoRedoAction) return;
+
+        const currentState = { nodes: [...this.workflow.nodes], edges: [...this.workflow.edges] };
+        const prevState = this.history[this.historyIndex];
+
+        // Only add to history if there's an actual change
+        if (!prevState ||
+            JSON.stringify(prevState.nodes) !== JSON.stringify(currentState.nodes) ||
+            JSON.stringify(prevState.edges) !== JSON.stringify(currentState.edges)) {
+
+            // Remove any future history if we're not at the end
+            this.history = this.history.slice(0, this.historyIndex + 1);
+
+            // Add current state
+            this.history.push(currentState);
+
+            // Limit history size
+            if (this.history.length > WorkflowEditorWidget.MAX_HISTORY_SIZE) {
+                this.history.shift();
+            } else {
+                this.historyIndex++;
+            }
+        }
+    }
+
+    handleContextMenu = (event: React.MouseEvent, selectedNodeId?: string): void => {
+        event.preventDefault();
+        event.stopPropagation();
+        // Store the selected node ID for use in hasSelectedNodes
+        this.pendingSelectedNodeId = selectedNodeId;
+        this.contextMenuRenderer.render({
+            menuPath: WORKFLOW_EDITOR_CONTEXT_MENU,
+            anchor: { x: event.clientX, y: event.clientY },
+            args: [this],
+            onHide: () => { this.pendingSelectedNodeId = undefined; }
+        });
+    }
+
+    // Command execution methods
+    runWorkflow(): void {
+        this.workflowEditorRef.current?.runWorkflow();
+    }
+
+    openNodeSettings(): void {
+        this.workflowEditorRef.current?.openNodeSettings();
+    }
+
+    hasSelectedNodes(): boolean {
+        // Check pending selection first (for right-click selection)
+        if (this.pendingSelectedNodeId !== undefined) {
+            return true;
+        }
+        const nodes = this.reactFlow?.getNodes() ?? [];
+        return nodes.some(n => n.selected);
+    }
+
+    copySelectedNodes(): void {
+        if (!this.reactFlow) return;
+        const selectedNodes = this.reactFlow.getNodes().filter(n => n.selected);
+        const selectedNodeIds = selectedNodes.map(n => n.id);
+        const selectedEdges = this.reactFlow.getEdges().filter(
+            e => selectedNodeIds.includes(e.source) && selectedNodeIds.includes(e.target)
+        );
+        this.clipboardService.copy(selectedNodes, selectedEdges);
+    }
+
+    cutSelectedNodes(): void {
+        this.copySelectedNodes();
+        this.deleteSelectedNodes();
+    }
+
+    pasteNodes(): void {
+        const clipboard = this.clipboardService.paste();
+        if (!clipboard || !this.reactFlow || clipboard.nodes.length === 0) return;
+
+        // Convert mouse screen position to flow position
+        const mouseFlowPosition = this.reactFlow.screenToFlowPosition(this.lastMousePosition);
+
+        // Calculate the center of copied nodes
+        const minX = Math.min(...clipboard.nodes.map(n => n.position.x));
+        const maxX = Math.max(...clipboard.nodes.map(n => n.position.x));
+        const minY = Math.min(...clipboard.nodes.map(n => n.position.y));
+        const maxY = Math.max(...clipboard.nodes.map(n => n.position.y));
+        const centerX = (minX + maxX) / 2;
+        const centerY = (minY + maxY) / 2;
+
+        // Calculate offset to move nodes to mouse position
+        const offsetX = mouseFlowPosition.x - centerX;
+        const offsetY = mouseFlowPosition.y - centerY;
+
+        const idMap = new Map<string, string>();
+
+        const newNodes = clipboard.nodes.map(node => {
+            const newId = (++this.maxNodeId).toString();
+            idMap.set(node.id, newId);
+            return {
+                ...node,
+                id: newId,
+                position: {
+                    x: node.position.x + offsetX,
+                    y: node.position.y + offsetY
+                },
+                selected: true
+            };
+        });
+
+        const newEdges = clipboard.edges.map(edge => ({
+            ...edge,
+            id: `${idMap.get(edge.source)}-${idMap.get(edge.target)}`,
+            source: idMap.get(edge.source)!,
+            target: idMap.get(edge.target)!
+        }));
+
+        // Deselect existing nodes and add new ones
+        this.reactFlow.setNodes(nodes =>
+            nodes.map(n => ({ ...n, selected: false })).concat(newNodes)
+        );
+        this.reactFlow.addEdges(newEdges);
+        // Defer history recording to allow React state to update first
+        setTimeout(() => this.onHistoryChange(), 0);
+    }
+
+    hasClipboardContent(): boolean {
+        return this.clipboardService.hasContent();
+    }
+
+    deleteSelectedNodes(): void {
+        if (!this.reactFlow) return;
+        const selectedNodeIds = this.reactFlow.getNodes()
+            .filter(n => n.selected)
+            .map(n => n.id);
+
+        this.reactFlow.setNodes(nodes => nodes.filter(n => !selectedNodeIds.includes(n.id)));
+        this.reactFlow.setEdges(edges => edges.filter(
+            e => !selectedNodeIds.includes(e.source) && !selectedNodeIds.includes(e.target)
+        ));
+        // Defer history recording to allow React state to update first
+        setTimeout(() => this.onHistoryChange(), 0);
+    }
+
+    selectAllNodes(): void {
+        if (!this.reactFlow) return;
+        this.reactFlow.setNodes(nodes => nodes.map(n => ({ ...n, selected: true })));
+    }
+
+    // Undo/Redo methods
+    canUndo(): boolean {
+        return this.historyIndex > 0;
+    }
+
+    canRedo(): boolean {
+        return this.historyIndex < this.history.length - 1;
+    }
+
+    undo(): void {
+        if (!this.canUndo() || !this.reactFlow) return;
+
+        this.isUndoRedoAction = true;
+        this.historyIndex--;
+        const prevState = this.history[this.historyIndex];
+
+        this.reactFlow.setNodes(prevState.nodes);
+        this.reactFlow.setEdges(prevState.edges);
+
+        this.isUndoRedoAction = false;
+    }
+
+    redo(): void {
+        if (!this.canRedo() || !this.reactFlow) return;
+
+        this.isUndoRedoAction = true;
+        this.historyIndex++;
+        const nextState = this.history[this.historyIndex];
+
+        this.reactFlow.setNodes(nextState.nodes);
+        this.reactFlow.setEdges(nextState.edges);
+
+        this.isUndoRedoAction = false;
+    }
+
     protected render(): ReactNode {
         return (
             <ReactFlowProvider>
                 <WorkflowEditorWidgetHOC
                     workflow={this.workflow}
                     onChange={this.onChange}
+                    onContextMenu={this.handleContextMenu}
+                    onHistoryChange={this.onHistoryChange}
                     setReactflow={(rFlow)=>{this.reactFlow = rFlow}}
-                    colorRegistry={this.colorRegistry}/>
+                    colorRegistry={this.colorRegistry}
+                    workflowEditorRef={this.workflowEditorRef}/>
             </ReactFlowProvider>
         );
     }
@@ -219,13 +473,19 @@ interface WorkflowEditorWidgetHOCProps {
     setReactflow: (reactflow: ReactFlowInstance)=>void;
     colorRegistry: ColorRegistry;
     onChange: (workflow: IWorkflow)=>void;
+    onContextMenu: (event: React.MouseEvent, selectedNodeId?: string)=>void;
+    onHistoryChange: ()=>void;
+    workflowEditorRef: React.RefObject<WorkflowEditorRef>;
 }
 
 function WorkflowEditorWidgetHOC({
-        workflow, 
+        workflow,
         setReactflow,
         colorRegistry,
-        onChange
+        onChange,
+        onContextMenu,
+        onHistoryChange,
+        workflowEditorRef
     }: WorkflowEditorWidgetHOCProps
 ) {
     const [theme] = useMUIThemeStore((state)=>([state.theme]))
@@ -242,7 +502,12 @@ function WorkflowEditorWidgetHOC({
         <ThemeProvider theme={theme}>
             <CssBaseline />
             <CssVarsProvider theme={cssTheme}></CssVarsProvider>
-            {workflow && <WorkflowEditor onChange={onChange} workflow={workflow}/>}
+            {workflow && <WorkflowEditor
+                ref={workflowEditorRef}
+                onChange={onChange}
+                workflow={workflow}
+                onContextMenu={onContextMenu}
+                onHistoryChange={onHistoryChange}/>}
         </ThemeProvider>
     );
 }

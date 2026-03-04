@@ -3,6 +3,7 @@ package com.continuum.base.node
 import com.continuum.core.commons.exception.NodeRuntimeException
 import com.continuum.core.commons.model.ContinuumWorkflowModel
 import com.continuum.core.commons.node.ProcessNodeModel
+import com.continuum.core.commons.prototol.progress.NodeProgressCallback
 import com.continuum.core.commons.utils.NodeInputReader
 import com.continuum.core.commons.utils.NodeOutputWriter
 import com.fasterxml.jackson.core.type.TypeReference
@@ -102,7 +103,8 @@ class TextNormalizerNodeModel : ProcessNodeModel() {
   override fun execute(
     properties: Map<String, Any>?,
     inputs: Map<String, NodeInputReader>,
-    nodeOutputWriter: NodeOutputWriter
+    nodeOutputWriter: NodeOutputWriter,
+    nodeProgressCallback: NodeProgressCallback
   ) {
     val inputCol = properties?.get("inputCol") as String? ?: throw NodeRuntimeException(
       workflowId = "",

@@ -44,6 +44,42 @@ services:
     stdin_open: true
     tty: true
     restart: unless-stopped
+  temporal-search-attributes-init:
+    container_name: temporal-search-attributes-init
+    depends_on:
+      temporal:
+        condition: service_started
+    environment:
+      - TEMPORAL_ADDRESS=temporal:7233
+      - TEMPORAL_CLI_ADDRESS=temporal:7233
+    image: temporalio/admin-tools:${TEMPORAL_ADMINTOOLS_VERSION}
+    networks:
+      - temporal-network
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        echo "Waiting for Temporal server to be ready..."
+        max_attempts=30
+        attempt=0
+        until temporal operator cluster health 2>/dev/null | grep -q "SERVING"; do
+          attempt=$((attempt + 1))
+          if [ $$attempt -ge $$max_attempts ]; then
+            echo "Temporal server did not become ready in time, exiting..."
+            exit 1
+          fi
+          echo "Temporal not ready yet (attempt $$attempt/$$max_attempts), waiting..."
+          sleep 5
+        done
+        echo "Temporal cluster is healthy. Waiting for default namespace..."
+        until temporal operator namespace describe default > /dev/null 2>&1; do
+          echo "Default namespace not ready yet, waiting..."
+          sleep 3
+        done
+        echo "Temporal is ready. Creating search attributes..."
+        temporal operator search-attribute create --name "Continuum:ExecutionStatus" --type Int || true
+        temporal operator search-attribute create --name "Continuum:WorkflowFileName" --type Keyword || true
+        echo "Search attributes created successfully!"
+    restart: "no"
   temporal-ui:
     container_name: temporal-ui
     depends_on:
@@ -166,6 +202,21 @@ services:
       - kafka2
       - kafka3
     restart: unless-stopped
+  minio:
+    image: minio/minio:latest
+    container_name: minio
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    command: server /data --console-address ":9001"
+    ports:
+      - "39000:9000"
+      - "39001:9001"
+    volumes:
+      - minio-data:/data
+    networks:
+      - temporal-network
+    restart: unless-stopped
 networks:
   temporal-network:
     driver: bridge
@@ -179,3 +230,4 @@ volumes:
   kafka-data-1:
   kafka-data-2:
   kafka-data-3:
+  minio-data:

@@ -6,6 +6,9 @@ import { inject, injectable } from "@theia/core/shared/inversify";
 import { ColorRegistry } from "@theia/core/lib/browser/color-registry";
 import { FileDialogService } from "@theia/filesystem/lib/browser";
 import ContinuumNodeDialog from "../../dialog/node-dialog/ContinuumNodeDialog";
+import { ContextMenuRenderer } from "@theia/core/lib/browser/context-menu-renderer";
+import { ContextKeyService } from "@theia/core/lib/browser/context-key-service";
+import { WorkflowClipboardService } from "../../service/WorkflowClipboardService";
 
 @injectable()
 export default class WorkflowEditorWidgetFactory implements WidgetFactory {
@@ -34,7 +37,13 @@ export default class WorkflowEditorWidgetFactory implements WidgetFactory {
         @inject(MessageService)
         protected readonly messageService: MessageService,
         @inject(ContinuumNodeDialog)
-        protected readonly continuumNodeDialog: ContinuumNodeDialog
+        protected readonly continuumNodeDialog: ContinuumNodeDialog,
+        @inject(ContextMenuRenderer)
+        protected readonly contextMenuRenderer: ContextMenuRenderer,
+        @inject(ContextKeyService)
+        protected readonly contextKeyService: ContextKeyService,
+        @inject(WorkflowClipboardService)
+        protected readonly clipboardService: WorkflowClipboardService
     ) {}
 
     createWidget(options: WorkflowEditorWidgetOptions): MaybePromise<Widget> {
@@ -65,12 +74,15 @@ export default class WorkflowEditorWidgetFactory implements WidgetFactory {
     }
 
     contructEditor(options: WorkflowEditorWidgetOptions): WorkflowEditorWidget {
-        const editor = new WorkflowEditorWidget(options, 
-            this.remoteFileSystemProvider, 
-            this.colorRegistry, 
+        const editor = new WorkflowEditorWidget(options,
+            this.remoteFileSystemProvider,
+            this.colorRegistry,
             this.fileDialogService,
             this.messageService,
-            this.continuumNodeDialog);
+            this.continuumNodeDialog,
+            this.contextMenuRenderer,
+            this.contextKeyService,
+            this.clipboardService);
         editor.initLabel();
         return editor;
     }

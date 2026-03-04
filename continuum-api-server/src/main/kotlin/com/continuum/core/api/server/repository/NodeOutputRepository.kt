@@ -20,10 +20,9 @@ import java.net.URI
 class NodeOutputRepository(
   private val duckDBConnection: DuckDBConnection,
   private val s3TransferManager: S3TransferManager,
-  private val s3Presigner: S3Presigner,
-  @Value("\${continuum.core.api-server.cache-bucket-name}")
-  val s3BucketName: String = "continuum-data",
-  @Value("\${continuum.core.api-server.cache-bucket-base-path}")
+  @Value("\${continuum.core.api-server.storage.bucket-name}")
+  val s3BucketName: String,
+  @Value("\${continuum.core.api-server.storage.bucket-base-path}")
   val s3BucketBasePath: String,
   @Value("\${continuum.core.api-server.dataFileExtension:parquet}")
   val dataFileExtension: String,
