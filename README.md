@@ -179,6 +179,7 @@ docker compose up -d
 # Open the Workbench
 cd continuum-frontend
 yarn install
+yarn build
 yarn start:workbench
 
 # Open http://localhost:3002 and start building workflows!
