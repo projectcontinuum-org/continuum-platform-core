@@ -190,12 +190,16 @@ class ContinuumNodeActivity(
 
     val nodeOutputWriter = NodeOutputWriter(cacheStoragePath.resolve("$workflowRunId/${node.id}"))
 
+    progressCallback.report(NodeProgress(0))
+
     processNodeMap[nodeModel]!!.run(
       node = node,
       inputs = nodeInputs,
       nodeOutputWriter = nodeOutputWriter,
       nodeProgressCallback = progressCallback
     )
+
+    progressCallback.report(NodeProgress(100))
 
     LOGGER.info("Uploading output files for node ${node.id} ($nodeModel)")
     val nodeOutput = prepareNodeOutputs(node.id, nodeOutputWriter)
@@ -209,16 +213,22 @@ class ContinuumNodeActivity(
    */
   private fun executeTriggerNode(
     node: ContinuumWorkflowModel.Node,
-    @Suppress("UNUSED_PARAMETER") progressCallback: NodeProgressCallback
+    progressCallback: NodeProgressCallback
   ): IContinuumNodeActivity.NodeActivityOutput {
     val workflowRunId = Activity.getExecutionContext().info.runId
     val nodeOutputWriter = NodeOutputWriter(cacheStoragePath.resolve("$workflowRunId/${node.id}"))
 
+    progressCallback.report(NodeProgress(0))
+
     triggerNodeMap[node.data.nodeModel]!!.run(node, nodeOutputWriter = nodeOutputWriter)
+
+    progressCallback.report(NodeProgress(100))
+
+    val nodeOutput = prepareNodeOutputs(node.id, nodeOutputWriter)
 
     return IContinuumNodeActivity.NodeActivityOutput(
       nodeId = node.id,
-      outputs = prepareNodeOutputs(node.id, nodeOutputWriter)
+      outputs = nodeOutput
     )
   }
 
@@ -282,35 +292,39 @@ class ContinuumNodeActivity(
   private fun createProgressCallback(nodeId: String): NodeProgressCallback {
     val lastReportTime = AtomicLong(0)
     val lastReportedStages = AtomicReference<Map<String, StageStatus>?>(null)
+    val startTime = System.currentTimeMillis()
 
     return object : NodeProgressCallback {
       override fun report(nodeProgress: NodeProgress) {
+        val now = System.currentTimeMillis()
+        val elapsed = now - startTime
+        val progressWithDuration = nodeProgress.copy(totalDurationMs = elapsed)
+
         // Always send a heartbeat to Temporal to keep the activity alive.
         // This is independent of rate limiting - heartbeats are cheap and
         // prevent Temporal from thinking the activity is dead.
-        Activity.getExecutionContext().heartbeat(nodeProgress)
+        Activity.getExecutionContext().heartbeat(progressWithDuration)
 
-        val now = System.currentTimeMillis()
         val lastTime = lastReportTime.get()
-        val currentStages = nodeProgress.stageStatus
+        val currentStages = progressWithDuration.stageStatus
         val previousStages = lastReportedStages.get()
         val stageChanged = currentStages != null && currentStages != previousStages
 
-        val shouldReport = nodeProgress.progressPercentage == 0 ||
-                           nodeProgress.progressPercentage == 100 ||
+        val shouldReport = progressWithDuration.progressPercentage == 0 ||
+                           progressWithDuration.progressPercentage == 100 ||
                            stageChanged ||
                            (now - lastTime) >= progressReportRateLimitMs
 
         if (!shouldReport) {
-          LOGGER.debug("Skipping progress report (rate limited) - Node: $nodeId, Progress: ${nodeProgress.progressPercentage}%")
+          LOGGER.debug("Skipping progress report (rate limited) - Node: $nodeId, Progress: ${progressWithDuration.progressPercentage}%")
           return
         }
 
         lastReportTime.set(now)
         lastReportedStages.set(currentStages)
-        LOGGER.info("Progress report - Node: $nodeId, Progress: ${nodeProgress.progressPercentage}%, Message: ${nodeProgress.message}")
+        LOGGER.info("Progress report - Node: $nodeId, Progress: ${progressWithDuration.progressPercentage}%, Message: ${progressWithDuration.message}")
 
-        sendProgressSignal(nodeId, nodeProgress)
+        sendProgressSignal(nodeId, progressWithDuration)
       }
 
       override fun report(progressPercentage: Int) {

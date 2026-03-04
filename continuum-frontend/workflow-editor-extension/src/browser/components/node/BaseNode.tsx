@@ -16,6 +16,21 @@ import DynamicIcon from "../utils/DynamicIcon";
 
 mirage.register()
 
+const formatDuration = (ms?: number): string | null => {
+    if (!ms) return null;
+
+    const seconds = Math.floor(ms / 1000);
+    const minutes = Math.floor(seconds / 60);
+    const hours = Math.floor(minutes / 60);
+    const days = Math.floor(hours / 24);
+
+    if (days > 0) return `${days}d`;
+    if (hours > 0) return `${hours}h`;
+    if (minutes > 0) return `${minutes}m`;
+    if (seconds > 0) return `${seconds}s`;
+    return `${ms}ms`;
+};
+
 const getStepIcon = (status: StageStatus) => {
     switch (status) {
         case StageStatus.COMPLETED:
@@ -107,6 +122,11 @@ export default function BaseNode(props: NodeProps<IBaseNodeData>) {
                     sx={{ display: 'block', color: getStatusColor(props.data.status), fontWeight: 500 }}
                   >
                     {props.data.status}
+                  </Typography>
+                )}
+                {props.data.nodeProgress?.totalDurationMs && (
+                  <Typography variant="caption" sx={{ display: 'block', color: 'text.disabled', fontSize: '0.65rem' }}>
+                    {formatDuration(props.data.nodeProgress.totalDurationMs)}
                   </Typography>
                 )}
               </Box>
