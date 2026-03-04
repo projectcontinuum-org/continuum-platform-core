@@ -10,12 +10,12 @@ spring:
           environment:
             spring.cloud.stream.kafka:
               binder:
-                brokers: ${CONTINUUM_KAFKA_MAIN_BROKER_LIST}
+                brokers: ${CONTINUUM_KAFKA_MAIN_BROKER_LIST:localhost:39092,localhost:39093,localhost:39094}
                 consumer-properties:
                   key.deserializer: org.apache.kafka.common.serialization.StringDeserializer
                   # value.deserializer: io.confluent.kafka.serializers.KafkaAvroDeserializer
                   value.deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
-                  schema.registry.url: ${CONTINUUM_KAFKA_MAIN_SCHEMA_REGISTRY}
+                  schema.registry.url: ${CONTINUUM_KAFKA_MAIN_SCHEMA_REGISTRY:http://localhost:38080} # Not required yet
                   specific.avro.reader: true
                   auto.offset.reset: latest
                   fetch.max.wait.ms: 40000
@@ -24,13 +24,13 @@ spring:
                   key.serializer: org.apache.kafka.common.serialization.StringSerializer
                   # value.serializer: io.confluent.kafka.serializers.KafkaAvroSerializer
                   value.serializer: org.springframework.kafka.support.serializer.JsonSerializer
-                  schema.registry.url: ${CONTINUUM_KAFKA_MAIN_SCHEMA_REGISTRY}
+                  schema.registry.url: ${CONTINUUM_KAFKA_MAIN_SCHEMA_REGISTRY:http://localhost:38080} # Not required yet
                   max.request.size: 104857600
                 dlq-producer-properties:
                   key.serializer: org.apache.kafka.common.serialization.StringSerializer
                   # value.serializer: io.confluent.kafka.serializers.KafkaAvroSerializer
                   value.serializer: org.springframework.kafka.support.serializer.JsonSerializer
-                  schema.registry.url: ${CONTINUUM_KAFKA_MAIN_SCHEMA_REGISTRY}
+                  schema.registry.url: ${CONTINUUM_KAFKA_MAIN_SCHEMA_REGISTRY:http://localhost:38080} # Not required yet
                   max.request.size: 104857600
       bindings:
         continuum-core-event-WorkflowExecutionSnapshot-output:
@@ -42,7 +42,7 @@ spring:
   temporal:
     namespace: ${TEMPORAL_NAMESPACE:default}
     connection:
-      target: ${TEMPORAL_SERVER_ADDRESS}
+      target: ${TEMPORAL_SERVER_ADDRESS:localhost:7233}
     workersAutoDiscovery:
       packages: com.continuum.core.worker
 continuum.core:
