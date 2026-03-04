@@ -190,8 +190,6 @@ class ContinuumNodeActivity(
 
     val nodeOutputWriter = NodeOutputWriter(cacheStoragePath.resolve("$workflowRunId/${node.id}"))
 
-    progressCallback.report(NodeProgress(0))
-
     processNodeMap[nodeModel]!!.run(
       node = node,
       inputs = nodeInputs,
@@ -217,8 +215,6 @@ class ContinuumNodeActivity(
   ): IContinuumNodeActivity.NodeActivityOutput {
     val workflowRunId = Activity.getExecutionContext().info.runId
     val nodeOutputWriter = NodeOutputWriter(cacheStoragePath.resolve("$workflowRunId/${node.id}"))
-
-    progressCallback.report(NodeProgress(0))
 
     triggerNodeMap[node.data.nodeModel]!!.run(node, nodeOutputWriter = nodeOutputWriter)
 
@@ -292,13 +288,24 @@ class ContinuumNodeActivity(
   private fun createProgressCallback(nodeId: String): NodeProgressCallback {
     val lastReportTime = AtomicLong(0)
     val lastReportedStages = AtomicReference<Map<String, StageStatus>?>(null)
-    val startTime = System.currentTimeMillis()
+    val startTime = AtomicLong(0)
 
     return object : NodeProgressCallback {
       override fun report(nodeProgress: NodeProgress) {
         val now = System.currentTimeMillis()
-        val elapsed = now - startTime
-        val progressWithDuration = nodeProgress.copy(totalDurationMs = elapsed)
+        startTime.compareAndSet(0, now)
+        val elapsed = now - startTime.get()
+
+        // Preserve last known stage status when reporting 100% without stage info
+        val effectiveStageStatus = if (nodeProgress.progressPercentage == 100 && nodeProgress.stageStatus == null) {
+          lastReportedStages.get()
+        } else {
+          nodeProgress.stageStatus
+        }
+        val progressWithDuration = nodeProgress.copy(
+          totalDurationMs = elapsed,
+          stageStatus = effectiveStageStatus
+        )
 
         // Always send a heartbeat to Temporal to keep the activity alive.
         // This is independent of rate limiting - heartbeats are cheap and
