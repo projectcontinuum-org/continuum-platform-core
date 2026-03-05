@@ -1,35 +1,35 @@
-<p style="text-align: center">
+<div align="center">
   <strong>🚀 Build visual, crash-proof workflows in your browser — open source, cloud-native, and extensible.</strong>
-</p>
+</div>
 
-<p style="text-align: center">
+<div align="center">
   <img src="https://img.shields.io/badge/Kotlin-69.9%25-blue" alt="Kotlin 69.9%">
   <img src="https://img.shields.io/badge/Eclipse_Theia-IDE-1a237e?logo=eclipse&logoColor=white" alt="Eclipse Theia">
   <img src="https://img.shields.io/badge/Temporal.io-Durable_Execution-000?logo=temporal&logoColor=white" alt="Temporal.io">
   <img src="https://img.shields.io/badge/React_Flow-Canvas-ff0072?logo=react&logoColor=white" alt="React Flow">
-</p>
+</div>
 
-<p style="text-align: center">
+<div align="center">
   <img src="docs/gifs/logo-ani.gif" width="25%" alt="Project Continuum Logo">
-</p>
+</div>
 
-<h1 style="text-align: center">Project Continuum</h1>
+<h1 align="center">Project Continuum</h1>
 
-<p style="text-align: center">
+<div align="center">
   <strong>Visual workflows that actually run — and survive.</strong><br/>
   Inspired by KNIME. Made for the cloud. Built to never die.
-</p>
+</div>
 
-<p style="text-align: center">
+<div align="center">
   <a href="#-quick-start"><img src="https://img.shields.io/badge/Quick_Start-🚀-blue?style=for-the-badge" alt="Quick Start"></a>
   <a href="#-how-it-works"><img src="https://img.shields.io/badge/Architecture-🧱-orange?style=for-the-badge" alt="Architecture"></a>
   <a href="#-contribute"><img src="https://img.shields.io/badge/Contribute-💜-purple?style=for-the-badge" alt="Contribute"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-Apache_2.0-green?style=for-the-badge" alt="License"></a>
-</p>
+</div>
 
-<p style="text-align: center">
+<div align="center">
   <em>No desktop. No install. Just resilient workflows, in your browser.</em>
-</p>
+</div>
 
 ---
 
@@ -45,11 +45,11 @@
 
 ## 🎬 See It In Action
 
-<p style="text-align: center">
+<div align="center">
   <img src="docs/gifs/Sensor Anomaly.gif" width="80%" alt="Sensor Anomaly Detection Workflow">
-</p>
+</div>
 
-<p style="text-align: center"><em>↑ A real workflow: streaming sensor data → anomaly detection → alert — all drag-and-drop.</em></p>
+<div align="center"><em>↑ A real workflow: streaming sensor data → anomaly detection → alert — all drag-and-drop.</em></div>
 
 ---
 
@@ -128,11 +128,11 @@ A click turned outcome.
 
 ## 🧬 AI Training Workflows
 
-<p style="text-align: center">
+<div align="center">
   <img src="docs/gifs/Unsloth1.gif" width="80%" alt="Unsloth AI Training Workflow">
-</p>
+</div>
 
-<p style="text-align: center"><em>↑ Fine-tune LLMs with Unsloth — right inside your workflow graph.</em></p>
+<div align="center"><em>↑ Fine-tune LLMs with Unsloth — right inside your workflow graph.</em></div>
 
 ---
 
@@ -279,7 +279,7 @@ If you see the gap — fill it. Check out the [Issues](../../issues) page, pick 
 
 ---
 
-<p style="text-align: center">
+<div align="center">
   <strong>Welcome. Break it. Fix it. Flow with us.</strong>
-</p>
+</div>
 
