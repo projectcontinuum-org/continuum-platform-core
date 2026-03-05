@@ -10,7 +10,8 @@ RUN apt-get update && \
 
 # Install Node.js, Yarn, pkg-config, and libsecret-1-dev
 RUN curl -fsSL https://deb.nodesource.com/setup_22.x | bash - && \
-    apt-get install -y nodejs pkg-config libsecret-1-dev
+    apt-get install -y nodejs pkg-config libsecret-1-dev python3-venv
+
 
 # Set the default shell to bash
 SHELL ["/bin/bash", "-c"]
