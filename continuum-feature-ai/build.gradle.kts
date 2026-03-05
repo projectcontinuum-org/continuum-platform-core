@@ -6,7 +6,7 @@ plugins {
 }
 
 group = "com.continuum.feature.ai"
-version = "1.0.0"
+version = "0.0.1"
 
 java {
     toolchain {

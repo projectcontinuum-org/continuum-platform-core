@@ -8,7 +8,7 @@ plugins {
 }
 
 group = "com.continuum.core"
-version = "1.0.0"
+version = "0.0.1"
 
 java {
     toolchain {
