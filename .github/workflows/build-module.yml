@@ -16,7 +16,8 @@ on:
           - continuum-frontend
           - continuum-knime-base
           - continuum-message-bridge
-          - continuum-worker
+          - continuum-worker-springboot-starter
+          - continuum-feature-ai
           - workers:continuum-base-worker
 
 jobs:

@@ -40,7 +40,11 @@ jobs:
 
       - name: Publish
         run: |
-          ./gradlew :${{ inputs.module-name }}:publish --no-daemon
+          if [ "${{ inputs.module-name }}" = "all" ]; then
+            ./gradlew publish --no-daemon
+          else
+            ./gradlew :${{ inputs.module-name }}:publish --no-daemon
+          fi
         env:
           MAVEN_REPO_USERNAME: ${{ github.actor }}
           MAVEN_REPO_PASSWORD: ${{ secrets.GITHUB_TOKEN }}
@@ -50,10 +54,14 @@ jobs:
       - name: Containerize
         if: always()
         run: |
-          if ./gradlew :${{ inputs.module-name }}:tasks --all | grep -q "jib "; then
-            ./gradlew :${{ inputs.module-name }}:jib --no-daemon
+          if [ "${{ inputs.module-name }}" = "all" ]; then
+            ./gradlew jib --no-daemon || echo "Some modules may not have jib tasks, continuing."
           else
-            echo "Jib task does not exist for module ${{ inputs.module-name }}, skipping."
+            if ./gradlew :${{ inputs.module-name }}:tasks --all | grep -q "jib "; then
+              ./gradlew :${{ inputs.module-name }}:jib --no-daemon
+            else
+              echo "Jib task does not exist for module ${{ inputs.module-name }}, skipping."
+            fi
           fi
         env:
           DOCKER_REPO_USERNAME: ${{ github.actor }}

@@ -50,6 +50,7 @@ tasks.withType<Test> {
 }
 
 publishing {
+    val repoName = System.getenv("GITHUB_REPOSITORY") ?: property("repoName").toString()
     publications {
         create<MavenPublication>("mavenJava") {
             from(components["java"])
@@ -59,14 +60,14 @@ publishing {
             pom {
                 name.set(project.name)
                 description.set(project.description)
-                url.set("https://github.com/roushan65/Continuum")
+                url.set("https://github.com/$repoName")
             }
         }
     }
     repositories {
         maven {
             name = "GitHubPackages"
-            url = uri("https://maven.pkg.github.com/roushan65/Continuum")
+            url = uri("https://maven.pkg.github.com/$repoName")
             credentials {
                 username = System.getenv("MAVEN_REPO_USERNAME")
                 password = System.getenv("MAVEN_REPO_PASSWORD")

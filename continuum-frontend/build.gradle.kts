@@ -4,6 +4,11 @@ plugins {
     id("com.github.node-gradle.node") version "3.2.1"
 }
 
+// Read version from package.json
+val packageJsonFile = file("package.json")
+val packageJson = groovy.json.JsonSlurper().parseText(packageJsonFile.readText()) as Map<*, *>
+version = packageJson["version"] ?: throw GradleException("Unable to read version from package.json")
+
 node {
     version.set("22.12.0") // Specify the Node.js version
     yarnVersion.set("1.22.22") // Specify the Yarn version
@@ -41,7 +46,7 @@ tasks.register("publish") {
 tasks.register<Exec>("jib") {
   description = "Docker build and push to GitHub Container Registry"
   group = "Jib tasks"
-  val dockerRepoName = "ghcr.io/${(System.getenv("GITHUB_REPOSITORY") ?: "roushan65/continuum").lowercase()}"
+  val dockerRepoName = "ghcr.io/${(System.getenv("GITHUB_REPOSITORY") ?: property("repoName").toString()).lowercase()}"
   val imageName = "$dockerRepoName/${project.name.lowercase()}:${project.version}"
   commandLine("bash", "-c",
     "docker build -t $imageName . --progress=plain && " +

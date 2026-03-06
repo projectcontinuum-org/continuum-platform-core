@@ -63,7 +63,7 @@ globalThis.extensionInfo = [
     },
     {
         "name": "@continuum/workflow-editor-extension",
-        "version": "0.0.0"
+        "version": "0.0.1"
     }
 ];
 
