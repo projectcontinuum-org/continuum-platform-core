@@ -7,6 +7,11 @@ on:
         description: 'The Gradle module to build (e.g., continuum-api-server)'
         required: true
         type: string
+      release:
+        description: 'Publish as a release build (no SNAPSHOT suffix)'
+        required: true
+        type: boolean
+        default: false
 jobs:
   build:
     permissions:
@@ -46,6 +51,7 @@ jobs:
             ./gradlew :${{ inputs.module-name }}:publish --no-daemon
           fi
         env:
+          IS_RELEASE_BUILD: ${{ inputs.release }}
           MAVEN_REPO_USERNAME: ${{ github.actor }}
           MAVEN_REPO_PASSWORD: ${{ secrets.GITHUB_TOKEN }}
           DOCKER_REPO_USERNAME: ${{ github.actor }}
@@ -64,5 +70,6 @@ jobs:
             fi
           fi
         env:
+          IS_RELEASE_BUILD: ${{ inputs.release }}
           DOCKER_REPO_USERNAME: ${{ github.actor }}
           DOCKER_REPO_PASSWORD: ${{ secrets.GITHUB_TOKEN }}

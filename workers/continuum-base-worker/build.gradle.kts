@@ -8,7 +8,9 @@ plugins {
 }
 
 group = "com.continuum.app.worker.base"
-version = "0.0.1"
+val baseVersion = "0.0.1"
+val isRelease = System.getenv("IS_RELEASE_BUILD")?.toBoolean() ?: false
+version = if (isRelease) baseVersion else "$baseVersion-SNAPSHOT"
 
 java {
     toolchain {

@@ -19,9 +19,15 @@ on:
           - continuum-worker-springboot-starter
           - continuum-feature-ai
           - workers:continuum-base-worker
+      release:
+        description: 'Publish as a release build (immutable version, no SNAPSHOT suffix)'
+        required: true
+        type: boolean
+        default: false
 
 jobs:
   build-module:
     uses: ./.github/workflows/generic-module-builder.yml
     with:
       module-name: ${{ github.event.inputs.module }}
+      release: ${{ github.event.inputs.release == 'true' }}
