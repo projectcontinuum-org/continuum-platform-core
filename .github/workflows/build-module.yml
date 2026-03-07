@@ -11,14 +11,10 @@ on:
           - all
           - continuum-api-server
           - continuum-avro-schemas
-          - continuum-base
           - continuum-commons
-          - continuum-frontend
           - continuum-knime-base
           - continuum-message-bridge
           - continuum-worker-springboot-starter
-          - continuum-feature-ai
-          - workers:continuum-base-worker
       release:
         description: 'Publish as a release build (immutable version, no SNAPSHOT suffix)'
         required: true
