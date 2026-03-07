@@ -33,6 +33,39 @@
 
 ---
 
+## 🌐 Ecosystem
+
+Project Continuum is split across several focused repositories:
+
+| Repository | Description |
+|-----------|-------------|
+| **Continuum** (this repo) | Core backend — API server, worker framework, shared libraries |
+| [continuum-workbench](https://github.com/projectcontinuum/continuum-workbench) | Browser IDE — Eclipse Theia + React Flow workflow editor |
+| [continuum-feature-base](https://github.com/projectcontinuum/continuum-feature-base) | Base analytics nodes — data transforms, REST, scripting, anomaly detection |
+| [continuum-feature-ai](https://github.com/projectcontinuum/continuum-feature-ai) | AI/ML nodes — LLM fine-tuning with Unsloth + LoRA |
+| [continuum-feature-template](https://github.com/projectcontinuum/continuum-feature-template) | Template — scaffold your own custom worker with nodes |
+
+---
+
+## 📦 What's In This Repo
+
+This monorepo contains the **core backend infrastructure** for Project Continuum:
+
+| Module | Purpose |
+|--------|---------|
+| `continuum-commons` | Shared library — node model base classes, data types, Parquet/S3 utilities |
+| `continuum-worker-springboot-starter` | Spring Boot starter for building workers — auto-registers nodes with Temporal |
+| `continuum-api-server` | REST API server — manages workflows, node registry, executions |
+| `continuum-message-bridge` | Kafka-to-MQTT bridge — streams execution events to the browser |
+| `continuum-avro-schemas` | Shared Avro schemas for Kafka messages |
+| `continuum-knime-base` | KNIME compatibility layer (experimental) |
+
+> **Looking for workflow nodes?** See [continuum-feature-base](https://github.com/projectcontinuum/continuum-feature-base) and [continuum-feature-ai](https://github.com/projectcontinuum/continuum-feature-ai).
+>
+> **Looking for the UI?** See [continuum-workbench](https://github.com/projectcontinuum/continuum-workbench).
+
+---
+
 ## 🔥 Why It's Cool
 
 - **Truly cloud-native** — not a desktop app ported to the web. Built from day one for browsers, containers, and distributed infrastructure.
@@ -142,25 +175,23 @@ A click turned outcome.
 
 > 🧠 **Zero-config IDE setup** — This repo ships with shared [IntelliJ IDEA Run Configurations](https://www.jetbrains.com/help/idea/run-debug-configuration.html) in the `.run/` directory. Just open the project and they'll be **auto-detected** in your Run/Debug toolbar — no manual setup needed.
 >
-> Included configurations: **ApiServer**, **MessageBridge**, **BaseWorker**, **Frontend**
+> Included configurations: **ApiServer**, **MessageBridge**
 
 1. Open the project in IntelliJ IDEA
 2. Start infrastructure:
    ```bash
    cd docker && docker compose up -d
    ```
-3. Select a run configuration from the toolbar and hit ▶️ — start **ApiServer**, **MessageBridge**, and **BaseWorker**
-4. Run the **Frontend** configuration (or manually):
-   ```bash
-   cd continuum-frontend && yarn install && yarn start:workbench
-   ```
-5. Open [http://localhost:3002](http://localhost:3002) and start building workflows!
+3. Select a run configuration from the toolbar and hit ▶️ — start **ApiServer** and **MessageBridge**
+4. Start a feature worker from one of the feature repos (e.g., [continuum-feature-base](https://github.com/projectcontinuum/continuum-feature-base))
+5. Start the browser UI from [continuum-workbench](https://github.com/projectcontinuum/continuum-workbench)
+6. Open [http://localhost:3002](http://localhost:3002) and start building workflows!
 
 ### Option B: Command Line
 
 ```bash
 # Clone the repo
-git clone https://github.com/your-org/Continuum.git
+git clone https://github.com/projectcontinuum/Continuum.git
 cd Continuum
 
 # Spin up infrastructure (Temporal, Kafka, MinIO, Mosquitto)
@@ -173,16 +204,11 @@ docker compose up -d
 # (In another terminal) Build and run Message Bridge (Kafka → MQTT)
 ./gradlew :continuum-message-bridge:bootRun --args='--server.port=8082'
 
-# (In another terminal) Start the worker
-./gradlew :workers:continuum-base-worker:bootRun --args='--server.port=8081'
+# Start a feature worker from a feature repo (e.g., continuum-feature-base)
+# See: https://github.com/projectcontinuum/continuum-feature-base
 
-# Open the Workbench
-cd continuum-frontend
-yarn install
-yarn build
-yarn start:workbench
-
-# Open http://localhost:3002 and start building workflows!
+# Start the browser UI from the workbench repo
+# See: https://github.com/projectcontinuum/continuum-workbench
 ```
 
 > 💡 **Tip:** Pass any `spring.*` property via `--args`:
@@ -235,6 +261,7 @@ This is the vision: **a marketplace of workers** — lightweight, independent, c
 - [x] Base node library (Transform, REST, Branch, etc.)
 - [x] Unsloth AI training node
 - [x] IntelliJ IDEA shared run configurations — zero-config dev setup
+- [x] Multi-repo architecture — feature nodes developed independently as separate workers
 - [ ] 🔁 True `while` / `for` loops with condition builder
 - [ ] 🖥️ Electron standalone — run Continuum as a native desktop app, no browser required
 - [ ] 🧪 More RDKit chemistry nodes — full RDKit integration for molecular workflows
@@ -276,6 +303,18 @@ If you see the gap — fill it. Check out the [Issues](../../issues) page, pick 
 ## 📄 License
 
 [Apache 2.0](LICENSE) — open, safe, patent-protected.
+
+---
+
+## 🔗 Related Repositories
+
+| Repository | Description |
+|-----------|-------------|
+| **Continuum** (this repo) | Core backend — API server, worker framework, shared libraries |
+| [continuum-workbench](https://github.com/projectcontinuum/continuum-workbench) | Browser IDE — Eclipse Theia + React Flow workflow editor |
+| [continuum-feature-base](https://github.com/projectcontinuum/continuum-feature-base) | Base analytics nodes — data transforms, REST, scripting, anomaly detection |
+| [continuum-feature-ai](https://github.com/projectcontinuum/continuum-feature-ai) | AI/ML nodes — LLM fine-tuning with Unsloth + LoRA |
+| [continuum-feature-template](https://github.com/projectcontinuum/continuum-feature-template) | Template — scaffold your own custom worker with nodes |
 
 ---
 
