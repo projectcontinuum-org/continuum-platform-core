@@ -1,0 +1,13 @@
+@namespace("org.projectcontinuum.core.protocol.data.table")
+protocol DataRowProtocol {
+	record DataCell {
+		string name;
+		bytes value;
+		string contentType;
+	}
+
+	record DataRow {
+		long rowNumber;
+		array<DataCell> cells;
+	}
+}

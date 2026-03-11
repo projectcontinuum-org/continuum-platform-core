@@ -20,6 +20,16 @@ on:
         required: true
         type: boolean
         default: false
+      publish_to_maven:
+        description: 'Publish artifacts to Maven Central'
+        required: true
+        type: boolean
+        default: false
+      publish_to_docker_hub:
+        description: 'Push container images to Docker Hub'
+        required: true
+        type: boolean
+        default: false
 
 jobs:
   build-module:
@@ -27,3 +37,14 @@ jobs:
     with:
       module-name: ${{ github.event.inputs.module }}
       release: ${{ github.event.inputs.release == 'true' }}
+      publish_to_maven: ${{ github.event.inputs.publish_to_maven == 'true' }}
+      publish_to_docker_hub: ${{ github.event.inputs.publish_to_docker_hub == 'true' }}
+    secrets:
+      MAVEN_REPO_USERNAME: ${{ secrets.MAVEN_CENTRAL_USERNAME }}
+      MAVEN_REPO_PASSWORD: ${{ secrets.MAVEN_CENTRAL_PASSWORD }}
+      GPG_KEY_ID: ${{ secrets.GPG_KEY_ID }}
+      GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
+      GPG_SECRET_KEY: ${{ secrets.GPG_SECRET_KEY }}
+      GPG_PUBLIC_KEY: ${{ secrets.GPG_PUBLIC_KEY }}
+      DOCKER_HUB_USERNAME: ${{ secrets.DOCKER_HUB_USERNAME }}
+      DOCKER_HUB_PASSWORD: ${{ secrets.DOCKER_HUB_PASSWORD }}

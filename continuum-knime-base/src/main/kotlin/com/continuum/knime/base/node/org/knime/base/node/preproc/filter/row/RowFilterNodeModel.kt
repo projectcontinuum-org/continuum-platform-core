@@ -1,10 +1,10 @@
-package com.continuum.knime.base.node.org.knime.base.node.preproc.filter.row
+package org.projectcontinuum.knime.base.node.org.knime.base.node.preproc.filter.row
 
-import com.continuum.core.commons.model.ContinuumWorkflowModel
-import com.continuum.core.commons.node.KnimeNodeModel
-import com.continuum.core.commons.prototol.progress.NodeProgressCallback
-import com.continuum.core.commons.utils.NodeInputReader
-import com.continuum.core.commons.utils.NodeOutputWriter
+import org.projectcontinuum.core.commons.model.ContinuumWorkflowModel
+import org.projectcontinuum.core.commons.node.KnimeNodeModel
+import org.projectcontinuum.core.commons.prototol.progress.NodeProgressCallback
+import org.projectcontinuum.core.commons.utils.NodeInputReader
+import org.projectcontinuum.core.commons.utils.NodeOutputWriter
 import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
 import com.fasterxml.jackson.module.kotlin.readValue
 import org.slf4j.LoggerFactory

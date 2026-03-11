@@ -1,4 +1,4 @@
-package com.continuum.knime.base
+package org.projectcontinuum.knime.base
 
 import org.springframework.context.annotation.ComponentScan
 import org.springframework.context.annotation.Configuration

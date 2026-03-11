@@ -11,12 +11,12 @@
                 "y": 1060.3291400725761
             },
             "data": {
-                "id": "com.continuum.feature.ai.node.UnslothTrainerNodeModel",
+                "id": "org.projectcontinuum.feature.ai.node.UnslothTrainerNodeModel",
                 "description": "Fine-tune Large Language Models using LoRA with Unsloth acceleration",
                 "title": "LLM Trainer (Unsloth)",
                 "subTitle": "Fine-tune LLMs with LoRA adapters",
                 "icon": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.5\">\n  <path stroke-linecap=\"round\" stroke-linejoin=\"round\" d=\"M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 00-2.456 2.456zM16.894 20.567L16.5 21.75l-.394-1.183a2.25 2.25 0 00-1.423-1.423L13.5 18.75l1.183-.394a2.25 2.25 0 001.423-1.423l.394-1.183.394 1.183a2.25 2.25 0 001.423 1.423l1.183.394-1.183.394a2.25 2.25 0 00-1.423 1.423z\" />\n</svg>",
-                "nodeModel": "com.continuum.feature.ai.node.UnslothTrainerNodeModel",
+                "nodeModel": "org.projectcontinuum.feature.ai.node.UnslothTrainerNodeModel",
                 "busy": null,
                 "inputs": {
                     "training_data": {
@@ -364,12 +364,12 @@
                 "y": 976.8236516389022
             },
             "data": {
-                "id": "com.continuum.base.node.CreateTableNodeModel",
+                "id": "org.projectcontinuum.base.node.CreateTableNodeModel",
                 "description": "Creates a structured table from FreeMarker template configuration",
                 "title": "Create Table",
                 "subTitle": "Generate table rows from template",
                 "icon": "<svg xmlns=\"http://www.w3.org/2000/svg\" fill=\"none\" stroke=\"currentColor\" strokeWidth={1.5} viewBox=\"0 0 24 24\">\n\t<path d=\"M21.5 2h-19a.5.5 0 0 0-.5.5v19a.5.5 0 0 0 .5.5h19a.5.5 0 0 0 .5-.5v-19a.5.5 0 0 0-.5-.5zm-13 19H3v-5.5h5.5V21zm0-6.5H3v-5h5.5v5zm0-6H3V3h5.5v5.5zm6 12.5h-5v-5.5h5V21zm0-6.5h-5v-5h5v5zm0-6h-5V3h5v5.5zM21 21h-5.5v-5.5H21V21zm0-6.5h-5.5v-5H21v5zm0-6h-5.5V3H21v5.5z\" fill=\"currentColor\"/>\n</svg>",
-                "nodeModel": "com.continuum.base.node.CreateTableNodeModel",
+                "nodeModel": "org.projectcontinuum.base.node.CreateTableNodeModel",
                 "busy": null,
                 "inputs": null,
                 "outputs": {

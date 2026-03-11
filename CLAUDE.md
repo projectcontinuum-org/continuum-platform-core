@@ -75,13 +75,13 @@ continuum-workbench (frontend) ──REST/WebSocket──► continuum-api-serve
 
 | Module | Group | Depends On | Purpose |
 |--------|-------|-----------|---------|
-| `continuum-commons` | `com.continuum.core` | — | Base classes: `ProcessNodeModel`, `ContinuumWorkflowModel`, `NodePort`, `NodeInputReader`, `NodeOutputWriter`, Parquet/S3 utilities |
-| `continuum-avro-schemas` | `com.continuum.core` | — | Avro schemas for Kafka workflow execution messages |
-| `continuum-worker-springboot-starter` | `com.continuum.core` | commons, avro-schemas | Spring Boot starter that auto-registers nodes with Temporal, handles download/upload/progress lifecycle |
-| `continuum-api-server` | `com.continuum.core` | commons, avro-schemas | REST API — workflow CRUD, node registry, execution triggers. Includes DuckDB 1.2.2 |
-| `continuum-message-bridge` | `com.continuum.core` | commons | Kafka consumer → MQTT publisher bridge for real-time browser updates |
-| `continuum-knime-base` | `com.continuum.knime` | commons | KNIME node compatibility layer (experimental) |
-| `workers/continuum-base-worker` | `com.continuum.app.worker.base` | starter, continuum-base, continuum-feature-ai | Legacy monorepo worker (features extracted to separate repos) |
+| `continuum-commons` | `org.projectcontinuum.core` | — | Base classes: `ProcessNodeModel`, `ContinuumWorkflowModel`, `NodePort`, `NodeInputReader`, `NodeOutputWriter`, Parquet/S3 utilities |
+| `continuum-avro-schemas` | `org.projectcontinuum.core` | — | Avro schemas for Kafka workflow execution messages |
+| `continuum-worker-springboot-starter` | `org.projectcontinuum.core` | commons, avro-schemas | Spring Boot starter that auto-registers nodes with Temporal, handles download/upload/progress lifecycle |
+| `continuum-api-server` | `org.projectcontinuum.core` | commons, avro-schemas | REST API — workflow CRUD, node registry, execution triggers. Includes DuckDB 1.2.2 |
+| `continuum-message-bridge` | `org.projectcontinuum.core` | commons | Kafka consumer → MQTT publisher bridge for real-time browser updates |
+| `continuum-knime-base` | `org.projectcontinuum.knime` | commons | KNIME node compatibility layer (experimental) |
+| `workers/continuum-base-worker` | `org.projectcontinuum.app.worker.base` | starter, continuum-base, continuum-feature-ai | Legacy monorepo worker (features extracted to separate repos) |
 
 **Key paths:**
 ```
@@ -142,7 +142,7 @@ continuum-feature-<name>/
 ### continuum-feature-base
 
 **Settings:** `include(":features:continuum-feature-analytics")`, `include(":worker")`
-**Group:** `com.continuum.base` (feature), `com.continuum.feature.base` (worker)
+**Group:** `org.projectcontinuum.base` (feature), `org.projectcontinuum.feature.base` (worker)
 **Extra deps beyond commons:** Kafka + Confluent Avro 7.6.1, Temporal SDK, AWS SDK, MQTT Paho 1.2.5, FreeMarker 2.3.32, Kotlin Scripting
 
 **16 nodes** in `features/continuum-feature-analytics/src/main/kotlin/com/continuum/feature/analytics/node/`:
@@ -169,7 +169,7 @@ continuum-feature-<name>/
 ### continuum-feature-ai
 
 **Settings:** `include("features:continuum-feature-unsloth")`, `include(":worker")`
-**Group:** `com.continuum.feature.unsloth` (feature), `com.continuum.feature.ai` (worker)
+**Group:** `org.projectcontinuum.feature.unsloth` (feature), `org.projectcontinuum.feature.ai` (worker)
 **Extra deps beyond commons:** Jackson Kotlin
 
 **1 node** in `features/continuum-feature-unsloth/src/main/kotlin/com/continuum/feature/ai/node/`:
@@ -183,13 +183,13 @@ continuum-feature-<name>/
 - Supported models: Phi-4, Mistral 7B, Llama 2/3, Gemma 2, Qwen 2.5, Falcon 7B, any HuggingFace causal LM
 - Config groups: Model, Data, Training (epochs, batch, lr, seq length), LoRA (rank, alpha, dropout), Advanced (4-bit quant, seed)
 - Python execution via auto-managed venv (`PythonEnvironmentManager.kt`)
-- Config: `com.continuum.feature.ai.unsloth-trainer.venv-path` (default: `~/.continuum/unsloth-env`)
+- Config: `org.projectcontinuum.feature.ai.unsloth-trainer.venv-path` (default: `~/.continuum/unsloth-env`)
 
 ### continuum-feature-template
 
 **Settings:** `include(":features:continuum-feature-example")`, `include(":worker")`
-**Group:** `com.continuum.feature.template`
-**Note:** Directory is `continuum-feature-example/` but Kotlin package is `com.continuum.feature.template`
+**Group:** `org.projectcontinuum.feature.template`
+**Note:** Directory is `continuum-feature-example/` but Kotlin package is `org.projectcontinuum.feature.template`
 
 **1 example node** in `features/continuum-feature-example/src/main/kotlin/com/continuum/feature/template/node/`:
 

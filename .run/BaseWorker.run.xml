@@ -1,11 +1,12 @@
 <component name="ProjectRunConfigurationManager">
   <configuration default="false" name="BaseWorker" type="SpringBootApplicationConfigurationType" factoryName="Spring Boot">
+    <option name="ALTERNATIVE_JRE_PATH" value="temurin-21" />
+    <option name="ALTERNATIVE_JRE_PATH_ENABLED" value="true" />
     <envs>
-      <env name="CONTINUUM_KAFKA_MAIN_BROKER_LIST" value="localhost:39092,localhost:39093,localhost:39094" />
-      <env name="TEMPORAL_SERVER_ADDRESS" value="localhost:7233" />
+      <env name="CONTINUUM_NODE_TASK_QUEUE" value="CONTINUUM_FEATURE_BASE" />
     </envs>
-    <module name="continuum.workers.continuum-base-worker.main" />
-    <option name="SPRING_BOOT_MAIN_CLASS" value="com.comtinuum.app.worker.base.App" />
+    <module name="continuum-feature-base.worker.main" />
+    <option name="SPRING_BOOT_MAIN_CLASS" value="org.projectcontinuum.feature.base.worker.App" />
     <option name="VM_PARAMETERS" value="-Dserver.port=8081" />
     <extension name="coverage">
       <pattern>

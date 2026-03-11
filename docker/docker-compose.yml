@@ -11,6 +11,7 @@ services:
       - 35432:5432
     volumes:
       - postgresql-data:/var/lib/postgresql/data
+      - ./postgres/init-bridge-db.sh:/docker-entrypoint-initdb.d/init-bridge-db.sh
     restart: unless-stopped
   temporal:
     container_name: temporal

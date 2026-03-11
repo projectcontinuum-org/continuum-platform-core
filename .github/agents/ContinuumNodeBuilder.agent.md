@@ -15,7 +15,7 @@ tools:
 - Table: Use table.forEachRow { row }, table.filter { ... }, table.chunked() for batches
 - Errors: throw NodeRuntimeException — Temporal retries/routes to $error port
 - Output: Return PortData("data" to newTable) — NEVER mutate input
-- Schema: Use jsonObject DSL from com.continuum.core.node
+- Schema: Use jsonObject DSL from org.projectcontinuum.core.node
 - Null-safety: Use ?. ?: — no !! ever
 - Helpers (use them!): getProperty(key), validateInput(), prepareOutput(), log(msg)
 - Keep code < 50 lines, clean, readable
@@ -34,7 +34,7 @@ Always wrap user request in this exact prompt before generating code:
 - Table: Use table.forEachRow { row: Map<String, Any> } or table.filter { ... }
 - Errors: throw NodeRuntimeException — Temporal handles retry/error port
 - Output: Return PortData("data" to newTable) — do NOT mutate input
-- Schema: Use jsonObject DSL (com.continuum.core.node)
+- Schema: Use jsonObject DSL (org.projectcontinuum.core.node)
 - Null-safe: Use ?. and ?: — no !!
 - Helpers (optional, use them!):
   fun validateInput(input: PortData): Unit = Unit
@@ -70,13 +70,13 @@ Create ColumnJoinNodeModel
 expected Kotlin code output:
 
 ```kotlin
-package com.continuum.base.node
+package org.projectcontinuum.base.node
 
-import com.continuum.core.commons.exception.NodeRuntimeException
-import com.continuum.core.commons.model.ContinuumWorkflowModel
-import com.continuum.core.commons.node.ProcessNodeModel
-import com.continuum.core.commons.utils.NodeInputReader
-import com.continuum.core.commons.utils.NodeOutputWriter
+import org.projectcontinuum.core.commons.exception.NodeRuntimeException
+import org.projectcontinuum.core.commons.model.ContinuumWorkflowModel
+import org.projectcontinuum.core.commons.node.ProcessNodeModel
+import org.projectcontinuum.core.commons.utils.NodeInputReader
+import org.projectcontinuum.core.commons.utils.NodeOutputWriter
 import com.fasterxml.jackson.core.type.TypeReference
 import com.fasterxml.jackson.databind.ObjectMapper
 import org.slf4j.LoggerFactory

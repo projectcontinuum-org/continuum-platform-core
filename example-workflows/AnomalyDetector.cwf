@@ -11,12 +11,12 @@
                 "y": 433.82473140643623
             },
             "data": {
-                "id": "com.continuum.base.node.ConditionalSplitterNodeModel",
+                "id": "org.projectcontinuum.base.node.ConditionalSplitterNodeModel",
                 "description": "Splits rows into two outputs based on threshold comparison",
                 "title": "Conditional Splitter",
                 "subTitle": "Split by threshold",
                 "icon": "<svg xmlns=\"http://www.w3.org/2000/svg\" fill=\"none\" stroke=\"currentColor\" strokeWidth={1.5} viewBox=\"0 0 24 24\">\n    <path strokeLinecap=\"round\" strokeLinejoin=\"round\" d=\"M3 7.5L7.5 3m0 0L12 7.5M7.5 3v13.5m13.5 0L16.5 21m0 0L12 16.5m4.5 4.5V7.5\" />\n</svg>",
-                "nodeModel": "com.continuum.base.node.ConditionalSplitterNodeModel",
+                "nodeModel": "org.projectcontinuum.base.node.ConditionalSplitterNodeModel",
                 "busy": null,
                 "inputs": {
                     "data": {
@@ -90,12 +90,12 @@
                 "y": 437.2590983570042
             },
             "data": {
-                "id": "com.continuum.base.node.AnomalyDetectorZScoreNodeModel",
+                "id": "org.projectcontinuum.base.node.AnomalyDetectorZScoreNodeModel",
                 "description": "Detects outliers using Z-score method (flags values with |Z| > 2)",
                 "title": "Anomaly Detector",
                 "subTitle": "(Z-Score) outlier detection",
                 "icon": "<svg xmlns=\"http://www.w3.org/2000/svg\" fill=\"none\" stroke=\"currentColor\" strokeWidth={1.5} viewBox=\"0 0 24 24\">\n    <path strokeLinecap=\"round\" strokeLinejoin=\"round\" d=\"M3.75 3v11.25A2.25 2.25 0 006 16.5h2.25M3.75 3h-1.5m1.5 0h16.5m0 0h1.5m-1.5 0v11.25A2.25 2.25 0 0118 16.5h-2.25m-7.5 0h7.5m-7.5 0l-1 3m8.5-3l1 3m0 0l.5 1.5m-.5-1.5h-9.5m0 0l-.5 1.5M9 11.25v1.5M12 9v3.75m3-6v6\" />\n</svg>",
-                "nodeModel": "com.continuum.base.node.AnomalyDetectorZScoreNodeModel",
+                "nodeModel": "org.projectcontinuum.base.node.AnomalyDetectorZScoreNodeModel",
                 "busy": null,
                 "inputs": {
                     "data": {
@@ -178,12 +178,12 @@
                 "y": 451.9600324823517
             },
             "data": {
-                "id": "com.continuum.base.node.CreateTableNodeModel",
+                "id": "org.projectcontinuum.base.node.CreateTableNodeModel",
                 "description": "Creates a structured table from FreeMarker template configuration",
                 "title": "Create Table",
                 "subTitle": "Generate table rows from template",
                 "icon": "<svg xmlns=\"http://www.w3.org/2000/svg\" fill=\"none\" stroke=\"currentColor\" strokeWidth={1.5} viewBox=\"0 0 24 24\">\n\t<path d=\"M21.5 2h-19a.5.5 0 0 0-.5.5v19a.5.5 0 0 0 .5.5h19a.5.5 0 0 0 .5-.5v-19a.5.5 0 0 0-.5-.5zm-13 19H3v-5.5h5.5V21zm0-6.5H3v-5h5.5v5zm0-6H3V3h5.5v5.5zm6 12.5h-5v-5.5h5V21zm0-6.5h-5v-5h5v5zm0-6h-5V3h5v5.5zM21 21h-5.5v-5.5H21V21zm0-6.5h-5.5v-5H21v5zm0-6h-5.5V3H21v5.5z\" fill=\"currentColor\"/>\n</svg>",
-                "nodeModel": "com.continuum.base.node.CreateTableNodeModel",
+                "nodeModel": "org.projectcontinuum.base.node.CreateTableNodeModel",
                 "busy": null,
                 "inputs": null,
                 "outputs": {

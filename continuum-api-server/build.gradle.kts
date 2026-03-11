@@ -3,12 +3,12 @@ plugins {
     kotlin("plugin.spring") version "1.9.25"
     id("org.springframework.boot") version "3.4.0"
     id("io.spring.dependency-management") version "1.1.6"
-    `maven-publish`
     id("com.google.cloud.tools.jib") version "3.4.1"
 }
 
-group = "com.continuum.core"
-val baseVersion = "0.0.1"
+group = "org.projectcontinuum.core"
+description = "Continuum API Server — REST API for workflow management and execution"
+val baseVersion = property("platformVersion").toString()
 val isRelease = System.getenv("IS_RELEASE_BUILD")?.toBoolean() ?: false
 version = if (isRelease) baseVersion else "$baseVersion-SNAPSHOT"
 
@@ -32,7 +32,6 @@ dependencies {
 
     // Project dependencies
     implementation(project(":continuum-commons"))
-    implementation(project(":continuum-avro-schemas"))
 
     // Swagger-UI Dependencies
     implementation("org.springdoc:springdoc-openapi-starter-webmvc-ui:2.5.0")
@@ -76,43 +75,16 @@ tasks.withType<Test> {
     useJUnitPlatform()
 }
 
-publishing {
-    val repoName = System.getenv("GITHUB_REPOSITORY") ?: property("repoName").toString()
-    publications {
-        create<MavenPublication>("mavenJava") {
-            from(components["java"])
-            group = project.group
-            description = project.description
-            version = project.version.toString()
-            pom {
-                name.set(project.name)
-                description.set(project.description)
-                url.set("https://github.com/$repoName")
-            }
-        }
-    }
-    repositories {
-        maven {
-            name = "GitHubPackages"
-            url = uri("https://maven.pkg.github.com/$repoName")
-            credentials {
-                username = System.getenv("MAVEN_REPO_USERNAME")
-                password = System.getenv("MAVEN_REPO_PASSWORD")
-            }
-        }
-    }
-}
-
 jib {
-    to {
-        image = "ghcr.io/${(System.getenv("GITHUB_REPOSITORY") ?: property("repoName").toString()).lowercase()}/${project.name.lowercase()}:${project.version}"
-        auth {
-            username = System.getenv("DOCKER_REPO_USERNAME")
-            password = System.getenv("DOCKER_REPO_PASSWORD")
-        }
-
-    }
     from {
         image = "eclipse-temurin:21-jre"
+    }
+
+    to {
+      image = "docker.io/projectcontinuum/${project.name.lowercase()}:${project.version}"
+      auth {
+        username = System.getenv("DOCKER_REPO_USERNAME") ?: ""
+        password = System.getenv("DOCKER_REPO_PASSWORD") ?: ""
+      }
     }
 }

@@ -14,7 +14,7 @@ spring:
     test-server:
       enabled: true
     workersAutoDiscovery:
-      packages: com.continuum.core.worker
+      packages: org.projectcontinuum.core.worker
 
 continuum.core:
   worker:

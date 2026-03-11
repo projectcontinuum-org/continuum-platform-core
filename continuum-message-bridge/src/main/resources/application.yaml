@@ -1,7 +1,9 @@
 spring.application.name: continuum-message-bridge
-spring.kafka.consumer.properties.spring.json.trusted.packages: com.continuum.core.commons.model
+spring.kafka.consumer.properties.spring.json.trusted.packages: org.projectcontinuum.core.commons.model
 spring:
   cloud:
+    function:
+      definition: continuum-core-event-FeatureRegistration-input;continuum-core-event-WorkflowExecutionSnapshot-input
     stream:
       binders:
         main-kafka-cluster:
@@ -13,24 +15,21 @@ spring:
                 brokers: ${CONTINUUM_KAFKA_MAIN_BROKER_LIST:localhost:39092,localhost:39093,localhost:39094}
                 consumer-properties:
                   key.deserializer: org.apache.kafka.common.serialization.StringDeserializer
-                  # value.deserializer: io.confluent.kafka.serializers.KafkaAvroDeserializer
                   value.deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
-                  schema.registry.url: ${CONTINUUM_KAFKA_MAIN_SCHEMA_REGISTRY:http://localhost:38080} # Not required yet
+                  schema.registry.url: ${CONTINUUM_KAFKA_MAIN_SCHEMA_REGISTRY:http://localhost:38080}
                   specific.avro.reader: true
                   auto.offset.reset: latest
                   fetch.max.wait.ms: 40000
                   request.timeout.ms: 60000
                 producer-properties:
                   key.serializer: org.apache.kafka.common.serialization.StringSerializer
-                  # value.serializer: io.confluent.kafka.serializers.KafkaAvroSerializer
                   value.serializer: org.springframework.kafka.support.serializer.JsonSerializer
-                  schema.registry.url: ${CONTINUUM_KAFKA_MAIN_SCHEMA_REGISTRY:http://localhost:38080} # Not required yet
+                  schema.registry.url: ${CONTINUUM_KAFKA_MAIN_SCHEMA_REGISTRY:http://localhost:38080}
                   max.request.size: 104857600
                 dlq-producer-properties:
                   key.serializer: org.apache.kafka.common.serialization.StringSerializer
-                  # value.serializer: io.confluent.kafka.serializers.KafkaAvroSerializer
                   value.serializer: org.springframework.kafka.support.serializer.JsonSerializer
-                  schema.registry.url: ${CONTINUUM_KAFKA_MAIN_SCHEMA_REGISTRY:http://localhost:38080} # Not required yet
+                  schema.registry.url: ${CONTINUUM_KAFKA_MAIN_SCHEMA_REGISTRY:http://localhost:38080}
                   max.request.size: 104857600
       bindings:
         continuum-core-event-WorkflowExecutionSnapshot-input-in-0:
@@ -44,4 +43,27 @@ spring:
               spring:
                 json:
                   trusted:
-                    packages: "com.continuum.core.commons.model"
+                    packages: "org.projectcontinuum.core.commons.model"
+        continuum-core-event-FeatureRegistration-input-in-0:
+          binder: main-kafka-cluster
+          destination: continuum-core-event-FeatureRegistration
+          content-type: application/*+avro
+          group: ${spring.application.name}
+          consumer:
+            use-native-decoding: true
+      kafka:
+        bindings:
+          continuum-core-event-FeatureRegistration-input-in-0:
+            consumer:
+              configuration:
+                value.deserializer: io.confluent.kafka.serializers.KafkaAvroDeserializer
+                schema.registry.url: ${CONTINUUM_KAFKA_MAIN_SCHEMA_REGISTRY:http://localhost:38080}
+                specific.avro.reader: true
+  datasource:
+    url: ${CONTINUUM_BRIDGE_DB_URL:jdbc:postgresql://localhost:35432/continuum_bridge}
+    username: ${CONTINUUM_BRIDGE_DB_USERNAME:temporal}
+    password: ${CONTINUUM_BRIDGE_DB_PASSWORD:temporal}
+    driver-class-name: org.postgresql.Driver
+  sql:
+    init:
+      mode: always

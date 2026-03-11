@@ -1,1 +1,1 @@
-com.continuum.core.worker.AutoConfigure
+org.projectcontinuum.core.worker.starter.AutoConfigure

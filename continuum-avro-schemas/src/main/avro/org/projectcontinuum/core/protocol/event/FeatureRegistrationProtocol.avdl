@@ -1,0 +1,19 @@
+@namespace("org.projectcontinuum.core.protocol.event")
+protocol FeatureRegistrationProtocol {
+
+	record FeatureRegistrationRequest {
+		string nodeId;
+		string workerId;
+		/** Root package name of the feature module, e.g. "org.projectcontinuum.feature.analytics" */
+		string featureId;
+		string taskQueue;
+		/** Full node model metadata serialized as JSON string */
+		string nodeManifest;
+		/** Node documentation markup as text */
+		string documentationMarkdown;
+		@logicalType("timestamp-millis")
+		long registeredAtTimestampUtc;
+		/** Reserved for future extensions without breaking schema compatibility */
+		map<string> extensions = {};
+	}
+}
