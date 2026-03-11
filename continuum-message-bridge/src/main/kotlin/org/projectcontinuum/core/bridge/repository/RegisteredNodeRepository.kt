@@ -12,13 +12,14 @@ interface RegisteredNodeRepository : CrudRepository<RegisteredNodeEntity, Long> 
 
   @Modifying
   @Query("""
-    INSERT INTO registered_nodes (node_id, task_queue, worker_id, feature_id, node_manifest, documentation_markdown, extensions, registered_at, last_seen_at)
-    VALUES (:nodeId, :taskQueue, :workerId, :featureId, CAST(:nodeManifest AS JSONB), :documentationMarkdown, CAST(:extensions AS JSONB), :registeredAt, :lastSeenAt)
+    INSERT INTO registered_nodes (node_id, task_queue, worker_id, feature_id, node_manifest, documentation_markdown, categories, extensions, registered_at, last_seen_at)
+    VALUES (:nodeId, :taskQueue, :workerId, :featureId, CAST(:nodeManifest AS JSONB), :documentationMarkdown, CAST(:categories AS JSONB), CAST(:extensions AS JSONB), :registeredAt, :lastSeenAt)
     ON CONFLICT (node_id, task_queue) DO UPDATE SET
       worker_id = :workerId,
       feature_id = :featureId,
       node_manifest = CAST(:nodeManifest AS JSONB),
       documentation_markdown = :documentationMarkdown,
+      categories = CAST(:categories AS JSONB),
       extensions = CAST(:extensions AS JSONB),
       registered_at = :registeredAt,
       last_seen_at = :lastSeenAt
@@ -30,6 +31,7 @@ interface RegisteredNodeRepository : CrudRepository<RegisteredNodeEntity, Long> 
     featureId: String,
     nodeManifest: String,
     documentationMarkdown: String,
+    categories: String,
     extensions: String,
     registeredAt: Instant,
     lastSeenAt: Instant

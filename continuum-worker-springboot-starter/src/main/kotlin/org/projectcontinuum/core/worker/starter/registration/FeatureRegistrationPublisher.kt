@@ -78,6 +78,7 @@ class FeatureRegistrationPublisher(
       .setNodeManifest(nodeManifestJson)
       .setDocumentationMarkdown(nodeModel.documentationMarkdown ?: "No documentation available")
       .setRegisteredAtTimestampUtc(Instant.now())
+      .setCategories(nodeModel.categories)
       .setExtensions(emptyMap())
       .build()
   }

@@ -43,6 +43,11 @@ dependencies {
     // DuckDB Dependencies
     implementation("org.duckdb:duckdb_jdbc:1.2.2.0")
 
+    // PostgreSQL Dependencies
+    implementation("org.springframework.boot:spring-boot-starter-data-jdbc")
+    implementation("com.fasterxml.jackson.module:jackson-module-kotlin")
+    implementation("org.postgresql:postgresql")
+
     // AWS dependencies
     implementation("software.amazon.awssdk:s3")
     implementation("software.amazon.awssdk:sts")
@@ -54,6 +59,7 @@ dependencies {
     // Test dependencies
     testImplementation("org.springframework.boot:spring-boot-starter-test")
     testImplementation("org.jetbrains.kotlin:kotlin-test-junit5")
+    testImplementation("org.mockito.kotlin:mockito-kotlin:5.3.1")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
 }
 

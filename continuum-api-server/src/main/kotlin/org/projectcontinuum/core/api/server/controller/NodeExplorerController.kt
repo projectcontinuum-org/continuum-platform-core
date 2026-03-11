@@ -2,7 +2,10 @@ package org.projectcontinuum.core.api.server.controller
 
 import org.projectcontinuum.core.api.server.model.NodeExplorerTreeItem
 import org.projectcontinuum.core.api.server.service.NodeExplorerService
+import org.springframework.http.MediaType
+import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.GetMapping
+import org.springframework.web.bind.annotation.PathVariable
 import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.RequestParam
 import org.springframework.web.bind.annotation.RestController
@@ -26,5 +29,14 @@ class NodeExplorerController(
         @RequestParam query: String
     ): List<NodeExplorerTreeItem> {
         return nodeExplorerService.search(query)
+    }
+
+    @GetMapping("/nodes/{nodeId}/documentation", produces = [MediaType.TEXT_MARKDOWN_VALUE])
+    fun getDocumentation(
+        @PathVariable nodeId: String
+    ): ResponseEntity<String> {
+        val documentation = nodeExplorerService.getDocumentation(nodeId)
+            ?: return ResponseEntity.notFound().build()
+        return ResponseEntity.ok(documentation)
     }
 }

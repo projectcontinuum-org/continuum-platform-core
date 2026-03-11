@@ -13,6 +13,8 @@ protocol FeatureRegistrationProtocol {
 		string documentationMarkdown;
 		@logicalType("timestamp-millis")
 		long registeredAtTimestampUtc;
+		/** Category paths for tree navigation, e.g. ["analytics/data", "math/transform"]. Empty means root-level node. */
+		array<string> categories = [];
 		/** Reserved for future extensions without breaking schema compatibility */
 		map<string> extensions = {};
 	}

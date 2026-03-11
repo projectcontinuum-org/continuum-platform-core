@@ -21,6 +21,8 @@ data class RegisteredNodeEntity(
   val nodeManifest: String,
   @Column("documentation_markdown")
   val documentationMarkdown: String,
+  @Column("categories")
+  val categories: String = "[]",
   @Column("extensions")
   val extensions: String = "{}",
   @Column("registered_at")

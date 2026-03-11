@@ -1,4 +1,10 @@
 spring.application.name: continuum-api-server
+spring:
+  datasource:
+    url: ${CONTINUUM_DB_URL:jdbc:postgresql://localhost:35432/continuum}
+    username: ${CONTINUUM_DB_USERNAME:continuum_owner}
+    password: ${CONTINUUM_DB_PASSWORD:continuum-test-password}
+    driver-class-name: org.postgresql.Driver
 temporal:
   connection:
     target: ${TEMPORAL_SERVER_ADDRESS:localhost:7233}

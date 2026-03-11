@@ -60,9 +60,9 @@ spring:
                 schema.registry.url: ${CONTINUUM_KAFKA_MAIN_SCHEMA_REGISTRY:http://localhost:38080}
                 specific.avro.reader: true
   datasource:
-    url: ${CONTINUUM_BRIDGE_DB_URL:jdbc:postgresql://localhost:35432/continuum_bridge}
-    username: ${CONTINUUM_BRIDGE_DB_USERNAME:temporal}
-    password: ${CONTINUUM_BRIDGE_DB_PASSWORD:temporal}
+    url: ${CONTINUUM_DB_URL:jdbc:postgresql://localhost:35432/continuum}
+    username: ${CONTINUUM_DB_USERNAME:continuum_owner}
+    password: ${CONTINUUM_DB_PASSWORD:continuum-test-password}
     driver-class-name: org.postgresql.Driver
   sql:
     init:

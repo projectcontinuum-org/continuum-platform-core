@@ -7,7 +7,8 @@ data class NodeExplorerTreeItem(
     val name: String,
     val nodeInfo: ContinuumWorkflowModel.NodeData? = null,
     val hasChildren: Boolean = false,
-    val type: NodeExplorerItemType = NodeExplorerItemType.CATEGORY
+    val type: NodeExplorerItemType = NodeExplorerItemType.CATEGORY,
+    val children: MutableList<NodeExplorerTreeItem>? = null
 )
 
 enum class NodeExplorerItemType {

@@ -1,5 +1,6 @@
 package org.projectcontinuum.core.bridge.handler
 
+import com.fasterxml.jackson.databind.ObjectMapper
 import org.projectcontinuum.core.bridge.repository.RegisteredNodeRepository
 import org.projectcontinuum.core.protocol.event.FeatureRegistrationRequest
 import org.slf4j.LoggerFactory
@@ -16,6 +17,7 @@ class FeatureRegistrationHandler(
 
   companion object {
     private val LOGGER = LoggerFactory.getLogger(FeatureRegistrationHandler::class.java)
+    private val objectMapper = ObjectMapper()
   }
 
   @Bean("continuum-core-event-FeatureRegistration-input")
@@ -30,6 +32,9 @@ class FeatureRegistrationHandler(
   private fun handle(message: Message<FeatureRegistrationRequest>) {
     val request = message.payload
     val now = Instant.now()
+    val categoriesJson = objectMapper.writeValueAsString(
+      request.getCategories().map { it.toString() }
+    )
 
     LOGGER.info("Received feature registration: node='${request.getNodeId()}', taskQueue='${request.getTaskQueue()}', worker='${request.getWorkerId()}'")
 
@@ -40,6 +45,7 @@ class FeatureRegistrationHandler(
       featureId = request.getFeatureId(),
       nodeManifest = request.getNodeManifest().toString(),
       documentationMarkdown = request.getDocumentationMarkdown().toString(),
+      categories = categoriesJson,
       extensions = request.getExtensions().toString(),
       registeredAt = request.getRegisteredAtTimestampUtc(),
       lastSeenAt = now
