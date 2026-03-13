@@ -40,4 +40,6 @@ interface RegisteredNodeRepository : CrudRepository<RegisteredNodeEntity, Long> 
     LIMIT 1
   """)
   fun findDocumentationByNodeId(nodeId: String): String?
+
 }
+

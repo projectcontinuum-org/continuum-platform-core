@@ -18,6 +18,7 @@ spring:
 
 continuum.core:
   worker:
+    api-server-base-url: http://localhost:8080
     aws-profile-name: test-profile
     cache-bucket-name: test-bucket
     cache-bucket-base-path: test-base-path

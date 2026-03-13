@@ -59,9 +59,6 @@ dependencies {
     implementation("software.amazon.awssdk.crt:aws-crt:0.33.10")
     implementation("software.amazon.awssdk:s3-transfer-manager")
 
-    // Nodes
-//    implementation(project(":continuum-knime-base"))
-
     // Test dependencies
     testImplementation("org.springframework.boot:spring-boot-starter-test")
     testImplementation("org.jetbrains.kotlin:kotlin-test-junit5")

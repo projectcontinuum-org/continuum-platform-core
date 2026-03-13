@@ -6,6 +6,8 @@ import org.springframework.http.MediaType
 import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PathVariable
+import org.springframework.web.bind.annotation.PostMapping
+import org.springframework.web.bind.annotation.RequestBody
 import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.RequestParam
 import org.springframework.web.bind.annotation.RestController
@@ -38,5 +40,12 @@ class NodeExplorerController(
         val documentation = nodeExplorerService.getDocumentation(nodeId)
             ?: return ResponseEntity.notFound().build()
         return ResponseEntity.ok(documentation)
+    }
+
+    @PostMapping("/nodes/task-queues")
+    fun getTaskQueues(
+        @RequestBody nodeIds: List<String>
+    ): Map<String, String> {
+        return nodeExplorerService.getTaskQueues(nodeIds)
     }
 }

@@ -6,4 +6,5 @@ package org.projectcontinuum.core.commons.constant
 object TaskQueues {
   const val WORKFLOW_TASK_QUEUE = "WORKFLOW_TASK_QUEUE"
   const val ACTIVITY_TASK_QUEUE = "ACTIVITY_TASK_QUEUE"
+  const val ACTIVITY_TASK_QUEUE_INITIALIZE = "ACTIVITY_TASK_QUEUE_INITIALIZE"
 }

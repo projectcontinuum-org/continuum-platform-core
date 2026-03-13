@@ -1,12 +1,10 @@
 package org.projectcontinuum.core.worker.starter
 
 import com.fasterxml.jackson.module.kotlin.KotlinModule
+import io.temporal.common.converter.DataConverter
 import io.temporal.common.converter.DefaultDataConverter
-import io.temporal.common.converter.GlobalDataConverter
 import io.temporal.common.converter.JacksonJsonPayloadConverter
-import org.springframework.context.annotation.ComponentScan
-import org.springframework.context.annotation.Configuration
-import org.springframework.context.annotation.PropertySource
+import org.springframework.context.annotation.*
 
 /**
  * Spring Boot auto-configuration class for the Continuum Worker starter.
@@ -37,46 +35,38 @@ import org.springframework.context.annotation.PropertySource
 @ComponentScan
 @PropertySource("classpath:continuum-worker-springboot-starter.yaml", factory = YamlPropertySourceFactory::class)
 class AutoConfigure {
-  init {
-    // Register Kotlin-aware Jackson mapper for Temporal serialization
-    registerKotlinMapper()
+
+  /**
+   *Registers a Kotlin-aware Jackson ObjectMapper as Temporal's global data converter.
+   * This bean configures Temporal to use Jackson with Kotlin module support for
+   * serializing and deserializing workflow inputs, outputs, and activity parameters.
+   * Without this configuration, Kotlin data classes may not serialize correctly.
+   * ## Configuration Details
+   * - Creates a new Jackson ObjectMapper with default Temporal settings
+   * - Registers the Kotlin module for proper Kotlin class support
+   * - Creates a new JacksonJsonPayloadConverter with the configured mapper
+   * - Overrides the default data converter globally for all Temporal operations
+   * ## Thread Safety
+   * This bean is thread-safe and will be managed by Spring's singleton scope.
+   * It should only be initialized once during application startup.
+   * @see registerKotlinMapper
+   */
+  @Bean
+  @Primary  // this overrides Temporal's default
+  fun dataConverter(): DataConverter {
+    val mapper = JacksonJsonPayloadConverter.newDefaultObjectMapper()
+
+    // Build and register Kotlin module for proper Kotlin class serialization
+    val km = KotlinModule.Builder().build()
+    mapper.registerModule(km)
+
+    // Create a payload converter using the Kotlin-aware mapper
+    val jacksonConverter = JacksonJsonPayloadConverter(mapper)
+
+    // Create a new data converter with the custom Jackson converter
+    val dataConverter = DefaultDataConverter.newDefaultInstance()
+      .withPayloadConverterOverrides(jacksonConverter)
+
+    return dataConverter
   }
-}
-
-/**
- * Registers a Kotlin-aware Jackson ObjectMapper as Temporal's global data converter.
- *
- * This function configures Temporal to use Jackson with Kotlin module support for
- * serializing and deserializing workflow inputs, outputs, and activity parameters.
- * Without this configuration, Kotlin data classes may not serialize correctly.
- *
- * ## Configuration Details
- * - Creates a new Jackson ObjectMapper with default Temporal settings
- * - Registers the Kotlin module for proper Kotlin class support
- * - Creates a new JacksonJsonPayloadConverter with the configured mapper
- * - Overrides the default data converter globally for all Temporal operations
- *
- * ## Thread Safety
- * This function should only be called once during application startup, typically
- * from [AutoConfigure]'s init block.
- *
- * @see AutoConfigure
- */
-fun registerKotlinMapper() {
-  // Create Jackson mapper with Temporal's default configuration
-  val mapper = JacksonJsonPayloadConverter.newDefaultObjectMapper()
-
-  // Build and register Kotlin module for proper Kotlin class serialization
-  val km = KotlinModule.Builder().build()
-  mapper.registerModule(km)
-
-  // Create a payload converter using the Kotlin-aware mapper
-  val jacksonConverter = JacksonJsonPayloadConverter(mapper)
-
-  // Create a new data converter with the custom Jackson converter
-  val dataConverter = DefaultDataConverter.newDefaultInstance()
-    .withPayloadConverterOverrides(jacksonConverter)
-
-  // Register globally for all Temporal operations
-  GlobalDataConverter.register(dataConverter)
 }

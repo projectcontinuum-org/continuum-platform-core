@@ -6,7 +6,6 @@ import org.projectcontinuum.core.commons.constant.TaskQueues.WORKFLOW_TASK_QUEUE
 import org.projectcontinuum.core.commons.protocol.progress.ContinuumNodeActivitySignal
 import org.projectcontinuum.core.commons.workflow.IContinuumWorkflow
 import org.projectcontinuum.core.worker.starter.utils.StatusHelper
-import com.fasterxml.jackson.databind.ObjectMapper
 import io.temporal.activity.ActivityOptions
 import io.temporal.common.RetryOptions
 import io.temporal.failure.ApplicationFailure
@@ -15,6 +14,7 @@ import io.temporal.workflow.Async
 import io.temporal.workflow.Promise
 import io.temporal.workflow.Workflow
 import io.temporal.workflow.unsafe.WorkflowUnsafe
+import org.projectcontinuum.core.commons.activity.IInitializeActivity
 import org.projectcontinuum.core.commons.model.ContinuumWorkflowModel
 import org.projectcontinuum.core.commons.model.ExecutionStatus
 import org.projectcontinuum.core.commons.model.PortData
@@ -70,6 +70,8 @@ class ContinuumWorkflow : IContinuumWorkflow {
   /** The currently executing workflow model (for status updates) */
   private var currentRunningWorkflow: ContinuumWorkflowModel? = null
 
+  private var nodeIdToActivityMap: Map<String, IContinuumNodeActivity> = emptyMap()
+
   /**
    * Retry options for activity execution.
    * Configures exponential backoff with a maximum of 500 attempts.
@@ -79,9 +81,6 @@ class ContinuumWorkflow : IContinuumWorkflow {
     setBackoffCoefficient(2.0)
     setMaximumAttempts(500)
   }
-
-  /** Jackson ObjectMapper for JSON serialization */
-  private val objectMapper = ObjectMapper()
 
   /**
    * Base activity options for node execution.
@@ -93,12 +92,21 @@ class ContinuumWorkflow : IContinuumWorkflow {
     setTaskQueue(TaskQueues.ACTIVITY_TASK_QUEUE)
   }
 
-  /** Activity stub for executing node activities */
-  private val continuumNodeActivity = Workflow.newActivityStub(
-    IContinuumNodeActivity::class.java,
+  /**
+   * Base activity options for node execution.
+   * Activities can run for up to 60 days with the configured retry policy.
+   */
+  private val initializeActivityOptions: ActivityOptions = ActivityOptions {
+    setStartToCloseTimeout(Duration.ofDays(60))
+    setRetryOptions(retryOptions)
+    setTaskQueue(TaskQueues.ACTIVITY_TASK_QUEUE_INITIALIZE)
+  }
+
+  /** Activity stub for executing initialization activities (e.g., fetching task queues) */
+  private val initializeActivity = Workflow.newActivityStub(
+    IInitializeActivity::class.java,
     ActivityOptions {
-      mergeActivityOptions(baseActivityOptions)
-      setHeartbeatTimeout(Duration.ofMinutes(5))
+      mergeActivityOptions(initializeActivityOptions)
     }
   )
 
@@ -120,6 +128,8 @@ class ContinuumWorkflow : IContinuumWorkflow {
     continuumWorkflow: ContinuumWorkflowModel
   ): Map<String, Map<String, PortData>> {
     LOGGER.info("Starting ContinuumWorkflowImpl")
+
+    nodeIdToActivityMap = initializeNodeActivityStubs(continuumWorkflow)
 
     try {
       // Initialize workflow state
@@ -167,6 +177,44 @@ class ContinuumWorkflow : IContinuumWorkflow {
   }
 
   /**
+   * Initializes activity stubs for each node by fetching task queue assignments from the API server.
+   *
+   * Queries the [IInitializeActivity] to resolve each node's task queue, then creates
+   * a dedicated [IContinuumNodeActivity] stub per node routed to the correct task queue.
+   *
+   * @param continuumWorkflow The workflow model containing the nodes to initialize
+   * @return Map of node IDs to their configured activity stubs
+   * @throws ApplicationFailure if not all nodes could be resolved to a task queue
+   */
+  private fun initializeNodeActivityStubs(
+    continuumWorkflow: ContinuumWorkflowModel
+  ): Map<String, IContinuumNodeActivity> {
+    val uniqueNodeIds = continuumWorkflow.nodes.map { it.data.id!! }.toSet()
+    val nodeIdToTaskQueueMap = initializeActivity.getNodeTaskQueue(uniqueNodeIds)
+
+    val activityMap = nodeIdToTaskQueueMap.map { (nodeId, taskQueue) ->
+      val activityStub = Workflow.newActivityStub(
+        IContinuumNodeActivity::class.java,
+        ActivityOptions {
+          mergeActivityOptions(baseActivityOptions)
+          setTaskQueue(taskQueue)
+          setHeartbeatTimeout(Duration.ofMinutes(5))
+        }
+      )
+      nodeId to activityStub
+    }.toMap()
+
+    if (activityMap.size != uniqueNodeIds.size) {
+      throw ApplicationFailure.newNonRetryableFailure(
+        "Failed to initialize activities for all nodes. Expected ${uniqueNodeIds.size} but got ${activityMap.size}",
+        "InitializationFailed"
+      )
+    }
+
+    return activityMap
+  }
+
+  /**
    * Executes the workflow DAG by processing nodes in dependency order.
    *
    * This method implements the core workflow execution loop:
@@ -203,7 +251,9 @@ class ContinuumWorkflow : IContinuumWorkflow {
         // Mark node as running and animate incoming edges
         setNodeAnimationAndStatus(node, ContinuumWorkflowModel.NodeStatus.BUSY)
         // Start the activity asynchronously
-        Pair(node, Async.function { continuumNodeActivity.run(node, nodeInputs) })
+        Pair(node, Async.function {
+          nodeIdToActivityMap[node.data.id!!]!!.run(node, nodeInputs)
+        })
       }
       nodeExecutionPromises.addAll(morePromises)
 

@@ -58,10 +58,12 @@ spring:
     connection:
       target: ${TEMPORAL_SERVER_ADDRESS:localhost:7233}
     workersAutoDiscovery:
-      packages: org.projectcontinuum.core.worker
+      packages:
+        - org.projectcontinuum.core.worker.starter
 continuum.core:
   worker:
-    node-task-queue: ${CONTINUUM_NODE_TASK_QUEUE:continuum-node-task-queue}
+    api-server-base-url: ${CONTINUUM_API_SERVER_BASE_URL:http://localhost:8080}
+    node-task-queue: ${CONTINUUM_NODE_TASK_QUEUE}
     cache-storage-path: ${CONTINUUM_CACHE_STORAGE_PATH:./.continuum-cache/workflow-data}
     knime:
       executable-path: ${CONTINUUM_KNIME_EXECUTABLE_PATH:/opt/knime/knime}
@@ -79,8 +81,8 @@ continuum.core:
 logging:
   level:
     root: error
-    org.projectcontinuum.core.worker: info
-    org.projectcontinuum.core.commons.node: info
-    org.projectcontinuum.core: info
-    org.projectcontinuum.feature.ai: debug
-    org.projectcontinuum.core.worker.activity: debug
+#    org.projectcontinuum.core.worker: info
+#    org.projectcontinuum.core.commons.node: info
+#    org.projectcontinuum.core: info
+#    org.projectcontinuum.feature.ai: debug
+#    org.projectcontinuum.core.worker.activity: debug

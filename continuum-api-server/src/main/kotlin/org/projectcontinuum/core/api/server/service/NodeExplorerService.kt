@@ -38,6 +38,14 @@ class NodeExplorerService(
     return registeredNodeRepository.findDocumentationByNodeId(nodeId)
   }
 
+  fun getTaskQueues(nodeIds: List<String>): Map<String, String> {
+    if (nodeIds.isEmpty()) return emptyMap()
+    val nodeIdSet = nodeIds.toSet()
+    return registeredNodeRepository.findAll()
+      .filter { it.nodeId in nodeIdSet }
+      .associate { it.nodeId to it.taskQueue }
+  }
+
   private fun buildTree(entities: Iterable<RegisteredNodeEntity>): List<NodeExplorerTreeItem> {
     val treeRoots = mutableListOf<NodeExplorerTreeItem>()
 

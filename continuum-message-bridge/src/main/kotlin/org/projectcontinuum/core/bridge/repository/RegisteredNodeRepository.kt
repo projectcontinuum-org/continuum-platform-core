@@ -14,8 +14,9 @@ interface RegisteredNodeRepository : CrudRepository<RegisteredNodeEntity, Long> 
   @Query("""
     INSERT INTO registered_nodes (node_id, task_queue, worker_id, feature_id, node_manifest, documentation_markdown, categories, extensions, registered_at, last_seen_at)
     VALUES (:nodeId, :taskQueue, :workerId, :featureId, CAST(:nodeManifest AS JSONB), :documentationMarkdown, CAST(:categories AS JSONB), CAST(:extensions AS JSONB), :registeredAt, :lastSeenAt)
-    ON CONFLICT (node_id, task_queue) DO UPDATE SET
+    ON CONFLICT (node_id) DO UPDATE SET
       worker_id = :workerId,
+      task_queue = :taskQueue,
       feature_id = :featureId,
       node_manifest = CAST(:nodeManifest AS JSONB),
       documentation_markdown = :documentationMarkdown,

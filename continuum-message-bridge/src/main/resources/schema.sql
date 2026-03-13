@@ -10,5 +10,5 @@ CREATE TABLE IF NOT EXISTS registered_nodes (
     extensions              JSONB NOT NULL DEFAULT '{}',
     registered_at           TIMESTAMP NOT NULL,
     last_seen_at            TIMESTAMP NOT NULL,
-    UNIQUE (node_id, task_queue)
+    UNIQUE (node_id)
 );

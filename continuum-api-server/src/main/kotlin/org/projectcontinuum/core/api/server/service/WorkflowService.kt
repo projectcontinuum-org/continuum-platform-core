@@ -197,11 +197,27 @@ class WorkflowService(
         try {
           // Project the workflow events into output
           LOGGER.debug("Querying workflowId: ${it.workflowId} for output...")
+          // Build a set of scheduled event IDs for IContinuumNodeActivity ("Run") activities
+          val nodeActivityScheduledEventIds = history.events
+            .filter { evt ->
+              evt.eventType == EventType.EVENT_TYPE_ACTIVITY_TASK_SCHEDULED &&
+                evt.activityTaskScheduledEventAttributes.activityType.name == "Run"     // Corresponds to IContinuumNodeActivity.run() method call
+            }
+            .map { evt -> evt.eventId }
+            .toSet()
           workflowOutput =
-            history.events.filter { evt -> evt.eventType == EventType.EVENT_TYPE_ACTIVITY_TASK_COMPLETED }
+            history.events.filter { evt ->
+              evt.eventType == EventType.EVENT_TYPE_ACTIVITY_TASK_COMPLETED &&
+                nodeActivityScheduledEventIds.contains(evt.activityTaskCompletedEventAttributes.scheduledEventId)
+            }
               .associate { evt ->
                 val outputStr = evt.activityTaskCompletedEventAttributes.result.payloadsList[0].data.toStringUtf8()
                 val nodeOutput = objectMapper.readValue(outputStr, object : TypeReference<Map<String, Any>>() {})
+                // Make sure the nodeOutput contains nodeId and outputs
+                if (!nodeOutput.containsKey("nodeId") || !nodeOutput.containsKey("outputs")) {
+                  LOGGER.warn("Skipping eventId: {} as it does not contain nodeId or outputs! Event attributes: {}", evt.eventId, evt.activityTaskCompletedEventAttributes)
+                  return@associate "" to emptyMap()
+                }
                 val nodeId = nodeOutput["nodeId"] as String
                 val output = objectMapper.readValue(
                   objectMapper.writeValueAsString(nodeOutput["outputs"]),

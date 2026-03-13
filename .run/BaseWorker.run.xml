@@ -3,7 +3,7 @@
     <option name="ALTERNATIVE_JRE_PATH" value="temurin-21" />
     <option name="ALTERNATIVE_JRE_PATH_ENABLED" value="true" />
     <envs>
-      <env name="CONTINUUM_NODE_TASK_QUEUE" value="CONTINUUM_FEATURE_BASE" />
+      <env name="CONTINUUM_NODE_TASK_QUEUE" value="CONTINUUM_FEATURE_BASE_TASK_QUEUE" />
     </envs>
     <module name="continuum-feature-base.worker.main" />
     <option name="SPRING_BOOT_MAIN_CLASS" value="org.projectcontinuum.feature.base.worker.App" />
