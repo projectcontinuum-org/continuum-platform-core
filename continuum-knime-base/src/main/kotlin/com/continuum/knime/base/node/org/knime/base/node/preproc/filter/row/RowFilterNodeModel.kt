@@ -9,10 +9,10 @@ import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
 import com.fasterxml.jackson.module.kotlin.readValue
 import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.annotation.Value
-import org.springframework.stereotype.Component
+import org.projectcontinuum.core.commons.annotation.ContinuumNode
 import java.io.File
 
-@Component
+@ContinuumNode
 class RowFilterNodeModel(
   @Value("\${continuum.core.worker.knime.workspace-storage-path}")
   override val knimeWorkspacesRoot: String,

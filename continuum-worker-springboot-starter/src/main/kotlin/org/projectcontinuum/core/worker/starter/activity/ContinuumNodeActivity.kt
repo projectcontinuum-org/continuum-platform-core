@@ -1,6 +1,7 @@
 package org.projectcontinuum.core.worker.starter.activity
 
 import org.projectcontinuum.core.commons.activity.IContinuumNodeActivity
+import org.projectcontinuum.core.commons.annotation.ContinuumNode
 import org.projectcontinuum.core.commons.constant.TaskQueues
 import org.projectcontinuum.core.commons.exception.NodeRuntimeException
 import org.projectcontinuum.core.commons.model.ContinuumWorkflowModel
@@ -20,8 +21,8 @@ import io.temporal.activity.ActivityExecutionContext
 import io.temporal.spring.boot.ActivityImpl
 import jakarta.annotation.PostConstruct
 import org.slf4j.LoggerFactory
-import org.springframework.beans.factory.ObjectProvider
 import org.springframework.beans.factory.annotation.Value
+import org.springframework.context.ApplicationContext
 import org.springframework.stereotype.Component
 import software.amazon.awssdk.services.s3.model.GetObjectRequest
 import software.amazon.awssdk.services.s3.model.PutObjectRequest
@@ -64,8 +65,7 @@ import kotlin.system.measureTimeMillis
  * - [NodeRuntimeException] with `isRetriable = false` causes immediate failure
  * - Other exceptions trigger Temporal's retry mechanism
  *
- * @property processNodesModelProvider Provider for all registered [ProcessNodeModel] beans
- * @property triggerNodeModelProvider Provider for all registered [TriggerNodeModel] beans
+ * @property applicationContext Spring application context for on-demand prototype bean creation
  * @property s3TransferManager AWS S3 transfer manager for efficient file transfers
  * @property cacheBucketName S3 bucket name for storing workflow data
  * @property cacheBucketBasePath Base path within the S3 bucket for workflow data
@@ -81,8 +81,7 @@ import kotlin.system.measureTimeMillis
 @Component
 @ActivityImpl(taskQueues = ["\${continuum.core.worker.node-task-queue:${TaskQueues.ACTIVITY_TASK_QUEUE}}"])
 class ContinuumNodeActivity(
-  private val processNodesModelProvider: ObjectProvider<ProcessNodeModel>,
-  private val triggerNodeModelProvider: ObjectProvider<TriggerNodeModel>,
+  private val applicationContext: ApplicationContext,
   private val s3TransferManager: S3TransferManager,
   @param:Value("\${continuum.core.worker.storage.bucket-name}")
   private val cacheBucketName: String,
@@ -109,24 +108,68 @@ class ContinuumNodeActivity(
     private const val PARQUET_EXTENSION = ".parquet"
   }
 
-  /** Map of process node class names to their model instances */
-  private val processNodeMap = mutableMapOf<String, ProcessNodeModel>()
+  /** Set of registered process node class names */
+  private val processNodeClassNames = mutableSetOf<String>()
 
-  /** Map of trigger node class names to their model instances */
-  private val triggerNodeMap = mutableMapOf<String, TriggerNodeModel>()
+  /** Set of registered trigger node class names */
+  private val triggerNodeClassNames = mutableSetOf<String>()
 
   /**
-   * Initializes the node maps after bean construction.
+   * Initializes the node class name registries after bean construction.
    *
-   * Populates [processNodeMap] and [triggerNodeMap] with all registered node model beans,
-   * using their fully qualified class names as keys for fast lookup during workflow execution.
+   * Populates [processNodeClassNames] and [triggerNodeClassNames] with the fully qualified
+   * class names of all registered node model beans for fast lookup during workflow execution.
+   * Actual bean instances are created on-demand via [ApplicationContext] to support prototype scope.
    */
   @PostConstruct
   fun onInit() {
-    processNodesModelProvider.forEach { processNodeMap[it.javaClass.name] = it }
-    triggerNodeModelProvider.forEach { triggerNodeMap[it.javaClass.name] = it }
-    LOGGER.info("Registered process nodes: ${processNodeMap.keys}")
-    LOGGER.info("Registered trigger nodes: ${triggerNodeMap.keys}")
+    applicationContext.getBeanNamesForType(ProcessNodeModel::class.java).forEach { beanName ->
+      val beanType = applicationContext.getType(beanName)!!
+      validateNodeModelAnnotation(beanType)
+      processNodeClassNames.add(beanType.name)
+    }
+    applicationContext.getBeanNamesForType(TriggerNodeModel::class.java).forEach { beanName ->
+      val beanType = applicationContext.getType(beanName)!!
+      validateNodeModelAnnotation(beanType)
+      triggerNodeClassNames.add(beanType.name)
+    }
+    LOGGER.info("Registered process nodes: $processNodeClassNames")
+    LOGGER.info("Registered trigger nodes: $triggerNodeClassNames")
+  }
+
+  /**
+   * Validates that the given node model class is annotated with [ContinuumNode].
+   *
+   * This ensures proper prototype scoping and component registration for all node models.
+   * Throws [IllegalStateException] at startup if a node model is missing the annotation,
+   * preventing silent misconfiguration at runtime.
+   */
+  private fun validateNodeModelAnnotation(nodeClass: Class<*>) {
+    val hasAnnotation = nodeClass.isAnnotationPresent(ContinuumNode::class.java)
+    check(hasAnnotation) {
+      "Node model '${nodeClass.name}' must be annotated with @ContinuumNode. " +
+        "This annotation is required for proper prototype scope and Spring component registration."
+    }
+  }
+
+  /**
+   * Creates a new instance of a [ProcessNodeModel] by its fully qualified class name.
+   * Uses [ApplicationContext.getBean] to leverage Spring's prototype scope, ensuring
+   * each activity execution gets a fresh bean instance.
+   */
+  private fun createProcessNode(nodeModel: String): ProcessNodeModel {
+    val nodeClass = Class.forName(nodeModel)
+    return applicationContext.getBean(nodeClass) as ProcessNodeModel
+  }
+
+  /**
+   * Creates a new instance of a [TriggerNodeModel] by its fully qualified class name.
+   * Uses [ApplicationContext.getBean] to leverage Spring's prototype scope, ensuring
+   * each activity execution gets a fresh bean instance.
+   */
+  private fun createTriggerNode(nodeModel: String): TriggerNodeModel {
+    val nodeClass = Class.forName(nodeModel)
+    return applicationContext.getBean(nodeClass) as TriggerNodeModel
   }
 
   /**
@@ -160,8 +203,8 @@ class ContinuumNodeActivity(
 
     return try {
       when {
-        processNodeMap.containsKey(nodeModel) -> executeProcessNode(node, inputs, progressCallback, executionStartTime)
-        triggerNodeMap.containsKey(nodeModel) -> executeTriggerNode(node, progressCallback, executionStartTime)
+        processNodeClassNames.contains(nodeModel) -> executeProcessNode(node, inputs, progressCallback, executionStartTime)
+        triggerNodeClassNames.contains(nodeModel) -> executeTriggerNode(node, progressCallback, executionStartTime)
         else -> createErrorOutput(node.id, "Node model '$nodeModel' not found")
       }
     } catch (e: NodeRuntimeException) {
@@ -195,7 +238,7 @@ class ContinuumNodeActivity(
 
     executionStartTime.set(System.currentTimeMillis())
 
-    processNodeMap[nodeModel]!!.run(
+    createProcessNode(nodeModel).run(
       node = node,
       inputs = nodeInputs,
       nodeOutputWriter = nodeOutputWriter,
@@ -224,7 +267,7 @@ class ContinuumNodeActivity(
 
     executionStartTime.set(System.currentTimeMillis())
 
-    triggerNodeMap[node.data.nodeModel]!!.run(node, nodeOutputWriter = nodeOutputWriter)
+    createTriggerNode(node.data.nodeModel).run(node, nodeOutputWriter = nodeOutputWriter)
 
     progressCallback.report(NodeProgress(100))
 
