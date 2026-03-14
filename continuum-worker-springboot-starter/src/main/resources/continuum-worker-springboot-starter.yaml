@@ -33,12 +33,6 @@ spring:
                   schema.registry.url: ${CONTINUUM_KAFKA_MAIN_SCHEMA_REGISTRY:http://localhost:38080} # Not required yet
                   max.request.size: 104857600
       bindings:
-        continuum-core-event-WorkflowExecutionSnapshot-output:
-          binder: main-kafka-cluster
-          destination: continuum-core-event-WorkflowExecutionSnapshot
-          content-type: application/json
-          producer:
-            use-native-encoding: true
         continuum-core-event-FeatureRegistration-output:
           binder: main-kafka-cluster
           destination: continuum-core-event-FeatureRegistration

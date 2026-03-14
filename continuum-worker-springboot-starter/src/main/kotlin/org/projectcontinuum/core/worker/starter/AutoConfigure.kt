@@ -17,10 +17,12 @@ import org.springframework.context.annotation.*
  * Enables component scanning for all classes in this package and sub-packages,
  * automatically registering beans for:
  * - [ContinuumNodeActivity] - Temporal activity for node execution
- * - [ContinuumWorkflow] - Temporal workflow for orchestrating node execution
- * - [StatusHelper] - Utility for publishing workflow status to Kafka
  * - Configuration classes (S3Config, CorsConfig, S3BucketInitializer)
  * - REST controllers (NodeRepositoryController)
+ * - [FeatureRegistrationPublisher] - Publishes node registrations to Kafka
+ *
+ * Note: Workflow orchestration (ContinuumWorkflow, InitializeActivity, StatusHelper)
+ * has been moved to the `continuum-orchestration-service` module for independent scaling.
  *
  * ## Temporal Data Converter Setup
  * Registers a custom Jackson-based data converter with Kotlin module support

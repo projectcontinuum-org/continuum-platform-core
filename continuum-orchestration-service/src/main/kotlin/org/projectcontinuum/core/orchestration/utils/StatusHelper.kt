@@ -1,4 +1,4 @@
-package org.projectcontinuum.core.worker.starter.utils
+package org.projectcontinuum.core.orchestration.utils
 
 import org.projectcontinuum.core.commons.event.Channels
 import org.projectcontinuum.core.commons.model.WorkflowUpdateEvent

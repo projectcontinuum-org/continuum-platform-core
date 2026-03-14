@@ -1,4 +1,4 @@
-package org.projectcontinuum.core.worker.starter.activity
+package org.projectcontinuum.core.orchestration.activity
 
 import io.temporal.spring.boot.ActivityImpl
 import org.projectcontinuum.core.commons.activity.IInitializeActivity
@@ -17,9 +17,9 @@ import org.springframework.web.client.RestTemplate
 @Component
 @ActivityImpl(taskQueues = [TaskQueues.ACTIVITY_TASK_QUEUE_INITIALIZE])
 class InitializeActivity(
-    @param:Qualifier("continuumWorkerSpringbootStarterRestTemplate")
+    @param:Qualifier("orchestrationRestTemplate")
     private val restTemplate: RestTemplate,
-    @param:Value("\${continuum.core.worker.api-server-base-url}")
+    @param:Value("\${continuum.core.orchestration.api-server-base-url}")
     private val apiServerBaseUrl: String,
 ): IInitializeActivity {
 

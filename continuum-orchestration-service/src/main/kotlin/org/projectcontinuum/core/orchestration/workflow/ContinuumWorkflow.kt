@@ -1,11 +1,11 @@
-package org.projectcontinuum.core.worker.starter.workflow
+package org.projectcontinuum.core.orchestration.workflow
 
 import org.projectcontinuum.core.commons.activity.IContinuumNodeActivity
 import org.projectcontinuum.core.commons.constant.TaskQueues
 import org.projectcontinuum.core.commons.constant.TaskQueues.WORKFLOW_TASK_QUEUE
 import org.projectcontinuum.core.commons.protocol.progress.ContinuumNodeActivitySignal
 import org.projectcontinuum.core.commons.workflow.IContinuumWorkflow
-import org.projectcontinuum.core.worker.starter.utils.StatusHelper
+import org.projectcontinuum.core.orchestration.utils.StatusHelper
 import io.temporal.activity.ActivityOptions
 import io.temporal.common.RetryOptions
 import io.temporal.failure.ApplicationFailure
@@ -448,7 +448,7 @@ class ContinuumWorkflow : IContinuumWorkflow {
   /**
    * Signal handler for receiving node progress updates from activities.
    *
-   * This signal is called by [ContinuumNodeActivity] to report execution progress
+   * This signal is called by activity workers to report execution progress
    * for long-running nodes. The progress is stored in the node's data and a
    * status update is published to Kafka.
    *

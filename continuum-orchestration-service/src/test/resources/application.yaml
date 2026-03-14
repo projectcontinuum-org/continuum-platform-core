@@ -1,0 +1,21 @@
+spring.application.name: continuum-orchestration-service
+
+spring:
+  cloud:
+    stream:
+      bindings:
+        continuum-core-event-WorkflowExecutionSnapshot-output:
+          destination: continuum-core-event-WorkflowExecutionSnapshot
+          content-type: application/json
+          producer:
+            use-native-encoding: true
+  temporal:
+    namespace: default
+    test-server:
+      enabled: true
+    workersAutoDiscovery:
+      packages: org.projectcontinuum.core.orchestration
+
+continuum.core:
+  orchestration:
+    api-server-base-url: http://localhost:8080
