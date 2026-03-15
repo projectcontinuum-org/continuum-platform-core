@@ -15,6 +15,7 @@ on:
           - continuum-knime-base
           - continuum-message-bridge
           - continuum-worker-springboot-starter
+          - continuum-gradle-plugin
       release:
         description: 'Publish as a release build (immutable version, no SNAPSHOT suffix)'
         required: true
