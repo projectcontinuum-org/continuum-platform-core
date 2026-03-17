@@ -1,6 +1,6 @@
 <component name="ProjectRunConfigurationManager">
   <configuration default="false" name="MessageBridge" type="SpringBootApplicationConfigurationType" factoryName="Spring Boot">
-    <module name="continuum.continuum-message-bridge.main" />
+    <module name="continuum-platform-core.continuum-message-bridge.main" />
     <selectedOptions>
       <option name="environmentVariables" />
     </selectedOptions>

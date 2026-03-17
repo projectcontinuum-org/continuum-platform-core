@@ -1,4 +1,4 @@
-rootProject.name = "continuum"
+rootProject.name = "continuum-platform-core"
 
 include(":continuum-commons")
 include(":continuum-message-bridge")
