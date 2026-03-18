@@ -2,7 +2,7 @@
   <configuration default="false" name="ApiServer" type="SpringBootApplicationConfigurationType" factoryName="Spring Boot">
     <option name="ALTERNATIVE_JRE_PATH" value="temurin-21" />
     <option name="ALTERNATIVE_JRE_PATH_ENABLED" value="true" />
-    <module name="continuum.continuum-api-server.main" />
+    <module name="continuum-platform-core.continuum-api-server.main" />
     <selectedOptions>
       <option name="environmentVariables" />
     </selectedOptions>
