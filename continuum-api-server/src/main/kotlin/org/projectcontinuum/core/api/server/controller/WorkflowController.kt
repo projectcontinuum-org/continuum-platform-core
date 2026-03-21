@@ -16,7 +16,7 @@ class WorkflowController(
 
   @PostMapping
   fun startWorkflow(
-    @RequestHeader("x-continuum-user-id") ownedBy: String,
+    @RequestHeader("x-continuum-user-id", required = false, defaultValue = "anonymous") ownedBy: String,
     @RequestBody
     continuumWorkflowModel: ContinuumWorkflowModel
   ): StartWorkflowResponse {

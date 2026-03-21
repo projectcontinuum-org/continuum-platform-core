@@ -16,7 +16,7 @@ class WorkflowRunController(
 
   @GetMapping
   fun findAll(
-    @RequestHeader("x-continuum-user-id") ownedBy: String,
+    @RequestHeader("x-continuum-user-id", required = false, defaultValue = "anonymous") ownedBy: String,
     @RequestParam(required = false) filter: String?,
     @RequestParam(required = false, defaultValue = "0") page: Int,
     @RequestParam(required = false, defaultValue = "20") size: Int,
@@ -27,7 +27,7 @@ class WorkflowRunController(
 
   @GetMapping("/{workflowId}")
   fun findById(
-    @RequestHeader("x-continuum-user-id") ownedBy: String,
+    @RequestHeader("x-continuum-user-id", required = false, defaultValue = "anonymous") ownedBy: String,
     @PathVariable workflowId: UUID
   ): ResponseEntity<WorkflowRunEntity> {
     val entity = workflowRunService.findById(ownedBy, workflowId)
@@ -37,7 +37,7 @@ class WorkflowRunController(
 
   @GetMapping("/distinct-workflows")
   fun findDistinctWorkflows(
-    @RequestHeader("x-continuum-user-id") ownedBy: String,
+    @RequestHeader("x-continuum-user-id", required = false, defaultValue = "anonymous") ownedBy: String,
     @RequestParam(required = false) filter: String?,
     @RequestParam(required = false, defaultValue = "0") page: Int,
     @RequestParam(required = false, defaultValue = "50") size: Int
@@ -47,7 +47,7 @@ class WorkflowRunController(
 
   @GetMapping("/count")
   fun count(
-    @RequestHeader("x-continuum-user-id") ownedBy: String,
+    @RequestHeader("x-continuum-user-id", required = false, defaultValue = "anonymous") ownedBy: String,
     @RequestParam(required = false) filter: String?
   ): Map<String, Long> {
     return mapOf("count" to workflowRunService.count(ownedBy, filter))
