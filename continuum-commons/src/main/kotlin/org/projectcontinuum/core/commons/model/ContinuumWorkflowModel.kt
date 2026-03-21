@@ -92,6 +92,7 @@ data class ContinuumWorkflowModel @JsonCreator constructor(
     BUSY,
     SUCCESS,
     FAILED,
+    CANCELLED,
     WARNING,
     PRE_PROCESSING,
     POST_PROCESSING

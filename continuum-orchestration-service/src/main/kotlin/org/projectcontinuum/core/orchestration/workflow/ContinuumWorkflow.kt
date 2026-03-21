@@ -8,7 +8,9 @@ import org.projectcontinuum.core.commons.workflow.IContinuumWorkflow
 import org.projectcontinuum.core.orchestration.utils.StatusHelper
 import io.temporal.activity.ActivityOptions
 import io.temporal.common.RetryOptions
+import io.temporal.failure.ActivityFailure
 import io.temporal.failure.ApplicationFailure
+import io.temporal.failure.CanceledFailure
 import io.temporal.spring.boot.WorkflowImpl
 import io.temporal.workflow.Async
 import io.temporal.workflow.Promise
@@ -151,9 +153,29 @@ class ContinuumWorkflow : IContinuumWorkflow {
           .valueSet(ExecutionStatus.WORKFLOW_EXECUTION_COMPLETED.value)
       )
       sendUpdateEvent("FINISHED")
+    } catch (e: CanceledFailure) {
+      // Handle workflow cancellation or termination
+      LOGGER.warn("Workflow was cancelled or terminated", e)
+      markBusyNodesAs(ContinuumWorkflowModel.NodeStatus.CANCELLED)
+      Workflow.upsertTypedSearchAttributes(
+        IContinuumWorkflow.WORKFLOW_STATUS
+          .valueSet(ExecutionStatus.WORKFLOW_EXECUTION_CANCELED.value)
+      )
+      sendUpdateEvent("CANCELLED")
+      throw e
+    } catch (e: ActivityFailure) {
+      // Handle activity-level failures (e.g., activity timeout, retries exhausted)
+      LOGGER.error("Activity failure in workflow execution", e)
+      markBusyNodesAs(ContinuumWorkflowModel.NodeStatus.FAILED)
+      Workflow.upsertTypedSearchAttributes(
+        IContinuumWorkflow.WORKFLOW_STATUS
+          .valueSet(ExecutionStatus.WORKFLOW_EXECUTION_FAILED.value)
+      )
+      sendUpdateEvent("FAILED")
     } catch (e: Exception) {
-      // Handle workflow-level errors
+      // Handle unexpected workflow-level errors
       LOGGER.error("Error in executing workflow", e)
+      markBusyNodesAs(ContinuumWorkflowModel.NodeStatus.FAILED)
       Workflow.upsertTypedSearchAttributes(
         IContinuumWorkflow.WORKFLOW_STATUS
           .valueSet(ExecutionStatus.WORKFLOW_EXECUTION_FAILED.value)
@@ -174,6 +196,20 @@ class ContinuumWorkflow : IContinuumWorkflow {
         )
     }
     return nodeToOutputsMap
+  }
+
+  /**
+   * Marks all nodes currently in BUSY status with the given status.
+   *
+   * This is used during workflow failure, cancellation, or termination to
+   * update any in-progress nodes so the UI reflects their final state.
+   *
+   * @param status The status to assign to busy nodes (e.g., FAILED, CANCELLED)
+   */
+  private fun markBusyNodesAs(status: ContinuumWorkflowModel.NodeStatus) {
+    currentRunningWorkflow?.nodes
+      ?.filter { it.data.status == ContinuumWorkflowModel.NodeStatus.BUSY }
+      ?.forEach { setNodeAnimationAndStatus(it, status) }
   }
 
   /**
