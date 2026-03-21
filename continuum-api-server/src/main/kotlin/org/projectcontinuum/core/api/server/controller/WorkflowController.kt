@@ -15,10 +15,11 @@ class WorkflowController(
 
   @PostMapping
   fun startWorkflow(
+    @RequestHeader("x-continuum-user-id") ownedBy: String,
     @RequestBody
     continuumWorkflowModel: ContinuumWorkflowModel
   ): String {
-    return workflowService.startWorkflow(continuumWorkflowModel)
+    return workflowService.startWorkflow(continuumWorkflowModel, ownedBy)
   }
 
   @GetMapping("/active")

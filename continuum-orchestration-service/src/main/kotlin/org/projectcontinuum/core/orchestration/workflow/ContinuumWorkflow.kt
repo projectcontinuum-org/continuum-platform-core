@@ -390,7 +390,7 @@ class ContinuumWorkflow : IContinuumWorkflow {
         jobId = Workflow.getInfo().workflowId,
         data = WorkflowUpdate(
           executionUUID = Workflow.getInfo().workflowId,
-          progressPercentage = 0,
+          progressPercentage = calculateProgressPercentage(),
           status = status,
           nodeToOutputsMap = nodeToOutputsMapWithErr,
           createdAtTimestampUtc = Workflow.getInfo().runStartedTimestampMillis,
@@ -405,6 +405,21 @@ class ContinuumWorkflow : IContinuumWorkflow {
         eventMetadata
       )
     }
+  }
+
+  /**
+   * Calculates the overall workflow progress percentage.
+   *
+   * This method computes progress based on the number of completed nodes
+   * (both successful and failed) relative to the total number of nodes in the workflow.
+   *
+   * @return Progress percentage as an integer between 0 and 100
+   */
+  fun calculateProgressPercentage(): Int {
+    val totalNodes = currentRunningWorkflow?.nodes?.size ?: 0
+    if (totalNodes == 0) return 100
+    val completedNodes = nodeToOutputsMap.size + nodeErrorsMap.size
+    return (completedNodes * 100) / totalNodes
   }
 
   /**

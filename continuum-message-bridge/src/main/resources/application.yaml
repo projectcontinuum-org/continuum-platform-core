@@ -3,7 +3,7 @@ spring.kafka.consumer.properties.spring.json.trusted.packages: org.projectcontin
 spring:
   cloud:
     function:
-      definition: continuum-core-event-FeatureRegistration-input;continuum-core-event-WorkflowExecutionSnapshot-input
+      definition: continuum-core-event-FeatureRegistration-input;continuum-core-event-WorkflowExecutionSnapshot-input;continuum-core-event-WorkflowExecutionSnapshotToDbSync-input
     stream:
       binders:
         main-kafka-cluster:
@@ -32,11 +32,23 @@ spring:
                   schema.registry.url: ${CONTINUUM_KAFKA_MAIN_SCHEMA_REGISTRY:http://localhost:38080}
                   max.request.size: 104857600
       bindings:
+        continuum-core-event-WorkflowExecutionSnapshotToDbSync-input-in-0:
+          binder: main-kafka-cluster
+          destination: continuum-core-event-WorkflowExecutionSnapshot
+          content-type: application/json
+          group: ${spring.application.name}-db-sync
+          consumer:
+            use-native-decoding: true
+            properties:
+              spring:
+                json:
+                  trusted:
+                    packages: "org.projectcontinuum.core.commons.model"
         continuum-core-event-WorkflowExecutionSnapshot-input-in-0:
           binder: main-kafka-cluster
           destination: continuum-core-event-WorkflowExecutionSnapshot
           content-type: application/json
-          group: ${spring.application.name}
+          group: ${spring.application.name}-mqtt-sync
           consumer:
             use-native-decoding: true
             properties:

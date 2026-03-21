@@ -1,6 +1,7 @@
 plugins {
     kotlin("jvm") version "2.1.0"
     kotlin("plugin.spring") version "1.9.25"
+    kotlin("plugin.jpa") version "2.1.0"
     id("org.springframework.boot") version "3.4.0"
     id("io.spring.dependency-management") version "1.1.6"
     id("com.google.cloud.tools.jib") version "3.4.1"
@@ -45,8 +46,15 @@ dependencies {
 
     // PostgreSQL Dependencies
     implementation("org.springframework.boot:spring-boot-starter-data-jdbc")
+    implementation("org.springframework.boot:spring-boot-starter-data-jpa")
     implementation("com.fasterxml.jackson.module:jackson-module-kotlin")
     implementation("org.postgresql:postgresql")
+
+    // Hibernate JSONB support
+    implementation("io.hypersistence:hypersistence-utils-hibernate-63:3.9.0")
+
+    // RSQL query support
+    implementation("io.github.perplexhub:rsql-jpa-spring-boot-starter:6.0.27")
 
     // AWS dependencies
     implementation("software.amazon.awssdk:s3")

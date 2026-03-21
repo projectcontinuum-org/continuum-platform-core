@@ -5,6 +5,13 @@ spring:
     username: ${CONTINUUM_DB_USERNAME:continuum_owner}
     password: ${CONTINUUM_DB_PASSWORD:continuum-test-password}
     driver-class-name: org.postgresql.Driver
+  sql:
+    init:
+      mode: always
+  jpa:
+    hibernate:
+      ddl-auto: none
+    open-in-view: false
 temporal:
   connection:
     target: ${TEMPORAL_SERVER_ADDRESS:localhost:7233}

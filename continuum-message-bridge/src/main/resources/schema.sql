@@ -8,7 +8,7 @@ CREATE TABLE IF NOT EXISTS registered_nodes (
     documentation_markdown  TEXT NOT NULL,
     categories              JSONB NOT NULL DEFAULT '[]',
     extensions              JSONB NOT NULL DEFAULT '{}',
-    registered_at           TIMESTAMP NOT NULL,
-    last_seen_at            TIMESTAMP NOT NULL,
+    registered_at           TIMESTAMPTZ NOT NULL,
+    last_seen_at            TIMESTAMPTZ NOT NULL,
     UNIQUE (node_id)
 );
