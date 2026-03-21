@@ -1,6 +1,7 @@
 package org.projectcontinuum.core.api.server.controller
 
 import org.projectcontinuum.core.api.server.model.CountWorkflowResponse
+import org.projectcontinuum.core.api.server.model.StartWorkflowResponse
 import org.projectcontinuum.core.api.server.model.WorkflowStatus
 import org.projectcontinuum.core.api.server.service.WorkflowService
 import org.projectcontinuum.core.api.server.utils.TreeHelper
@@ -18,8 +19,10 @@ class WorkflowController(
     @RequestHeader("x-continuum-user-id") ownedBy: String,
     @RequestBody
     continuumWorkflowModel: ContinuumWorkflowModel
-  ): String {
-    return workflowService.startWorkflow(continuumWorkflowModel, ownedBy)
+  ): StartWorkflowResponse {
+    return StartWorkflowResponse(
+      workflowId = workflowService.startWorkflow(continuumWorkflowModel, ownedBy)
+    )
   }
 
   @GetMapping("/active")
