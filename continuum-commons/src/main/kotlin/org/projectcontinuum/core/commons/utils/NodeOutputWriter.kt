@@ -1,7 +1,6 @@
 package org.projectcontinuum.core.commons.utils
 
 import org.projectcontinuum.core.protocol.data.table.DataRow
-import org.apache.hadoop.conf.Configuration
 import org.apache.parquet.avro.AvroParquetWriter
 import org.apache.parquet.hadoop.ParquetFileWriter
 import org.apache.parquet.hadoop.ParquetWriter
@@ -40,7 +39,6 @@ class NodeOutputWriter(
     private val parquetWriter: ParquetWriter<DataRow> =
       AvroParquetWriter.builder<DataRow>(LocalOutputFile(outputFilePath))
         .withSchema(DataRow.getClassSchema())
-        .withConf(Configuration())
         .withCompressionCodec(CompressionCodecName.SNAPPY)
         .withPageSize(1024 * 1024)
         .enableDictionaryEncoding()

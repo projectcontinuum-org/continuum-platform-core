@@ -1,7 +1,6 @@
 package org.projectcontinuum.core.commons.utils
 
 import org.projectcontinuum.core.protocol.data.table.DataRow
-import org.apache.hadoop.conf.Configuration
 import org.apache.parquet.avro.AvroParquetReader
 import org.apache.parquet.hadoop.ParquetFileReader
 import org.apache.parquet.hadoop.ParquetReader
@@ -54,7 +53,6 @@ class NodeInputReader(
    * @return A new ParquetReader instance
    */
   private fun createReader(): ParquetReader<DataRow> = AvroParquetReader.builder<DataRow>(LocalInputFile(inputFilePath))
-    .withConf(Configuration())
     .build()
 
   /**
