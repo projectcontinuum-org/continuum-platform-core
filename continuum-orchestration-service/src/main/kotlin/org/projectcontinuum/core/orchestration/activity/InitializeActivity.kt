@@ -1,5 +1,6 @@
 package org.projectcontinuum.core.orchestration.activity
 
+import io.temporal.failure.ApplicationFailure
 import io.temporal.spring.boot.ActivityImpl
 import org.projectcontinuum.core.commons.activity.IInitializeActivity
 import org.projectcontinuum.core.commons.constant.TaskQueues
@@ -12,6 +13,7 @@ import org.springframework.http.HttpHeaders
 import org.springframework.http.HttpMethod
 import org.springframework.http.MediaType
 import org.springframework.stereotype.Component
+import org.springframework.web.client.RestClientException
 import org.springframework.web.client.RestTemplate
 
 @Component
@@ -36,7 +38,7 @@ class InitializeActivity(
         val url = "${apiServerBaseUrl}${TASK_QUEUES_ENDPOINT}"
         LOGGER.info("Fetching task queues for {} node(s) from {}", nodeIds.size, url)
 
-        try {
+        val taskQueueMap = try {
             val headers = HttpHeaders().apply {
                 contentType = MediaType.APPLICATION_JSON
             }
@@ -45,12 +47,29 @@ class InitializeActivity(
             val responseType = object : ParameterizedTypeReference<Map<String, String>>() {}
             val response = restTemplate.exchange(url, HttpMethod.POST, requestEntity, responseType)
 
-            val taskQueueMap = response.body ?: emptyMap()
-            LOGGER.info("Received task queues for {} node(s)", taskQueueMap.size)
-            return taskQueueMap
-        } catch (e: Exception) {
+            val result = response.body ?: emptyMap()
+            LOGGER.info("Received task queues for {} node(s)", result.size)
+            result
+        } catch (e: RestClientException) {
             LOGGER.error("Failed to fetch task queues from {}: {}", url, e.message, e)
-            throw RuntimeException("Failed to fetch task queues from API server", e)
+            throw ApplicationFailure.newFailureWithCause(
+                "Failed to fetch task queues from API server. Will retry.",
+                "ApiServerFailure",
+                e
+            )
         }
+
+        // Check for missing task queues and throw an exception to trigger a retry if any are missing
+        val missingNodes = nodeIds - taskQueueMap.keys
+        if (missingNodes.isNotEmpty()) {
+            LOGGER.warn("Missing task queues for {} node(s): {}", missingNodes.size, missingNodes)
+            throw ApplicationFailure.newFailureWithCause(
+                "Task queues not yet available for nodes: $missingNodes. Will retry.",
+                "MissingTaskQueues",
+              RuntimeException("Missing task queues for nodes: $missingNodes")
+            )
+        }
+
+        return taskQueueMap
     }
 }
