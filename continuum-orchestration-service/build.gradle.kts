@@ -8,9 +8,7 @@ plugins {
 
 group = "org.projectcontinuum.core"
 description = "Continuum Orchestration Service — standalone workflow orchestration engine for DAG execution"
-val baseVersion = property("platformVersion").toString()
-val isRelease = System.getenv("IS_RELEASE_BUILD")?.toBoolean() ?: false
-version = if (isRelease) baseVersion else "$baseVersion-SNAPSHOT"
+version = property("platformVersion").toString()
 
 java {
     toolchain {

@@ -1,11 +1,12 @@
 package org.projectcontinuum.core.commons.utils
 
-import org.projectcontinuum.core.protocol.data.table.DataRow
 import org.apache.parquet.avro.AvroParquetWriter
+import org.apache.parquet.conf.PlainParquetConfiguration
 import org.apache.parquet.hadoop.ParquetFileWriter
 import org.apache.parquet.hadoop.ParquetWriter
 import org.apache.parquet.hadoop.metadata.CompressionCodecName
 import org.apache.parquet.io.LocalOutputFile
+import org.projectcontinuum.core.protocol.data.table.DataRow
 import java.io.Closeable
 import java.nio.file.Path
 
@@ -33,22 +34,16 @@ class NodeOutputWriter(
   ) : Closeable {
     private val spec = mutableSetOf<Map<String, String>>()
 
-    //        private val objectMapper = ObjectMapper()
     private val dataRowToMapConverter = DataRowToMapConverter()
 
     private val parquetWriter: ParquetWriter<DataRow> =
-      AvroParquetWriter.builder<DataRow>(LocalOutputFile(outputFilePath))
-        .withSchema(DataRow.getClassSchema())
-        .withCompressionCodec(CompressionCodecName.SNAPPY)
-        .withPageSize(1024 * 1024)
-        .enableDictionaryEncoding()
-        .withWriteMode(ParquetFileWriter.Mode.OVERWRITE)
-        .withRowGroupSize(1024 * 1024 * 128)
-        .build()
-
-//        private fun write(data: DataRow) {
-//            parquetWriter.write(data)
-//        }
+        AvroParquetWriter.builder<DataRow>(LocalOutputFile(outputFilePath))
+          .withConf(PlainParquetConfiguration())
+          .withSchema(DataRow.getClassSchema())
+          .withCompressionCodec(CompressionCodecName.SNAPPY)
+          .enableDictionaryEncoding()
+          .withWriteMode(ParquetFileWriter.Mode.OVERWRITE)
+          .build()
 
     fun write(
       rowNumber: Long,

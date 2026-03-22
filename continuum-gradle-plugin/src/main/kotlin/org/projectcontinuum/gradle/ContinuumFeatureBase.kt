@@ -99,6 +99,7 @@ object ContinuumFeatureBase {
         val springBootVer = ext.springBootVersion.get()
         val temporalVer = ext.temporalVersion.get()
         val springCloudVer = ext.springCloudVersion.get()
+//        val hadoopVer = ext.hadoopVersion.get()
         val isKotlin = ext.useKotlin.get()
 
         // Import BOMs via Spring dependency management

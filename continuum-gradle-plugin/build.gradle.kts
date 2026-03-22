@@ -7,9 +7,7 @@ plugins {
 
 group = "org.projectcontinuum.core"
 description = "Continuum Gradle Plugin — convention plugins for Continuum feature and worker modules"
-val baseVersion = properties["platformVersion"].toString()
-val isRelease = System.getenv("IS_RELEASE_BUILD")?.toBoolean() ?: false
-version = if (isRelease) baseVersion else "$baseVersion-SNAPSHOT"
+version = property("platformVersion").toString()
 
 java {
     toolchain {

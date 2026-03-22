@@ -7,9 +7,7 @@ plugins {
 
 group = "org.projectcontinuum.core"
 description = "Continuum Avro Schemas — shared Kafka message schemas for workflow execution"
-val baseVersion = properties["platformVersion"].toString()
-val isRelease = System.getenv("IS_RELEASE_BUILD")?.toBoolean() ?: false
-version = if (isRelease) baseVersion else "$baseVersion-SNAPSHOT"
+version = property("platformVersion").toString()
 
 java {
     withJavadocJar()

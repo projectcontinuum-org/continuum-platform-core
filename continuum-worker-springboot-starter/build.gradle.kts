@@ -1,6 +1,7 @@
 plugins {
     kotlin("jvm") version "2.1.0"
-    kotlin("plugin.spring") version "1.9.25"
+    kotlin("plugin.spring") version "2.1.0"
+    `java-library`
     id("io.spring.dependency-management") version "1.1.6"
     `maven-publish`
     id("org.jreleaser")
@@ -8,9 +9,7 @@ plugins {
 
 group = "org.projectcontinuum.core"
 description = "Continuum Worker Spring Boot Starter — auto-registers nodes with Temporal and handles execution lifecycle"
-val baseVersion = properties["platformVersion"].toString()
-val isRelease = System.getenv("IS_RELEASE_BUILD")?.toBoolean() ?: false
-version = if (isRelease) baseVersion else "$baseVersion-SNAPSHOT"
+version = property("platformVersion").toString()
 
 java {
     toolchain {

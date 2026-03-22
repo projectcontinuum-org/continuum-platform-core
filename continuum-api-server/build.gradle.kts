@@ -9,9 +9,7 @@ plugins {
 
 group = "org.projectcontinuum.core"
 description = "Continuum API Server — REST API for workflow management and execution"
-val baseVersion = property("platformVersion").toString()
-val isRelease = System.getenv("IS_RELEASE_BUILD")?.toBoolean() ?: false
-version = if (isRelease) baseVersion else "$baseVersion-SNAPSHOT"
+version = property("platformVersion").toString()
 
 java {
     toolchain {

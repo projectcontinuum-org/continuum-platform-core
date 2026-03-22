@@ -8,9 +8,7 @@ plugins {
 
 group = "org.projectcontinuum.core"
 description = "Continuum Message Bridge — Kafka consumer to MQTT publisher bridge for real-time browser updates"
-val baseVersion = properties["platformVersion"].toString()
-val isRelease = System.getenv("IS_RELEASE_BUILD")?.toBoolean() ?: false
-version = if (isRelease) baseVersion else "$baseVersion-SNAPSHOT"
+version = property("platformVersion").toString()
 
 java {
     toolchain {
