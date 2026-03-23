@@ -17,11 +17,6 @@ on:
           - continuum-worker-springboot-starter
           - continuum-gradle-plugin
           - continuum-orchestration-service
-      release:
-        description: 'Publish as a release build (immutable version, no SNAPSHOT suffix)'
-        required: true
-        type: boolean
-        default: false
       publish_to_maven:
         description: 'Publish artifacts to Maven Central'
         required: true
@@ -38,7 +33,6 @@ jobs:
     uses: ./.github/workflows/generic-module-builder.yml
     with:
       module-name: ${{ github.event.inputs.module }}
-      release: ${{ github.event.inputs.release == 'true' }}
       publish_to_maven: ${{ github.event.inputs.publish_to_maven == 'true' }}
       publish_to_docker_hub: ${{ github.event.inputs.publish_to_docker_hub == 'true' }}
     secrets:

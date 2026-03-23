@@ -51,7 +51,7 @@ class ContinuumWorkerPlugin : Plugin<Project> {
                 image = "eclipse-temurin:21-jre"
             }
             to {
-                image = "ghcr.io/$repoName/${project.name.lowercase()}:${project.version}"
+                image = "docker.io/$repoName:${project.version}"
                 auth {
                     username = System.getenv("DOCKER_REPO_USERNAME") ?: ""
                     password = System.getenv("DOCKER_REPO_PASSWORD") ?: ""

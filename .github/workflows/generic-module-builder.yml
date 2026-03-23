@@ -7,11 +7,6 @@ on:
         description: 'The Gradle module to build (e.g., continuum-api-server)'
         required: true
         type: string
-      release:
-        description: 'Publish as a release build (no SNAPSHOT suffix)'
-        required: true
-        type: boolean
-        default: false
       publish_to_maven:
         description: 'Publish artifacts to Maven Central via JReleaser'
         required: false
@@ -85,8 +80,6 @@ jobs:
           else
             ./gradlew :${{ inputs.module-name }}:build --no-daemon
           fi
-        env:
-          IS_RELEASE_BUILD: ${{ inputs.release }}
 
       - name: Publish to local staging
         if: inputs.publish_to_maven
@@ -97,12 +90,11 @@ jobs:
             ./gradlew :${{ inputs.module-name }}:publish --no-daemon
           fi
         env:
-          IS_RELEASE_BUILD: ${{ inputs.release }}
           MAVEN_REPO_USERNAME: ${{ secrets.MAVEN_REPO_USERNAME }}
           MAVEN_REPO_PASSWORD: ${{ secrets.MAVEN_REPO_PASSWORD }}
 
       - name: Deploy to Maven Central via JReleaser
-        if: inputs.publish_to_maven && inputs.release
+        if: inputs.publish_to_maven
         run: |
           if [ "${{ inputs.module-name }}" = "all" ]; then
             ./gradlew jreleaserDeploy --no-daemon
@@ -110,7 +102,6 @@ jobs:
             ./gradlew :${{ inputs.module-name }}:jreleaserDeploy --no-daemon
           fi
         env:
-          IS_RELEASE_BUILD: ${{ inputs.release }}
           JRELEASER_MAVENCENTRAL_SONATYPE_USERNAME: ${{ secrets.MAVEN_REPO_USERNAME }}
           JRELEASER_MAVENCENTRAL_SONATYPE_TOKEN: ${{ secrets.MAVEN_REPO_PASSWORD }}
           JRELEASER_GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
@@ -126,6 +117,5 @@ jobs:
             ./gradlew :${{ inputs.module-name }}:jib --no-daemon
           fi
         env:
-          IS_RELEASE_BUILD: ${{ inputs.release }}
           DOCKER_REPO_USERNAME: ${{ secrets.DOCKER_HUB_USERNAME }}
           DOCKER_REPO_PASSWORD: ${{ secrets.DOCKER_HUB_PASSWORD }}
