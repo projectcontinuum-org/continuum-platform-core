@@ -35,11 +35,11 @@ interface RegisteredNodeRepository : CrudRepository<RegisteredNodeEntity, Long> 
   fun searchNodes(pattern: String): List<RegisteredNodeEntity>
 
   @Query("""
-    SELECT documentation_markdown FROM registered_nodes
+    SELECT * FROM registered_nodes
     WHERE node_id = :nodeId
     LIMIT 1
   """)
-  fun findDocumentationByNodeId(nodeId: String): String?
+  fun findByNodeId(nodeId: String): RegisteredNodeEntity?
 
 }
 

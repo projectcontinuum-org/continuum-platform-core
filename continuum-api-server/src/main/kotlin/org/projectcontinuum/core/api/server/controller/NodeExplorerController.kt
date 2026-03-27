@@ -42,6 +42,15 @@ class NodeExplorerController(
         return ResponseEntity.ok(documentation)
     }
 
+    @GetMapping("/nodes/documentation", produces = [MediaType.TEXT_MARKDOWN_VALUE])
+    fun getDocumentationByParam(
+        @RequestParam nodeId: String
+    ): ResponseEntity<String> {
+        val documentation = nodeExplorerService.getDocumentation(nodeId)
+            ?: return ResponseEntity.notFound().build()
+        return ResponseEntity.ok(documentation)
+    }
+
     @PostMapping("/nodes/task-queues")
     fun getTaskQueues(
         @RequestBody nodeIds: List<String>

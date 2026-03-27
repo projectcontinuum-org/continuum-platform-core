@@ -8,12 +8,15 @@ import org.projectcontinuum.core.api.server.model.NodeExplorerItemType
 import org.projectcontinuum.core.api.server.model.NodeExplorerTreeItem
 import org.projectcontinuum.core.api.server.repository.RegisteredNodeRepository
 import org.projectcontinuum.core.commons.model.ContinuumWorkflowModel
+import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
 
 @Service
 class NodeExplorerService(
   private val registeredNodeRepository: RegisteredNodeRepository
 ) {
+
+  private val log = LoggerFactory.getLogger(NodeExplorerService::class.java)
 
   private val objectMapper = ObjectMapper().apply {
     registerModule(kotlinModule())
@@ -35,7 +38,18 @@ class NodeExplorerService(
   }
 
   fun getDocumentation(nodeId: String): String? {
-    return registeredNodeRepository.findDocumentationByNodeId(nodeId)
+    log.info("Requesting documentation for nodeId='{}' (length={})", nodeId, nodeId.length)
+    val entity = registeredNodeRepository.findByNodeId(nodeId)
+    if (entity == null) {
+      log.warn("No registered node found for nodeId='{}'", nodeId)
+      return null
+    }
+    val doc = entity.documentationMarkdown
+    if (doc.isBlank() || doc.startsWith("Documentation not found for")) {
+      log.warn("No documentation available for nodeId='{}'", nodeId)
+      return null
+    }
+    return doc
   }
 
   fun getTaskQueues(nodeIds: List<String>): Map<String, String> {
