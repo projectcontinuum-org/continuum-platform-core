@@ -262,7 +262,13 @@ class NodeExplorerServiceTest {
 
   @Test
   fun `getDocumentation returns markdown for existing node`() {
-    whenever(repository.findDocumentationByNodeId("org.test.Node")).thenReturn("# Node Docs\nSome content")
+    whenever(repository.findByNodeId("org.test.Node")).thenReturn(
+      createEntity(
+        nodeId = "org.test.Node",
+        title = "Node",
+        documentation = "# Node Docs\nSome content"
+      )
+    )
 
     val result = service.getDocumentation("org.test.Node")
 
@@ -271,7 +277,7 @@ class NodeExplorerServiceTest {
 
   @Test
   fun `getDocumentation returns null for non-existing node`() {
-    whenever(repository.findDocumentationByNodeId("org.test.NonExistent")).thenReturn(null)
+    whenever(repository.findByNodeId("org.test.NonExistent")).thenReturn(null)
 
     val result = service.getDocumentation("org.test.NonExistent")
 
