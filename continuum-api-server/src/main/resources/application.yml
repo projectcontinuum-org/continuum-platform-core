@@ -28,3 +28,8 @@ continuum.core:
         endpoint: ${CONTINUUM_MINIO_ENDPOINT:http://localhost:39000}
         access-key: ${CONTINUUM_MINIO_USERNAME:minioadmin}
         secret-key: ${CONTINUUM_MINIO_PASSWORD:minioadmin}
+
+springdoc:
+  swagger-ui:
+    config-url: ../v3/api-docs/swagger-config
+    url: ../v3/api-docs

@@ -1,0 +1,32 @@
+package org.projectcontinuum.core.cluster.manager.config
+
+import org.springframework.context.annotation.Bean
+import org.springframework.context.annotation.Configuration
+import org.springframework.web.servlet.config.annotation.CorsRegistry
+import org.springframework.web.servlet.config.annotation.ResourceHandlerRegistry
+import org.springframework.web.servlet.config.annotation.ViewControllerRegistry
+import org.springframework.web.servlet.config.annotation.WebMvcConfigurer
+
+@Configuration
+class CorsConfig {
+  @Bean
+  fun corsConfigurer(): WebMvcConfigurer {
+    return object : WebMvcConfigurer {
+      override fun addCorsMappings(registry: CorsRegistry) {
+        registry.addMapping("/**")
+          .allowedOrigins("*")
+          .allowedMethods("GET", "POST", "PUT", "DELETE", "OPTIONS")
+          .allowedHeaders("*")
+      }
+
+      override fun addResourceHandlers(registry: ResourceHandlerRegistry) {
+        registry.addResourceHandler("/ui/**")
+          .addResourceLocations("classpath:/static/")
+      }
+
+      override fun addViewControllers(registry: ViewControllerRegistry) {
+        registry.addRedirectViewController("/", "/ui/")
+      }
+    }
+  }
+}

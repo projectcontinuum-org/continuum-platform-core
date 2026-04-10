@@ -1,0 +1,21 @@
+spring.application.name: continuum-cloud-gateway
+server:
+  port: 8080
+  error:
+    include-message: always
+    include-stacktrace: on_param
+spring:
+  datasource:
+    url: ${CONTINUUM_DB_URL:jdbc:postgresql://localhost:35432/continuum}
+    username: ${CONTINUUM_DB_USERNAME:continuum_owner}
+    password: ${CONTINUUM_DB_PASSWORD:continuum-test-password}
+    driver-class-name: org.postgresql.Driver
+  sql:
+    init:
+      mode: always
+
+logging:
+  level:
+    org.projectcontinuum.core.cloud.gateway.service.WorkbenchProxyService: DEBUG
+    org.projectcontinuum.core.cloud.gateway.service.WorkbenchWebSocketProxyHandler: DEBUG
+    org.springframework.cloud.gateway: DEBUG

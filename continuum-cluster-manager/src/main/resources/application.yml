@@ -1,0 +1,31 @@
+spring.application.name: continuum-cluster-manager
+server:
+  port: 8080
+  error:
+    include-message: always
+    include-stacktrace: on_param
+spring:
+  datasource:
+    url: ${CONTINUUM_DB_URL:jdbc:postgresql://localhost:35432/continuum}
+    username: ${CONTINUUM_DB_USERNAME:continuum_owner}
+    password: ${CONTINUUM_DB_PASSWORD:continuum-test-password}
+    driver-class-name: org.postgresql.Driver
+  sql:
+    init:
+      mode: always
+
+continuum.core:
+  cluster-manager:
+    kubernetes:
+      master-url: ${KUBERNETES_MASTER_URL:}
+      kubeconfig: ${KUBECONFIG:}
+    workbench:
+      default-image: ${WORKBENCH_DEFAULT_IMAGE:projectcontinuum/continuum-workbench:0.0.5}
+      namespace: ${WORKBENCH_NAMESPACE:default}
+      image-repository: ${WORKBENCH_IMAGE_REPOSITORY:projectcontinuum/continuum-workbench}
+
+springdoc:
+  packages-to-scan: org.projectcontinuum.core.cluster.manager.controller
+  swagger-ui:
+    config-url: ../v3/api-docs/swagger-config
+    url: ../v3/api-docs

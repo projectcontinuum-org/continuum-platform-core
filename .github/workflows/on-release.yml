@@ -31,10 +31,19 @@ jobs:
           - module: continuum-api-server
             publish_to_maven: false
             publish_to_docker_hub: true
+          - module: continuum-cloud-gateway
+            publish_to_maven: false
+            publish_to_docker_hub: true
           - module: continuum-orchestration-service
             publish_to_maven: false
             publish_to_docker_hub: true
           - module: continuum-message-bridge
+            publish_to_maven: false
+            publish_to_docker_hub: true
+          - module: continuum-cluster-manager
+            publish_to_maven: false
+            publish_to_docker_hub: true
+          - module: landing-page
             publish_to_maven: false
             publish_to_docker_hub: true
     steps:

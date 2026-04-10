@@ -11,12 +11,15 @@ on:
           - all
           - continuum-api-server
           - continuum-avro-schemas
+          - continuum-cloud-gateway
           - continuum-commons
           - continuum-knime-base
           - continuum-message-bridge
           - continuum-worker-springboot-starter
           - continuum-gradle-plugin
           - continuum-orchestration-service
+          - continuum-cluster-manager
+          - landing-page
       publish_to_maven:
         description: 'Publish artifacts to Maven Central'
         required: true

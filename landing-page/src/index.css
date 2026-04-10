@@ -1,0 +1,139 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ---- Light theme (default) — matches Continuum Light ---- */
+:root {
+  --c-bg: 245 245 245;           /* #F5F5F5  editor.background */
+  --c-surface: 237 237 245;      /* #EDEDF5  activityBar.background */
+  --c-card: 255 255 255;         /* #FFFFFF  white cards */
+  --c-fg: 51 56 77;              /* #33384D  dark text */
+  --c-fg-muted: 108 108 108;     /* #6C6C6C  secondary text */
+  --c-accent: 112 86 151;        /* #705697  button.background */
+  --c-purple: 151 105 220;       /* #9769DC  focusBorder */
+  --c-highlight: 146 115 194;    /* #9273C2  section headers */
+  --c-divider: 210 210 220;      /* #D2D2DC  borders */
+  --c-overlay: 0 0 0;            /* black base for overlays */
+  --c-on-accent: 255 255 255;    /* white text on accent buttons */
+  --svg-accent: #705697;
+  --svg-purple: #9769dc;
+  --gradient-from: #705697;
+  --gradient-to: #9273c2;
+}
+
+/* ---- Dark theme — matches Continuum Dark ---- */
+.dark {
+  --c-bg: 41 45 62;              /* #292D3E  activityBar.background */
+  --c-surface: 54 60 80;         /* #363C50  editor.background */
+  --c-card: 54 60 80;            /* #363C50  cards */
+  --c-fg: 238 231 231;           /* #EEE7E7  editor.foreground */
+  --c-fg-muted: 165 152 184;     /* #A598B8  input.foreground */
+  --c-accent: 196 168 255;       /* #C4A8FF  activityBar.foreground */
+  --c-purple: 112 86 151;        /* #705697  button.background */
+  --c-highlight: 146 115 194;    /* #9273C2  section headers */
+  --c-divider: 69 74 94;         /* #454A5E  selection */
+  --c-overlay: 255 255 255;      /* white base for overlays */
+  --c-on-accent: 41 45 62;       /* dark text on accent buttons */
+  --svg-accent: #C4A8FF;
+  --svg-purple: #705697;
+  --gradient-from: #C4A8FF;
+  --gradient-to: #9273c2;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+@layer utilities {
+  .glow-accent {
+    box-shadow: 0 0 30px rgb(var(--c-accent) / 0.25);
+  }
+
+  .glow-purple {
+    box-shadow: 0 0 30px rgb(var(--c-purple) / 0.25);
+  }
+
+  .text-gradient {
+    background: linear-gradient(135deg, var(--gradient-from), var(--gradient-to));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  .bg-gradient-radial {
+    background: radial-gradient(circle at 50% 50%, var(--gradient-from) 0%, transparent 70%);
+  }
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: rgb(var(--c-surface));
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgb(var(--c-divider));
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgb(var(--c-fg-muted));
+}
+
+/* Focus styles */
+*:focus-visible {
+  outline: 2px solid rgb(var(--c-accent));
+  outline-offset: 2px;
+}
+
+/* Button hover effects */
+.btn-primary {
+  @apply bg-accent text-on-accent px-6 py-3 rounded-full font-semibold transition-all duration-200;
+}
+
+.btn-primary:hover {
+  @apply bg-accent/90 shadow-lg;
+  transform: translateY(-2px);
+}
+
+.btn-secondary {
+  @apply border border-divider text-fg px-6 py-3 rounded-full font-semibold transition-all duration-200;
+}
+
+.btn-secondary:hover {
+  @apply border-accent/40 bg-overlay/5;
+}
+
+/* Card styles */
+.card {
+  @apply bg-card rounded-2xl border border-divider p-6 transition-all duration-300;
+}
+
+.card:hover {
+  @apply shadow-lg;
+  transform: translateY(-4px);
+}
+
+/* SSO Button styles */
+.sso-btn {
+  @apply flex items-center justify-center gap-3 w-full px-4 py-3 rounded-lg border border-divider bg-card font-medium transition-all duration-200;
+}
+
+.sso-btn:hover {
+  @apply border-accent/40 bg-overlay/5 shadow-md;
+}
+
+/* Modal backdrop */
+.modal-backdrop {
+  @apply fixed inset-0 bg-black/50 backdrop-blur-sm z-40;
+}
+
+/* Modal container */
+.modal-container {
+  @apply fixed inset-0 flex items-center justify-center z-50 p-4;
+}
+

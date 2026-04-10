@@ -1,0 +1,147 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ---- Light theme (default) — matches Continuum Light ---- */
+:root {
+  --c-bg: 245 245 245;           /* #F5F5F5  editor.background */
+  --c-surface: 237 237 245;      /* #EDEDF5  activityBar.background */
+  --c-card: 255 255 255;         /* #FFFFFF  white cards */
+  --c-fg: 51 56 77;              /* #33384D  dark text */
+  --c-fg-muted: 108 108 108;     /* #6C6C6C  secondary text */
+  --c-accent: 112 86 151;        /* #705697  button.background */
+  --c-purple: 151 105 220;       /* #9769DC  focusBorder */
+  --c-highlight: 146 115 194;    /* #9273C2  section headers */
+  --c-divider: 210 210 220;      /* #D2D2DC  borders */
+  --c-overlay: 0 0 0;            /* black base for overlays */
+  --c-on-accent: 255 255 255;    /* white text on accent buttons */
+  --svg-accent: #705697;
+  --svg-purple: #9769dc;
+  --gradient-from: #705697;
+  --gradient-to: #9273c2;
+}
+
+/* ---- Dark theme — matches Continuum Dark ---- */
+.dark {
+  --c-bg: 41 45 62;              /* #292D3E  activityBar.background */
+  --c-surface: 54 60 80;         /* #363C50  editor.background */
+  --c-card: 54 60 80;            /* #363C50  cards */
+  --c-fg: 238 231 231;           /* #EEE7E7  editor.foreground */
+  --c-fg-muted: 165 152 184;     /* #A598B8  input.foreground */
+  --c-accent: 196 168 255;       /* #C4A8FF  activityBar.foreground */
+  --c-purple: 112 86 151;        /* #705697  button.background */
+  --c-highlight: 146 115 194;    /* #9273C2  section headers */
+  --c-divider: 69 74 94;         /* #454A5E  selection */
+  --c-overlay: 255 255 255;      /* white base for overlays */
+  --c-on-accent: 41 45 62;       /* dark text on accent buttons */
+  --svg-accent: #C4A8FF;
+  --svg-purple: #705697;
+  --gradient-from: #C4A8FF;
+  --gradient-to: #9273c2;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+@layer utilities {
+  .glow-accent {
+    box-shadow: 0 0 30px rgb(var(--c-accent) / 0.25);
+  }
+
+  .glow-purple {
+    box-shadow: 0 0 30px rgb(var(--c-purple) / 0.25);
+  }
+
+  .text-gradient {
+    background: linear-gradient(135deg, var(--gradient-from), var(--gradient-to));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+}
+
+/* Status badge colors */
+.status-running {
+  @apply bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400;
+}
+
+.status-pending {
+  @apply bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400;
+}
+
+.status-suspended {
+  @apply bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400;
+}
+
+.status-failed {
+  @apply bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400;
+}
+
+.status-terminating {
+  @apply bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400;
+}
+
+.status-deleted {
+  @apply bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-400;
+}
+
+.status-unknown {
+  @apply bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-400;
+}
+
+/* ---- Slider styles ---- */
+:root {
+  --slider-fill: #7c5cfc;
+  --slider-track: #e2e2e2;
+}
+
+.dark {
+  --slider-fill: #a78bfa;
+  --slider-track: #3a3f54;
+}
+
+.slider-input {
+  -webkit-appearance: none;
+  appearance: none;
+  height: 6px;
+  border-radius: 9999px;
+  outline: none;
+}
+
+.slider-input::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--slider-fill);
+  border: 2px solid white;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.2);
+  cursor: pointer;
+  transition: transform 0.15s ease;
+}
+
+.slider-input::-webkit-slider-thumb:hover {
+  transform: scale(1.2);
+}
+
+.slider-input::-moz-range-thumb {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--slider-fill);
+  border: 2px solid white;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.2);
+  cursor: pointer;
+  transition: transform 0.15s ease;
+}
+
+.slider-input::-moz-range-thumb:hover {
+  transform: scale(1.2);
+}
+
+.slider-input:focus::-webkit-slider-thumb {
+  box-shadow: 0 0 0 3px rgba(124, 92, 252, 0.3);
+}
+
