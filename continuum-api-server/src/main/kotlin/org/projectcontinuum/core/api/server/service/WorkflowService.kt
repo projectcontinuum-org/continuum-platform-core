@@ -22,6 +22,7 @@ import io.temporal.client.WorkflowClient
 import io.temporal.client.WorkflowException
 import io.temporal.client.WorkflowOptions
 import io.temporal.common.SearchAttributes
+import org.projectcontinuum.core.commons.context.ContinuumOwnerContext
 import org.slf4j.LoggerFactory
 import org.springframework.scheduling.annotation.EnableScheduling
 import org.springframework.stereotype.Service
@@ -88,11 +89,17 @@ class WorkflowService(
       )
     )
 
-    val workflowExecution: WorkflowExecution = WorkflowClient.start(
-      continuumWorkflow::start,
-      continuumWorkflowModel
-    )
-    return workflowExecution.workflowId
+    // Set the owner context so ContinuumContextPropagator carries it into Temporal headers
+    ContinuumOwnerContext.set(ownedBy)
+    try {
+      val workflowExecution: WorkflowExecution = WorkflowClient.start(
+        continuumWorkflow::start,
+        continuumWorkflowModel
+      )
+      return workflowExecution.workflowId
+    } finally {
+      ContinuumOwnerContext.clear()
+    }
   }
 
   fun getActiveWorkflows(): List<WorkflowStatus> {

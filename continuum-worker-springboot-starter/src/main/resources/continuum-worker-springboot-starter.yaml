@@ -57,6 +57,7 @@ spring:
 continuum.core:
   worker:
     api-server-base-url: ${CONTINUUM_API_SERVER_BASE_URL:http://localhost:8080}
+    credentials-server-base-url: ${CONTINUUM_CREDENTIALS_SERVER_BASE_URL:http://localhost:8083}
     node-task-queue: ${CONTINUUM_NODE_TASK_QUEUE}
     cache-storage-path: ${CONTINUUM_CACHE_STORAGE_PATH:./.continuum-cache/workflow-data}
     knime:

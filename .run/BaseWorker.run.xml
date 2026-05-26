@@ -7,7 +7,7 @@
     </envs>
     <module name="continuum-feature-base.worker.main" />
     <option name="SPRING_BOOT_MAIN_CLASS" value="org.projectcontinuum.feature.base.worker.App" />
-    <option name="VM_PARAMETERS" value="-Dserver.port=8081" />
+    <option name="VM_PARAMETERS" value="-Dserver.port=8091" />
     <extension name="coverage">
       <pattern>
         <option name="PATTERN" value="com.comtinuum.app.worker.base.*" />

@@ -203,6 +203,39 @@ services:
       - kafka2
       - kafka3
     restart: unless-stopped
+  credentials-server:
+    container_name: continuum-credentials-server
+    image: projectcontinuum/continuum-credentials-server:${CREDENTIALS_SERVER_VERSION:-latest}
+    depends_on:
+      - postgresql
+    environment:
+      - CONTINUUM_DB_URL=jdbc:postgresql://postgresql:5432/continuum
+      - CONTINUUM_DB_USERNAME=continuum_owner
+      - CONTINUUM_DB_PASSWORD=continuum-test-password
+      - CREDENTIALS_ENCRYPTION_MASTER_KEY=${CREDENTIALS_ENCRYPTION_MASTER_KEY:-dGVzdC1tYXN0ZXIta2V5LWZvci1sb2NhbC1kZXY=}
+    networks:
+      - temporal-network
+    ports:
+      - "38083:8080"
+    restart: unless-stopped
+
+  cloud-gateway:
+    container_name: continuum-cloud-gateway
+    image: projectcontinuum/continuum-cloud-gateway:${CLOUD_GATEWAY_VERSION:-latest}
+    depends_on:
+      - postgresql
+      - credentials-server
+    environment:
+      - CONTINUUM_DB_URL=jdbc:postgresql://postgresql:5432/continuum
+      - CONTINUUM_DB_USERNAME=continuum_owner
+      - CONTINUUM_DB_PASSWORD=continuum-test-password
+      - CONTINUUM_CREDENTIALS_SERVER_URL=http://credentials-server:8080
+    networks:
+      - temporal-network
+    ports:
+      - "38084:8080"
+    restart: unless-stopped
+
   minio:
     image: minio/minio:latest
     container_name: minio

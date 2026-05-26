@@ -23,6 +23,7 @@ continuum.core:
       default-image: ${WORKBENCH_DEFAULT_IMAGE:projectcontinuum/continuum-workbench:0.0.5}
       namespace: ${WORKBENCH_NAMESPACE:default}
       image-repository: ${WORKBENCH_IMAGE_REPOSITORY:projectcontinuum/continuum-workbench}
+      image-pull-policy: ${WORKBENCH_IMAGE_PULL_POLICY:IfNotPresent}
 
 springdoc:
   packages-to-scan: org.projectcontinuum.core.cluster.manager.controller

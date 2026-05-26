@@ -570,6 +570,7 @@ class WorkbenchService(
       "instanceId" to entity.instanceId.toString(),
       "namespace" to entity.namespace,
       "image" to entity.image,
+      "imagePullPolicy" to workbenchProperties.imagePullPolicy,
       "cpuRequest" to entity.cpuRequest,
       "cpuLimit" to entity.cpuLimit,
       "memoryRequest" to entity.memoryRequest,

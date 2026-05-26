@@ -1,0 +1,27 @@
+spring.application.name: continuum-credentials-server
+server:
+  port: 8080
+  error:
+    include-message: always
+    include-stacktrace: on_param
+spring:
+  datasource:
+    url: ${CONTINUUM_DB_URL:jdbc:postgresql://localhost:35432/continuum}
+    username: ${CONTINUUM_DB_USERNAME:continuum_owner}
+    password: ${CONTINUUM_DB_PASSWORD:continuum-test-password}
+    driver-class-name: org.postgresql.Driver
+  sql:
+    init:
+      mode: always
+
+continuum.core:
+  credentials:
+    storage-backend: ${CREDENTIALS_STORAGE_BACKEND:postgres}
+    encryption:
+      master-key: ${CREDENTIALS_ENCRYPTION_MASTER_KEY}
+
+springdoc:
+  packages-to-scan: org.projectcontinuum.core.credentials.controller
+  swagger-ui:
+    config-url: ../v3/api-docs/swagger-config
+    url: ../v3/api-docs

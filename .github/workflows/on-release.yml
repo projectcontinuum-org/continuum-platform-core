@@ -43,6 +43,9 @@ jobs:
           - module: continuum-cluster-manager
             publish_to_maven: false
             publish_to_docker_hub: true
+          - module: continuum-credentials-server
+            publish_to_maven: false
+            publish_to_docker_hub: true
           - module: landing-page
             publish_to_maven: false
             publish_to_docker_hub: true

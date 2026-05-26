@@ -46,10 +46,7 @@ spring:
 
 continuum.core:
   orchestration:
-    api-server-base-url: ${CONTINUUM_API_SERVER_BASE_URL:http://localhost:8080}
-
-server:
-  port: ${CONTINUUM_ORCHESTRATION_SERVICE_PORT:8083}
+    api-server-base-url: ${CONTINUUM_API_SERVER_BASE_URL:http://localhost:8081}
 
 logging:
   level:

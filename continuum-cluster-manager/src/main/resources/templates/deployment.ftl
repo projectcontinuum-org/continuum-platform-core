@@ -27,6 +27,7 @@ spec:
       containers:
         - name: theia
           image: ${image}
+          imagePullPolicy: ${imagePullPolicy}
           ports:
             - containerPort: 8080
           resources:

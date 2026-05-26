@@ -1,9 +1,12 @@
 package org.projectcontinuum.core.worker.starter
 
 import com.fasterxml.jackson.module.kotlin.KotlinModule
+import io.temporal.client.WorkflowClientOptions
 import io.temporal.common.converter.DataConverter
 import io.temporal.common.converter.DefaultDataConverter
 import io.temporal.common.converter.JacksonJsonPayloadConverter
+import io.temporal.spring.boot.TemporalOptionsCustomizer
+import org.projectcontinuum.core.commons.context.ContinuumContextPropagator
 import org.springframework.context.annotation.*
 
 /**
@@ -70,5 +73,18 @@ class AutoConfigure {
       .withPayloadConverterOverrides(jacksonConverter)
 
     return dataConverter
+  }
+
+  /**
+   * Registers the [ContinuumContextPropagator] with the Temporal workflow client.
+   * This enables owner ID propagation from workflow to activity execution,
+   * which is required for per-user credential resolution.
+   */
+  @Bean
+  fun workflowClientOptionsCustomizer(): TemporalOptionsCustomizer<WorkflowClientOptions.Builder> {
+    return TemporalOptionsCustomizer { builder ->
+      builder.setContextPropagators(listOf(ContinuumContextPropagator()))
+      builder
+    }
   }
 }

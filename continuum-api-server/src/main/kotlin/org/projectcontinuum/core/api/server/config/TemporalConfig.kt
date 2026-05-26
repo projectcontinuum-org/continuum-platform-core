@@ -4,6 +4,7 @@ import io.temporal.client.WorkflowClient
 import io.temporal.client.WorkflowClientOptions
 import io.temporal.serviceclient.WorkflowServiceStubs
 import io.temporal.serviceclient.WorkflowServiceStubsOptions
+import org.projectcontinuum.core.commons.context.ContinuumContextPropagator
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
@@ -30,6 +31,7 @@ class TemporalConfig(
       workflowServiceStubs,
       WorkflowClientOptions.newBuilder()
         .setNamespace(temporalNamespace)
+        .setContextPropagators(listOf(ContinuumContextPropagator()))
         .build()
     )
   }

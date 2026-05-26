@@ -19,6 +19,7 @@ on:
           - continuum-gradle-plugin
           - continuum-orchestration-service
           - continuum-cluster-manager
+          - continuum-credentials-server
           - landing-page
       publish_to_maven:
         description: 'Publish artifacts to Maven Central'

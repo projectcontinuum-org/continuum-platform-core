@@ -37,6 +37,9 @@ class GatewayConfig(
 
   @Value("\${CONTINUUM_CLUSTER_MANAGER_URL:http://localhost:8082}")
   private val clusterManagerUrl: String,
+
+  @Value("\${CONTINUUM_CREDENTIALS_SERVER_URL:http://localhost:8083}")
+  private val credentialsServerUrl: String,
 ) {
 
   private val logger = LoggerFactory.getLogger(GatewayConfig::class.java)
@@ -52,6 +55,14 @@ class GatewayConfig(
     "te", "trailers", "transfer-encoding", "upgrade", "host", "content-length"
   )
 
+  // CORS headers from backend responses are stripped so the gateway's CorsFilter
+  // is the single authority — this prevents duplicate Access-Control-Allow-* headers.
+  private val CORS_HEADERS = setOf(
+    "access-control-allow-origin", "access-control-allow-methods",
+    "access-control-allow-headers", "access-control-allow-credentials",
+    "access-control-expose-headers", "access-control-max-age", "vary"
+  )
+
   @Bean
   fun apiServerRoute(): RouterFunction<ServerResponse> =
     route("api-server")
@@ -62,6 +73,12 @@ class GatewayConfig(
   fun clusterManagerRoute(): RouterFunction<ServerResponse> =
     route("cluster-manager")
       .route(path("/cluster-manager/**")) { request -> proxy(request, clusterManagerUrl, "/cluster-manager") }
+      .build()
+
+  @Bean
+  fun credentialsServerRoute(): RouterFunction<ServerResponse> =
+    route("credentials-manager")
+      .route(path("/credentials-manager/**")) { request -> proxy(request, credentialsServerUrl, "/credentials-manager") }
       .build()
 
   private fun proxy(request: ServerRequest, backendUrl: String, prefixToStrip: String): ServerResponse {
@@ -104,7 +121,7 @@ class GatewayConfig(
     // Build the response
     val responseBuilder = ServerResponse.status(proxyResponse.statusCode())
     proxyResponse.headers().map().forEach { (name, values) ->
-      if (name.lowercase() !in HOP_BY_HOP_HEADERS) {
+      if (name.lowercase() !in HOP_BY_HOP_HEADERS && name.lowercase() !in CORS_HEADERS) {
         values.forEach { value -> responseBuilder.header(name, value) }
       }
     }

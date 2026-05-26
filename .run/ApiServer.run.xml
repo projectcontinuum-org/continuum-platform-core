@@ -7,6 +7,7 @@
       <option name="environmentVariables" />
     </selectedOptions>
     <option name="SPRING_BOOT_MAIN_CLASS" value="org.projectcontinuum.core.api.server.AppKt" />
+    <option name="VM_PARAMETERS" value="-Dserver.port=8081" />
     <extension name="net.ashald.envfile">
       <option name="IS_ENABLED" value="false" />
       <option name="IS_SUBST" value="false" />

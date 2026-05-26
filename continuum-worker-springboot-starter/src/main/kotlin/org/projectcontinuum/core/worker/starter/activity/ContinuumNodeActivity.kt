@@ -3,6 +3,8 @@ package org.projectcontinuum.core.worker.starter.activity
 import org.projectcontinuum.core.commons.activity.IContinuumNodeActivity
 import org.projectcontinuum.core.commons.annotation.ContinuumNode
 import org.projectcontinuum.core.commons.constant.TaskQueues
+import org.projectcontinuum.core.commons.context.ContinuumOwnerContext
+import org.projectcontinuum.core.commons.context.ExecutionContext
 import org.projectcontinuum.core.commons.exception.NodeRuntimeException
 import org.projectcontinuum.core.commons.model.ContinuumWorkflowModel
 import org.projectcontinuum.core.commons.model.PortData
@@ -16,6 +18,7 @@ import org.projectcontinuum.core.commons.protocol.progress.StageStatus
 import org.projectcontinuum.core.commons.utils.NodeInputReader
 import org.projectcontinuum.core.commons.utils.NodeOutputWriter
 import org.projectcontinuum.core.commons.workflow.IContinuumWorkflow
+import org.projectcontinuum.core.worker.starter.resolver.CredentialResolver
 import io.temporal.activity.Activity
 import io.temporal.activity.ActivityExecutionContext
 import io.temporal.spring.boot.ActivityImpl
@@ -83,6 +86,7 @@ import kotlin.system.measureTimeMillis
 class ContinuumNodeActivity(
   private val applicationContext: ApplicationContext,
   private val s3TransferManager: S3TransferManager,
+  private val credentialResolver: CredentialResolver,
   @param:Value("\${continuum.core.worker.storage.bucket-name}")
   private val cacheBucketName: String,
   @param:Value("\${continuum.core.worker.storage.bucket-base-path}")
@@ -238,11 +242,25 @@ class ContinuumNodeActivity(
 
     executionStartTime.set(System.currentTimeMillis())
 
+    // Resolve credentials from UI Schema before node execution.
+    // Scans propertiesUISchema for fields with options.format == "credential",
+    // fetches the actual credential data from the Credentials Server,
+    // and passes it to the node via ExecutionContext.
+    val ownerId = ContinuumOwnerContext.get()
+    val credentials = if (ownerId != null) {
+      credentialResolver.resolve(node.data.properties, node.data.propertiesUISchema, ownerId)
+    } else {
+      emptyMap()
+    }
+
+    val executionContext = ExecutionContext(ownerId = ownerId, credentials = credentials)
+
     createProcessNode(nodeModel).run(
       node = node,
       inputs = nodeInputs,
       nodeOutputWriter = nodeOutputWriter,
-      nodeProgressCallback = progressCallback
+      nodeProgressCallback = progressCallback,
+      executionContext = executionContext
     )
 
     progressCallback.report(NodeProgress(100))

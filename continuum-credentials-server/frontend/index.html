@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/png" href="./Logo.png" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="Continuum Credential Manager - Securely store and manage credentials for external services" />
+    <title>Continuum Credential Manager</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+    <script>
+      // Set <base href> dynamically so relative asset paths resolve correctly
+      // whether served at /ui/ or behind a gateway prefix like /credentials/ui/
+      (function() {
+        var match = window.location.pathname.match(/^(.*\/ui)(\/|$)/);
+        var base = document.createElement('base');
+        base.href = (match ? match[1] : '/ui') + '/';
+        document.head.prepend(base);
+      })();
+    </script>
+    <script>
+      // Detect saved theme preference or system preference
+      const theme = localStorage.getItem('theme');
+      if (theme === 'dark' || (!theme && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+        document.documentElement.classList.add('dark');
+      }
+    </script>
+  </head>
+  <body class="bg-base text-fg antialiased">
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
