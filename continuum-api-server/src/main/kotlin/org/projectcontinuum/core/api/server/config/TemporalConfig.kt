@@ -11,7 +11,7 @@ import org.springframework.context.annotation.Configuration
 
 @Configuration
 class TemporalConfig(
-  @Value("\${temporal.connection.target}")
+  @param:Value("\${temporal.connection.target}")
   private val temporalServiceAddress: String
 ) {
 

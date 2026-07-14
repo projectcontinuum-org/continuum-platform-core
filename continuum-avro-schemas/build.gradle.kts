@@ -12,6 +12,9 @@ version = property("platformVersion").toString()
 java {
     withJavadocJar()
     withSourcesJar()
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(21)
+    }
 }
 
 repositories {
@@ -20,7 +23,7 @@ repositories {
 }
 
 dependencies {
-    api("org.apache.avro:avro:1.12.0")
+    api("org.apache.avro:avro:1.12.1")
 }
 
 publishing {
@@ -77,7 +80,9 @@ publishing {
 jreleaser {
     signing {
         active.set(org.jreleaser.model.Active.ALWAYS)
-        armored.set(true)
+        pgp {
+            armored.set(true)
+        }
     }
     deploy {
         maven {

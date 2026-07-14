@@ -1,6 +1,6 @@
 package org.projectcontinuum.core.bridge.handler
 
-import com.fasterxml.jackson.databind.ObjectMapper
+import tools.jackson.databind.ObjectMapper
 import org.eclipse.paho.client.mqttv3.MqttClient
 import org.eclipse.paho.client.mqttv3.MqttMessage
 import org.projectcontinuum.core.commons.model.WorkflowUpdateEvent
@@ -18,13 +18,13 @@ import java.util.function.Consumer
  */
 @Component
 class WorkflowExecutionSnapshotToMqttSyncHandler(
-  private val mqttClient: MqttClient
+  private val mqttClient: MqttClient,
+  private val objectMapper: ObjectMapper
 ) {
 
   companion object {
     private val LOGGER = LoggerFactory.getLogger(WorkflowExecutionSnapshotToMqttSyncHandler::class.java)
     private val MQTT_TOPIC_PREFIX = "continuum/workflow/execution"
-    private val objectMapper = ObjectMapper()
   }
 
   @Bean("continuum-core-event-WorkflowExecutionSnapshot-input")

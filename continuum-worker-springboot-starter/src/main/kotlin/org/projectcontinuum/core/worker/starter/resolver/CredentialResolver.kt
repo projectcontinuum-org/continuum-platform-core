@@ -41,9 +41,9 @@ import org.springframework.web.client.RestTemplate
  */
 @Component
 class CredentialResolver(
-  @Qualifier("continuumWorkerSpringbootStarterRestTemplate")
+  @param:Qualifier("continuumWorkerSpringbootStarterRestTemplate")
   private val restTemplate: RestTemplate,
-  @Value("\${continuum.core.worker.credentials-server-base-url:http://localhost:8083}")
+  @param:Value("\${continuum.core.worker.credentials-server-base-url:http://localhost:8083}")
   private val credentialsServerBaseUrl: String
 ) {
 

@@ -1,4 +1,4 @@
-package org.projectcontinuum.core.api.server.repository
+package org.projectcontinuum.core.api.server.repository.jdbc
 
 import org.projectcontinuum.core.api.server.entity.RegisteredNodeEntity
 import org.springframework.data.jdbc.repository.query.Query
@@ -42,4 +42,3 @@ interface RegisteredNodeRepository : CrudRepository<RegisteredNodeEntity, Long> 
   fun findByNodeId(nodeId: String): RegisteredNodeEntity?
 
 }
-

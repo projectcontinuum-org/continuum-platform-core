@@ -32,13 +32,13 @@ import java.time.Duration
 // is handled by WorkbenchProxyController and WorkbenchWebSocketProxyHandler.
 @Configuration
 class GatewayConfig(
-  @Value("\${CONTINUUM_API_SERVER_URL:http://localhost:8081}")
+  @param:Value("\${CONTINUUM_API_SERVER_URL:http://localhost:8081}")
   private val apiServerUrl: String,
 
-  @Value("\${CONTINUUM_CLUSTER_MANAGER_URL:http://localhost:8082}")
+  @param:Value("\${CONTINUUM_CLUSTER_MANAGER_URL:http://localhost:8082}")
   private val clusterManagerUrl: String,
 
-  @Value("\${CONTINUUM_CREDENTIALS_SERVER_URL:http://localhost:8083}")
+  @param:Value("\${CONTINUUM_CREDENTIALS_SERVER_URL:http://localhost:8083}")
   private val credentialsServerUrl: String,
 ) {
 

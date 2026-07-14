@@ -1,0 +1,9 @@
+<component name="ProjectRunConfigurationManager">
+  <configuration default="false" name="Gateway" type="SpringBootApplicationConfigurationType" factoryName="Spring Boot" folderName="Core">
+    <module name="continuum-platform-core.continuum-cloud-gateway.main" />
+    <option name="SPRING_BOOT_MAIN_CLASS" value="org.projectcontinuum.core.cloud.gateway.App" />
+    <method v="2">
+      <option name="Make" enabled="true" />
+    </method>
+  </configuration>
+</component>

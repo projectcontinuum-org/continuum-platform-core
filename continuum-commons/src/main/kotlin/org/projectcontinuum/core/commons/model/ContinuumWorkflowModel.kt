@@ -6,11 +6,11 @@ import com.fasterxml.jackson.annotation.JsonIgnore
 import com.fasterxml.jackson.annotation.JsonProperty
 
 data class ContinuumWorkflowModel @JsonCreator constructor(
-  @JsonProperty("id") val id: String,
-  @JsonProperty("name") val name: String,
-  @JsonProperty("active") val active: Boolean = true,
-  @JsonProperty("nodes") val nodes: List<Node> = emptyList(),
-  @JsonProperty("edges") val edges: List<Edge> = emptyList()
+  @param:JsonProperty("id") val id: String,
+  @param:JsonProperty("name") val name: String,
+  @param:JsonProperty("active") val active: Boolean = true,
+  @param:JsonProperty("nodes") val nodes: List<Node> = emptyList(),
+  @param:JsonProperty("edges") val edges: List<Edge> = emptyList()
 ) {
   @JsonIgnore
   private val nodesMap: Map<String, Node> = nodes.associateBy { it.id }
@@ -38,52 +38,52 @@ data class ContinuumWorkflowModel @JsonCreator constructor(
   }
 
   data class Edge @JsonCreator constructor(
-    @JsonProperty("id") val id: String,
-    @JsonProperty("type") val type: String? = null,
-    @JsonProperty("animated") var animated: Boolean? = null,
-    @JsonProperty("source") val source: String,
-    @JsonProperty("target") val target: String,
-    @JsonProperty("sourceHandle") val sourceHandle: String,
-    @JsonProperty("targetHandle") val targetHandle: String
+    @param:JsonProperty("id") val id: String,
+    @param:JsonProperty("type") val type: String? = null,
+    @param:JsonProperty("animated") var animated: Boolean? = null,
+    @param:JsonProperty("source") val source: String,
+    @param:JsonProperty("target") val target: String,
+    @param:JsonProperty("sourceHandle") val sourceHandle: String,
+    @param:JsonProperty("targetHandle") val targetHandle: String
   )
 
   data class Node @JsonCreator constructor(
-    @JsonProperty("id") val id: String,
-    @JsonProperty("type") val type: String,
-    @JsonProperty("position") val position: Position,
-    @JsonProperty("data") val data: NodeData,
-    @JsonProperty("width") val width: Int,
-    @JsonProperty("height") val height: Int,
-    @JsonProperty("selected") val selected: Boolean,
-    @JsonProperty("positionAbsolute") val positionAbsolute: Position? = null,
-    @JsonProperty("dragging") val dragging: Boolean
+    @param:JsonProperty("id") val id: String,
+    @param:JsonProperty("type") val type: String,
+    @param:JsonProperty("position") val position: Position,
+    @param:JsonProperty("data") val data: NodeData,
+    @param:JsonProperty("width") val width: Int,
+    @param:JsonProperty("height") val height: Int,
+    @param:JsonProperty("selected") val selected: Boolean,
+    @param:JsonProperty("positionAbsolute") val positionAbsolute: Position? = null,
+    @param:JsonProperty("dragging") val dragging: Boolean? = null
   )
 
   data class Position @JsonCreator constructor(
-    @JsonProperty("x") val x: Double,
-    @JsonProperty("y") val y: Double
+    @param:JsonProperty("x") val x: Double,
+    @param:JsonProperty("y") val y: Double
   )
 
   data class NodeData @JsonCreator constructor(
-    @JsonProperty("id") val id: String? = null,
-    @JsonProperty("description") val description: String,
-    @JsonProperty("title") val title: String,
-    @JsonProperty("subTitle") val subTitle: String? = null,
-    @JsonProperty("icon") val icon: String? = null,
-    @JsonProperty("nodeModel") val nodeModel: String,
-    @JsonProperty("busy") val busy: Boolean? = null,
-    @JsonProperty("inputs") val inputs: Map<String, NodePort>? = null,
-    @JsonProperty("outputs") val outputs: Map<String, NodePort>? = null,
-    @JsonProperty("properties") val properties: Map<String, Any> = mapOf(),
-    @JsonProperty("propertiesSchema") val propertiesSchema: Map<String, Any> = mapOf(),
-    @JsonProperty("propertiesUISchema") val propertiesUISchema: Map<String, Any> = mapOf(),
-    @JsonProperty("status") var status: NodeStatus? = null,
-    @JsonProperty("nodeProgress") var nodeProgress: NodeProgress? = null
+    @param:JsonProperty("id") val id: String? = null,
+    @param:JsonProperty("description") val description: String,
+    @param:JsonProperty("title") val title: String,
+    @param:JsonProperty("subTitle") val subTitle: String? = null,
+    @param:JsonProperty("icon") val icon: String? = null,
+    @param:JsonProperty("nodeModel") val nodeModel: String,
+    @param:JsonProperty("busy") val busy: Boolean? = null,
+    @param:JsonProperty("inputs") val inputs: Map<String, NodePort>? = null,
+    @param:JsonProperty("outputs") val outputs: Map<String, NodePort>? = null,
+    @param:JsonProperty("properties") val properties: Map<String, Any> = mapOf(),
+    @param:JsonProperty("propertiesSchema") val propertiesSchema: Map<String, Any> = mapOf(),
+    @param:JsonProperty("propertiesUISchema") val propertiesUISchema: Map<String, Any> = mapOf(),
+    @param:JsonProperty("status") var status: NodeStatus? = null,
+    @param:JsonProperty("nodeProgress") var nodeProgress: NodeProgress? = null
   )
 
   data class NodePort @JsonCreator constructor(
-    @JsonProperty("name") val name: String,
-    @JsonProperty("contentType") val contentType: String
+    @param:JsonProperty("name") val name: String,
+    @param:JsonProperty("contentType") val contentType: String
   )
 
   enum class NodeStatus {
@@ -95,6 +95,7 @@ data class ContinuumWorkflowModel @JsonCreator constructor(
     CANCELLED,
     WARNING,
     PRE_PROCESSING,
-    POST_PROCESSING
+    POST_PROCESSING,
+    SKIPPED
   }
 }

@@ -1,26 +1,23 @@
 package org.projectcontinuum.core.api.server.service
 
-import com.fasterxml.jackson.databind.ObjectMapper
-import com.fasterxml.jackson.module.kotlin.kotlinModule
-import com.fasterxml.jackson.module.kotlin.readValue
+import tools.jackson.databind.ObjectMapper
+import tools.jackson.module.kotlin.readValue
 import org.projectcontinuum.core.api.server.entity.RegisteredNodeEntity
 import org.projectcontinuum.core.api.server.model.NodeExplorerItemType
 import org.projectcontinuum.core.api.server.model.NodeExplorerTreeItem
-import org.projectcontinuum.core.api.server.repository.RegisteredNodeRepository
+import org.projectcontinuum.core.api.server.repository.jdbc.RegisteredNodeRepository
 import org.projectcontinuum.core.commons.model.ContinuumWorkflowModel
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
 
 @Service
 class NodeExplorerService(
-  private val registeredNodeRepository: RegisteredNodeRepository
+  private val registeredNodeRepository: RegisteredNodeRepository,
+  private val objectMapper: ObjectMapper
 ) {
 
   private val log = LoggerFactory.getLogger(NodeExplorerService::class.java)
 
-  private val objectMapper = ObjectMapper().apply {
-    registerModule(kotlinModule())
-  }
 
   fun getChildren(parentId: String): List<NodeExplorerTreeItem> {
     val fullTree = buildTree(registeredNodeRepository.findAll())

@@ -25,11 +25,11 @@ object ContinuumFeatureBase {
     // Default versions — matching the current ecosystem
     const val DEFAULT_CONTINUUM_VERSION = "0.0.6"
     const val DEFAULT_CONTINUUM_GROUP = "org.projectcontinuum.core"
-    const val DEFAULT_SPRING_BOOT_VERSION = "3.4.1"
-    const val DEFAULT_SPRING_CLOUD_VERSION = "2024.0.0"
+    const val DEFAULT_SPRING_BOOT_VERSION = "4.0.6"
+    const val DEFAULT_SPRING_CLOUD_VERSION = "2025.1.1"
     const val DEFAULT_TEMPORAL_VERSION = "1.28.0"
     const val DEFAULT_AWS_SDK_VERSION = "2.30.7"
-    const val DEFAULT_JACKSON_VERSION = "2.18.2"
+    const val DEFAULT_JACKSON_VERSION = "3.1.2"
 
     /**
      * Creates and configures the shared ContinuumExtension if it doesn't already exist.
@@ -121,9 +121,9 @@ object ContinuumFeatureBase {
 
             if (isKotlin) {
                 add("implementation", "org.jetbrains.kotlin:kotlin-reflect")
-                add("implementation", "com.fasterxml.jackson.module:jackson-module-kotlin:$jacksonVer")
+                add("implementation", "tools.jackson.module:jackson-module-kotlin:$jacksonVer")
             } else {
-                add("implementation", "com.fasterxml.jackson.core:jackson-databind:$jacksonVer")
+                add("implementation", "tools.jackson.core:jackson-databind:$jacksonVer")
             }
 
             // Test dependencies
@@ -209,7 +209,9 @@ object ContinuumFeatureBase {
         project.extensions.configure<JReleaserExtension> {
             signing {
                 active.set(Active.ALWAYS)
-                armored.set(true)
+                pgp {
+                    armored.set(true)
+                }
             }
             deploy {
                 maven {

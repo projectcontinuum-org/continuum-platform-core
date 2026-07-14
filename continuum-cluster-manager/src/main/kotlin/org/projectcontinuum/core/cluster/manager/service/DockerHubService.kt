@@ -4,25 +4,19 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties
 import com.fasterxml.jackson.annotation.JsonProperty
 import org.projectcontinuum.core.cluster.manager.config.WorkbenchProperties
 import org.slf4j.LoggerFactory
-import org.springframework.boot.web.client.RestTemplateBuilder
 import org.springframework.stereotype.Service
+import org.springframework.web.client.RestClient
 import org.springframework.web.client.RestClientException
-import org.springframework.web.client.RestTemplate
 import java.time.Duration
 import java.time.Instant
 
 @Service
 class DockerHubService(
-  restTemplateBuilder: RestTemplateBuilder,
+  private val restClient: RestClient,
   private val workbenchProperties: WorkbenchProperties
 ) {
 
   private val logger = LoggerFactory.getLogger(DockerHubService::class.java)
-
-  private val restTemplate: RestTemplate = restTemplateBuilder
-    .connectTimeout(Duration.ofSeconds(5))
-    .readTimeout(Duration.ofSeconds(10))
-    .build()
 
   @Volatile
   private var cachedTags: CachedResult? = null
@@ -58,7 +52,10 @@ class DockerHubService(
     logger.info("Fetching Docker Hub tags from: {}", url)
 
     try {
-      val response = restTemplate.getForObject(url, DockerHubTagsResponse::class.java)
+      val response = restClient.get()
+        .uri(url)
+        .retrieve()
+        .body(DockerHubTagsResponse::class.java)
         ?: throw RuntimeException("Received null response from Docker Hub")
 
       val tags = response.results.map { result ->
@@ -93,8 +90,8 @@ class DockerHubService(
   @JsonIgnoreProperties(ignoreUnknown = true)
   private data class DockerHubTagResult(
     val name: String,
-    @JsonProperty("last_updated") val lastUpdated: String?,
-    @JsonProperty("full_size") val fullSize: Long?
+    @param:JsonProperty("last_updated") val lastUpdated: String?,
+    @param:JsonProperty("full_size") val fullSize: Long?
   )
 
   private data class CachedResult(

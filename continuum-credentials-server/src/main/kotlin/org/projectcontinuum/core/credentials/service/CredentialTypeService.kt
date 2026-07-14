@@ -1,7 +1,8 @@
 package org.projectcontinuum.core.credentials.service
 
-import com.fasterxml.jackson.core.type.TypeReference
-import com.fasterxml.jackson.databind.ObjectMapper
+import tools.jackson.core.type.TypeReference
+import tools.jackson.databind.ObjectMapper
+import tools.jackson.databind.JsonNode
 import org.projectcontinuum.core.credentials.entity.CredentialTypeEntity
 import org.projectcontinuum.core.credentials.entity.JsonValue
 import org.projectcontinuum.core.credentials.exception.CredentialAlreadyExistsException
@@ -81,7 +82,7 @@ class CredentialTypeService(
   }
 
   private fun normalizeJson(data: Map<String, Any?>): String {
-    val tree = objectMapper.valueToTree<com.fasterxml.jackson.databind.JsonNode>(data)
+    val tree = objectMapper.valueToTree<JsonNode>(data)
     return objectMapper.writeValueAsString(tree)
   }
 

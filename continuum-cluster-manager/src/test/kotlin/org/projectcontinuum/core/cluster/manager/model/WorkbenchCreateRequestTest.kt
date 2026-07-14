@@ -10,8 +10,8 @@ class WorkbenchCreateRequestTest {
     val request = WorkbenchCreateRequest(instanceName = "test-wb")
 
     assertEquals("test-wb", request.instanceName)
-    assertEquals("projectcontinuum/continuum-workbench:0.0.5", request.image)
-    assertEquals(ResourceSpec(), request.resources)
+    assertEquals("projectcontinuum/continuum-workbench:0.0.5", request.resolvedImage())
+    assertEquals(ResourceSpec(), request.resolvedResources())
   }
 
   @Test
@@ -25,7 +25,7 @@ class WorkbenchCreateRequestTest {
 
     assertEquals("custom-wb", request.instanceName)
     assertEquals("theiaide/theia:v2", request.image)
-    assertEquals("4", request.resources.cpuRequest)
+    assertEquals("4", request.resources!!.cpuRequest)
   }
 
   @Test

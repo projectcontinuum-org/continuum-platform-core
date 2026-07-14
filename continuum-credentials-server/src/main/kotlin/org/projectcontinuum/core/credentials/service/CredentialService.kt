@@ -1,9 +1,9 @@
 package org.projectcontinuum.core.credentials.service
 
-import com.fasterxml.jackson.core.type.TypeReference
-import com.fasterxml.jackson.databind.JsonNode
-import com.fasterxml.jackson.databind.ObjectMapper
+import tools.jackson.core.type.TypeReference
+import tools.jackson.databind.ObjectMapper
 import com.networknt.schema.JsonSchemaFactory
+import com.networknt.schema.InputFormat
 import com.networknt.schema.SpecVersion
 import org.projectcontinuum.core.credentials.entity.CredentialEntity
 import org.projectcontinuum.core.credentials.entity.JsonValue
@@ -153,12 +153,12 @@ class CredentialService(
   }
 
   private fun validateDataAgainstSchema(data: Map<String, String>, schema: JsonValue) {
-    val schemaNode = objectMapper.readTree(schema.value)
-    if (schemaNode.isEmpty) return
+    val schemaString = schema.value
+    if (schemaString == "{}" || schemaString.isBlank()) return
 
-    val dataNode: JsonNode = objectMapper.valueToTree(data)
-    val jsonSchema = schemaFactory.getSchema(schemaNode)
-    val errors = jsonSchema.validate(dataNode)
+    val jsonSchema = schemaFactory.getSchema(schemaString)
+    val dataString = objectMapper.writeValueAsString(data)
+    val errors = jsonSchema.validate(dataString, InputFormat.JSON)
 
     if (errors.isNotEmpty()) {
       val errorMessages = errors.joinToString("; ") { it.message }

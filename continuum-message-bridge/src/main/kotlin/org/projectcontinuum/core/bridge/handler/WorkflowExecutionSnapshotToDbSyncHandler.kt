@@ -1,6 +1,6 @@
 package org.projectcontinuum.core.bridge.handler
 
-import com.fasterxml.jackson.databind.ObjectMapper
+import tools.jackson.databind.ObjectMapper
 import org.projectcontinuum.core.bridge.repository.WorkflowRunRepository
 import org.projectcontinuum.core.commons.model.WorkflowUpdateEvent
 import org.slf4j.LoggerFactory
@@ -18,12 +18,12 @@ import java.util.function.Consumer
  */
 @Component
 class WorkflowExecutionSnapshotToDbSyncHandler(
-  private val workflowRunRepository: WorkflowRunRepository
+  private val workflowRunRepository: WorkflowRunRepository,
+  private val objectMapper: ObjectMapper
 ) {
 
   companion object {
     private val LOGGER = LoggerFactory.getLogger(WorkflowExecutionSnapshotToDbSyncHandler::class.java)
-    private val objectMapper = ObjectMapper()
   }
 
   @Bean("continuum-core-event-WorkflowExecutionSnapshotToDbSync-input")

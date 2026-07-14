@@ -18,6 +18,7 @@ import io.temporal.workflow.Workflow
 import io.temporal.workflow.unsafe.WorkflowUnsafe
 import org.projectcontinuum.core.commons.activity.IInitializeActivity
 import org.projectcontinuum.core.commons.model.ContinuumWorkflowModel
+import org.projectcontinuum.core.commons.model.ContinuumWorkflowModel.NodeStatus
 import org.projectcontinuum.core.commons.model.ExecutionStatus
 import org.projectcontinuum.core.commons.model.PortData
 import org.projectcontinuum.core.commons.model.WorkflowSnapshot
@@ -381,16 +382,27 @@ class ContinuumWorkflow : IContinuumWorkflow {
             }
       }
 
+      // Check if all input ports are connected to a parent node's output port
+      val allInputPortsConnected = node.data.inputs?.all { inputPort ->
+          nodeParentEdges.any { edge -> edge.targetHandle == inputPort.key }
+      } ?: true
+
+      if(!allInputPortsConnected) {
+        node.data.status = NodeStatus.SKIPPED
+      }
+
       LOGGER.debug(
-        "Node: {} allParentsProducedOutput: {} executed: {} status: {}",
+        "Node: {} allParentsProducedOutput: {} allInputPortsConnected: {} executed: {} status: {}",
         node.id,
         allParentsProducedOutput,
+        allInputPortsConnected,
         nodeOutputMap.containsKey(node.id),
         node.data.status
       )
 
       // Node is ready if: parents done, not yet executed, and not currently running
       if (allParentsProducedOutput &&
+        allInputPortsConnected &&
         !nodeOutputMap.containsKey(node.id) &&
         node.data.status == null
       ) {

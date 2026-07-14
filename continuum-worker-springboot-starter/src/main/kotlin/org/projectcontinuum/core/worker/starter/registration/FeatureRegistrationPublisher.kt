@@ -32,7 +32,7 @@ import java.util.UUID
 class FeatureRegistrationPublisher(
   private val streamBridge: StreamBridge,
   private val nodeModels: ObjectProvider<ContinuumNodeModel>,
-  @Value("\${continuum.core.worker.node-task-queue:ACTIVITY_TASK_QUEUE}")
+  @param:Value("\${continuum.core.worker.node-task-queue:ACTIVITY_TASK_QUEUE}")
   private val taskQueue: String
 ) {
 

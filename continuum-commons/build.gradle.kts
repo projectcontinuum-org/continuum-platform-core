@@ -1,7 +1,7 @@
 plugins {
-    kotlin("jvm") version "2.1.0"
+    kotlin("jvm")
     `java-library`
-    id("io.spring.dependency-management") version "1.1.6"
+    id("io.spring.dependency-management") version "1.1.7"
     `maven-publish`
     id("org.jreleaser")
 }
@@ -27,7 +27,7 @@ dependencies {
     implementation("jakarta.annotation:jakarta.annotation-api:2.1.1")
 
     // Jackson dependencies
-    implementation("com.fasterxml.jackson.module:jackson-module-kotlin:2.18.2")
+    implementation("tools.jackson.module:jackson-module-kotlin")
 
     // Parquet writer — exposed via NodeOutputWriter/NodeInputReader public API
     implementation("org.apache.avro:avro:1.12.1")
@@ -65,13 +65,14 @@ dependencies {
     compileOnly("org.springframework:spring-beans")
 
     // Test dependencies
-    testImplementation("org.junit.jupiter:junit-jupiter:5.10.0")
+    testImplementation("org.junit.jupiter:junit-jupiter")
+    testRuntimeOnly("org.junit.platform:junit-platform-launcher")
 }
 
 dependencyManagement {
     imports {
-        mavenBom("org.springframework.boot:spring-boot-dependencies:3.4.0")
-        mavenBom("org.springframework.cloud:spring-cloud-dependencies:2024.0.0")
+        mavenBom("org.springframework.boot:spring-boot-dependencies:4.0.6")
+        mavenBom("org.springframework.cloud:spring-cloud-dependencies:2025.0.0")
         mavenBom("io.temporal:temporal-bom:1.28.0")
     }
 }
@@ -140,7 +141,9 @@ publishing {
 jreleaser {
     signing {
         active.set(org.jreleaser.model.Active.ALWAYS)
-        armored.set(true)
+        pgp {
+            armored.set(true)
+        }
     }
     deploy {
         maven {

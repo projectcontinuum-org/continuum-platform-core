@@ -86,13 +86,13 @@ class WorkbenchService(
       namespace = namespace,
       userId = userId,
       status = WorkbenchStatus.PENDING.name,
-      image = request.image,
-      cpuRequest = request.resources.cpuRequest,
-      cpuLimit = request.resources.cpuLimit,
-      memoryRequest = request.resources.memoryRequest,
-      memoryLimit = request.resources.memoryLimit,
-      storageSize = request.resources.storageSize,
-      storageClassName = request.resources.storageClassName,
+      image = request.resolvedImage(),
+      cpuRequest = request.resolvedResources().cpuRequest,
+      cpuLimit = request.resolvedResources().cpuLimit,
+      memoryRequest = request.resolvedResources().memoryRequest,
+      memoryLimit = request.resolvedResources().memoryLimit,
+      storageSize = request.resolvedResources().storageSize,
+      storageClassName = request.resolvedResources().storageClassName,
       createdAt = now,
       updatedAt = now
     )
@@ -132,10 +132,10 @@ class WorkbenchService(
         status = "SUCCESS",
         details = mapOf(
           "namespace" to namespace,
-          "image" to request.image,
-          "cpuRequest" to request.resources.cpuRequest,
-          "memoryRequest" to request.resources.memoryRequest,
-          "storageSize" to request.resources.storageSize
+          "image" to request.resolvedImage(),
+          "cpuRequest" to request.resolvedResources().cpuRequest,
+          "memoryRequest" to request.resolvedResources().memoryRequest,
+          "storageSize" to request.resolvedResources().storageSize
         )
       )
 

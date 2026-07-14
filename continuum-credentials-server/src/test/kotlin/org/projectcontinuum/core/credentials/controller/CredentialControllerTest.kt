@@ -1,6 +1,7 @@
 package org.projectcontinuum.core.credentials.controller
 
-import com.fasterxml.jackson.databind.ObjectMapper
+import tools.jackson.databind.ObjectMapper
+import tools.jackson.module.kotlin.jacksonObjectMapper
 import org.junit.jupiter.api.Test
 import org.mockito.kotlin.*
 import org.projectcontinuum.core.credentials.exception.CredentialNotFoundException
@@ -9,7 +10,7 @@ import org.projectcontinuum.core.credentials.model.CredentialCreateRequest
 import org.projectcontinuum.core.credentials.model.CredentialResponse
 import org.projectcontinuum.core.credentials.service.CredentialService
 import org.springframework.beans.factory.annotation.Autowired
-import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest
+import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest
 import org.springframework.http.MediaType
 import org.springframework.test.context.bean.override.mockito.MockitoBean
 import org.springframework.test.web.servlet.MockMvc

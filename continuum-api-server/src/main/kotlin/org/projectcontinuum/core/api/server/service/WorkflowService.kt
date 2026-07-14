@@ -10,8 +10,8 @@ import org.projectcontinuum.core.commons.model.ExecutionStatus
 import org.projectcontinuum.core.commons.model.PortData
 import org.projectcontinuum.core.commons.utils.ValidationHelper.Companion.validateJsonWithSchema
 import org.projectcontinuum.core.commons.workflow.IContinuumWorkflow
-import com.fasterxml.jackson.core.type.TypeReference
-import com.fasterxml.jackson.databind.ObjectMapper
+import tools.jackson.core.type.TypeReference
+import tools.jackson.databind.ObjectMapper
 import com.google.protobuf.ByteString
 import io.temporal.api.common.v1.WorkflowExecution
 import io.temporal.api.enums.v1.EventType
@@ -22,6 +22,7 @@ import io.temporal.client.WorkflowClient
 import io.temporal.client.WorkflowException
 import io.temporal.client.WorkflowOptions
 import io.temporal.common.SearchAttributes
+import org.projectcontinuum.core.api.server.model.WorkflowRunData
 import org.projectcontinuum.core.commons.context.ContinuumOwnerContext
 import org.slf4j.LoggerFactory
 import org.springframework.scheduling.annotation.EnableScheduling
@@ -80,11 +81,9 @@ class WorkflowService(
         workflowUri = URI.create(continuumWorkflowModel.name),
         progressPercentage = 0,
         status = "PENDING",
-        data = objectMapper.valueToTree(
-          mapOf(
-            "workflowSnapshot" to continuumWorkflowModel,
-            "nodeToOutputMap" to emptyMap<String, Any>()
-          )
+        data = WorkflowRunData(
+          workflowSnapshot = continuumWorkflowModel,
+          nodeToOutputMap = emptyMap()
         )
       )
     )

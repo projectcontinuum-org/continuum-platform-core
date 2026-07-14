@@ -1,6 +1,6 @@
 package org.projectcontinuum.core.bridge.handler
 
-import com.fasterxml.jackson.databind.ObjectMapper
+import tools.jackson.databind.ObjectMapper
 import org.projectcontinuum.core.bridge.repository.RegisteredNodeRepository
 import org.projectcontinuum.core.protocol.event.FeatureRegistrationRequest
 import org.slf4j.LoggerFactory
@@ -12,12 +12,12 @@ import java.util.function.Consumer
 
 @Component
 class FeatureRegistrationHandler(
-  private val registeredNodeRepository: RegisteredNodeRepository
+  private val registeredNodeRepository: RegisteredNodeRepository,
+  private val objectMapper: ObjectMapper
 ) {
 
   companion object {
     private val LOGGER = LoggerFactory.getLogger(FeatureRegistrationHandler::class.java)
-    private val objectMapper = ObjectMapper()
   }
 
   @Bean("continuum-core-event-FeatureRegistration-input")

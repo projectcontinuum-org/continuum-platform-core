@@ -19,7 +19,7 @@ class WorkflowRunService(
   val workflowRunSummaryRepository: WorkflowRunSummaryRepository
 ) {
 
-  private fun <T> ownedBySpec(ownedBy: String): Specification<T> {
+  private fun <T : Any> ownedBySpec(ownedBy: String): Specification<T> {
     return Specification { root, _, cb -> cb.equal(root.get<String>("ownedBy"), ownedBy) }
   }
 

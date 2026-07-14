@@ -1,9 +1,9 @@
 plugins {
-  kotlin("jvm") version "2.1.0"
-  kotlin("plugin.spring") version "1.9.25"
-  id("org.springframework.boot") version "3.4.0"
-  id("io.spring.dependency-management") version "1.1.6"
-  id("com.google.cloud.tools.jib") version "3.4.1"
+  kotlin("jvm")
+  kotlin("plugin.spring")
+  id("org.springframework.boot") version "4.0.6"
+  id("io.spring.dependency-management") version "1.1.7"
+  id("com.google.cloud.tools.jib") version "3.4.4"
 }
 
 group = "org.projectcontinuum.core"
@@ -31,7 +31,7 @@ dependencies {
   implementation("com.fasterxml.jackson.module:jackson-module-kotlin")
 
   // Spring Cloud Gateway Server MVC (servlet-based reverse proxy)
-  implementation("org.springframework.cloud:spring-cloud-gateway-server-mvc")
+  implementation("org.springframework.cloud:spring-cloud-starter-gateway-server-webmvc")
 
   // Database (read-only access to workbench_instances for endpoint resolution)
   implementation("org.springframework.boot:spring-boot-starter-data-jdbc")
@@ -46,7 +46,7 @@ dependencies {
 
 dependencyManagement {
   imports {
-    mavenBom("org.springframework.cloud:spring-cloud-dependencies:2024.0.1")
+    mavenBom("org.springframework.cloud:spring-cloud-dependencies:2025.1.1")
   }
 }
 

@@ -1,7 +1,7 @@
 package org.projectcontinuum.core.commons.utils
 
-import com.fasterxml.jackson.databind.ObjectMapper
-import com.fasterxml.jackson.module.kotlin.readValue
+import tools.jackson.databind.ObjectMapper
+import tools.jackson.module.kotlin.readValue
 import java.io.File
 
 class KnimeHelper {
@@ -73,6 +73,7 @@ class KnimeHelper {
       }
     }
 
+    @Suppress("UNCHECKED_CAST")
     fun continuumTableToKnimeContainerInputTable(
       reader: NodeInputReader
     ): Map<String, Any> {
@@ -99,6 +100,7 @@ class KnimeHelper {
       return knimeTable
     }
 
+    @Suppress("UNCHECKED_CAST")
     fun knimeContainerOutputTableToPortOutput(
       outputFile: File,
       outputPortWriter: NodeOutputWriter.OutputPortWriter

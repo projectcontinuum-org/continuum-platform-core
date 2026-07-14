@@ -1,11 +1,8 @@
 <component name="ProjectRunConfigurationManager">
-  <configuration default="false" name="MessageBridge" type="SpringBootApplicationConfigurationType" factoryName="Spring Boot">
+  <configuration default="false" name="MessageBridge" type="SpringBootApplicationConfigurationType" factoryName="Spring Boot" folderName="Core">
     <module name="continuum-platform-core.continuum-message-bridge.main" />
-    <selectedOptions>
-      <option name="environmentVariables" />
-    </selectedOptions>
     <option name="SPRING_BOOT_MAIN_CLASS" value="org.projectcontinuum.core.bridge.App" />
-    <option name="VM_PARAMETERS" value="-Dserver.port=8084" />
+    <option name="VM_PARAMETERS" value="-Dserver.port=9092" />
     <extension name="coverage">
       <pattern>
         <option name="PATTERN" value="org.projectcontinuum.core.bridge.*" />

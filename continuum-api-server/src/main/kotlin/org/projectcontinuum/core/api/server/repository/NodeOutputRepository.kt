@@ -19,13 +19,13 @@ import java.net.URI
 class NodeOutputRepository(
   private val duckDBConnection: DuckDBConnection,
   private val s3TransferManager: S3TransferManager,
-  @Value("\${continuum.core.api-server.storage.bucket-name}")
+  @param:Value("\${continuum.core.api-server.storage.bucket-name}")
   val s3BucketName: String,
-  @Value("\${continuum.core.api-server.storage.bucket-base-path}")
+  @param:Value("\${continuum.core.api-server.storage.bucket-base-path}")
   val s3BucketBasePath: String,
-  @Value("\${continuum.core.api-server.dataFileExtension:parquet}")
+  @param:Value("\${continuum.core.api-server.dataFileExtension:parquet}")
   val dataFileExtension: String,
-  @Value("\${continuum.core.api-server.cache-directory-base-path}")
+  @param:Value("\${continuum.core.api-server.cache-directory-base-path}")
   val cacheDirectoryBasePath: String
 ) {
 
@@ -68,6 +68,7 @@ class NodeOutputRepository(
     while (resultSet.next()) {
       // map dataset to avro object
       val cells = resultSet.getArray("cells") as DuckDBArray
+      @Suppress("UNCHECKED_CAST")
       val cellsDtos = (cells.array as Array<Object>).mapNotNull {
         if (it is DuckDBStruct) {
           val value = (it.map["value"] as DuckDBResultSet.DuckDBBlobResult)

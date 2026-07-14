@@ -33,15 +33,15 @@ import java.net.URI
 @Component
 @ConditionalOnProperty(name = ["continuum.core.api-server.storage.type"], havingValue = "minio")
 class S3BucketInitializer(
-  @Value("\${continuum.core.api-server.storage.minio.endpoint}")
+  @param:Value("\${continuum.core.api-server.storage.minio.endpoint}")
   private val minioEndpoint: String,
-  @Value("\${continuum.core.api-server.storage.minio.access-key}")
+  @param:Value("\${continuum.core.api-server.storage.minio.access-key}")
   private val minioAccessKey: String,
-  @Value("\${continuum.core.api-server.storage.minio.secret-key}")
+  @param:Value("\${continuum.core.api-server.storage.minio.secret-key}")
   private val minioSecretKey: String,
-  @Value("\${continuum.core.api-server.storage.bucket-name}")
+  @param:Value("\${continuum.core.api-server.storage.bucket-name}")
   private val bucketName: String,
-  @Value("\${continuum.core.api-server.storage.bucket-region}")
+  @param:Value("\${continuum.core.api-server.storage.bucket-region}")
   private val bucketRegion: String
 ) {
 

@@ -1,11 +1,11 @@
 import com.github.gradle.node.npm.task.NpmTask
 
 plugins {
-  kotlin("jvm") version "2.1.0"
-  kotlin("plugin.spring") version "1.9.25"
-  id("org.springframework.boot") version "3.4.0"
-  id("io.spring.dependency-management") version "1.1.6"
-  id("com.google.cloud.tools.jib") version "3.4.1"
+  kotlin("jvm")
+  kotlin("plugin.spring")
+  id("org.springframework.boot") version "4.0.6"
+  id("io.spring.dependency-management") version "1.1.7"
+  id("com.google.cloud.tools.jib") version "3.4.4"
   id("com.github.node-gradle.node") version "3.2.1"
 }
 
@@ -31,10 +31,11 @@ dependencies {
   implementation("org.springframework.boot:spring-boot-starter-validation")
 
   // Swagger-UI Dependencies
-  implementation("org.springdoc:springdoc-openapi-starter-webmvc-ui:2.8.4")
+  implementation("org.springdoc:springdoc-openapi-starter-webmvc-ui:2.8.6")
 
   // JSON
-  implementation("com.fasterxml.jackson.module:jackson-module-kotlin")
+  implementation("org.springframework.boot:spring-boot-starter-json")
+  implementation("tools.jackson.module:jackson-module-kotlin")
 
   // JSON Schema validation
   implementation("com.networknt:json-schema-validator:1.5.6")
@@ -45,6 +46,7 @@ dependencies {
 
   // Test dependencies
   testImplementation("org.springframework.boot:spring-boot-starter-test")
+  testImplementation("org.springframework.boot:spring-boot-starter-webmvc-test")
   testImplementation("org.jetbrains.kotlin:kotlin-test-junit5")
   testImplementation("org.mockito.kotlin:mockito-kotlin:5.3.1")
   testImplementation("com.h2database:h2")

@@ -24,10 +24,10 @@ repositories {
 
 dependencies {
     // Plugin APIs — these are the plugins our convention plugins apply programmatically
-    implementation("org.jetbrains.kotlin:kotlin-gradle-plugin:2.1.0")
-    implementation("org.jetbrains.kotlin:kotlin-allopen:1.9.25")
-    implementation("io.spring.gradle:dependency-management-plugin:1.1.6")
-    implementation("org.springframework.boot:spring-boot-gradle-plugin:3.4.1")
+    implementation("org.jetbrains.kotlin:kotlin-gradle-plugin:2.2.0")
+    implementation("org.jetbrains.kotlin:kotlin-allopen:2.2.0")
+    implementation("io.spring.gradle:dependency-management-plugin:1.1.7")
+    implementation("org.springframework.boot:spring-boot-gradle-plugin:4.0.6")
     implementation("com.google.cloud.tools:jib-gradle-plugin:3.4.1")
     implementation("org.jreleaser:jreleaser-gradle-plugin:1.23.0")
 
@@ -125,7 +125,9 @@ publishing {
 jreleaser {
     signing {
         active.set(org.jreleaser.model.Active.ALWAYS)
-        armored.set(true)
+        pgp {
+            armored.set(true)
+        }
     }
     deploy {
         maven {

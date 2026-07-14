@@ -35,7 +35,7 @@ class BuiltInCredentialTypeInitializer(
     )
   }
 
-  override fun run(args: ApplicationArguments?) {
+  override fun run(args: ApplicationArguments) {
     for (request in BUILT_IN_TYPES) {
       try {
         credentialTypeService.createType(request)
