@@ -1,7 +1,8 @@
 package org.projectcontinuum.core.bridge.handler
 
 import tools.jackson.databind.ObjectMapper
-import org.projectcontinuum.core.bridge.repository.RegisteredNodeRepository
+import org.projectcontinuum.core.bridge.service.NodeTreeSyncService
+import org.projectcontinuum.core.commons.model.ContinuumWorkflowModel
 import org.projectcontinuum.core.protocol.event.FeatureRegistrationRequest
 import org.slf4j.LoggerFactory
 import org.springframework.context.annotation.Bean
@@ -12,7 +13,7 @@ import java.util.function.Consumer
 
 @Component
 class FeatureRegistrationHandler(
-  private val registeredNodeRepository: RegisteredNodeRepository,
+  private val nodeTreeSyncService: NodeTreeSyncService,
   private val objectMapper: ObjectMapper
 ) {
 
@@ -32,25 +33,25 @@ class FeatureRegistrationHandler(
   private fun handle(message: Message<FeatureRegistrationRequest>) {
     val request = message.payload
     val now = Instant.now()
-    val categoriesJson = objectMapper.writeValueAsString(
-      request.getCategories().map { it.toString() }
-    )
+    val nodeManifest = request.nodeManifest.toString()
+    val nodeData = objectMapper.readValue(nodeManifest, ContinuumWorkflowModel.NodeData::class.java)
 
     LOGGER.info("Received feature registration: node='${request.getNodeId()}', taskQueue='${request.getTaskQueue()}', worker='${request.getWorkerId()}'")
 
-    registeredNodeRepository.upsert(
-      nodeId = request.getNodeId(),
-      taskQueue = request.getTaskQueue(),
-      workerId = request.getWorkerId(),
-      featureId = request.getFeatureId(),
-      nodeManifest = request.getNodeManifest().toString(),
-      documentationMarkdown = request.getDocumentationMarkdown().toString(),
-      categories = categoriesJson,
-      extensions = request.getExtensions().toString(),
-      registeredAt = request.getRegisteredAtTimestampUtc(),
+    nodeTreeSyncService.sync(
+      nodeId = request.nodeId,
+      name = nodeData.title,
+      taskQueue = request.taskQueue,
+      workerId = request.workerId,
+      featureId = request.featureId,
+      nodeManifest = nodeManifest,
+      documentationMarkdown = request.documentationMarkdown.toString(),
+      categories = request.categories.map { it.toString() },
+      extensions = request.extensions.toString(),
+      registeredAt = request.registeredAtTimestampUtc,
       lastSeenAt = now
     )
 
-    LOGGER.info("Upserted registered node: ${request.getNodeId()} on taskQueue '${request.getTaskQueue()}'")
+    LOGGER.info("Synced node tree entries for node: ${request.getNodeId()} on taskQueue '${request.getTaskQueue()}'")
   }
 }
