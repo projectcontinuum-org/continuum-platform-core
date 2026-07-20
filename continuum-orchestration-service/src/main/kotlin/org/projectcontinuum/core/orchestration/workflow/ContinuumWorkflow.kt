@@ -219,39 +219,64 @@ class ContinuumWorkflow : IContinuumWorkflow {
   /**
    * Initializes activity stubs for each node by fetching task queue assignments from the API server.
    *
-   * Queries the [IInitializeActivity] to resolve each node's task queue, then creates
-   * a dedicated [IContinuumNodeActivity] stub per node routed to the correct task queue.
+   * Queries the [IInitializeActivity] to resolve each node type's task queue, then creates a
+   * dedicated [IContinuumNodeActivity] stub per DAG node instance (keyed by [ContinuumWorkflowModel.Node.id],
+   * not the node type) routed to the correct task queue, with per-node retry overrides applied.
    *
    * @param continuumWorkflow The workflow model containing the nodes to initialize
-   * @return Map of node IDs to their configured activity stubs
+   * @return Map of node instance IDs to their configured activity stubs
    * @throws ApplicationFailure if not all nodes could be resolved to a task queue
    */
   private fun initializeNodeActivityStubs(
     continuumWorkflow: ContinuumWorkflowModel
   ): Map<String, IContinuumNodeActivity> {
     val uniqueNodeIds = continuumWorkflow.nodes.map { it.data.id!! }.toSet()
-    val nodeIdToTaskQueueMap = initializeActivity.getNodeTaskQueue(uniqueNodeIds)
+    val nodeTypeToTaskQueueMap = initializeActivity.getNodeTaskQueue(uniqueNodeIds)
 
-    val activityMap = nodeIdToTaskQueueMap.map { (nodeId, taskQueue) ->
+    val activityMap = continuumWorkflow.nodes.mapNotNull { node ->
+      val taskQueue = nodeTypeToTaskQueueMap[node.data.id!!] ?: return@mapNotNull null
+      val nodeRetryOptions = buildNodeRetryOptions(node.data.retryOptions)
       val activityStub = Workflow.newActivityStub(
         IContinuumNodeActivity::class.java,
         ActivityOptions {
           mergeActivityOptions(baseActivityOptions)
           setTaskQueue(taskQueue)
           setHeartbeatTimeout(Duration.ofMinutes(5))
+          setRetryOptions(nodeRetryOptions)
         }
       )
-      nodeId to activityStub
+      node.id to activityStub
     }.toMap()
 
-    if (activityMap.size != uniqueNodeIds.size) {
+    if (activityMap.size != continuumWorkflow.nodes.size) {
       throw ApplicationFailure.newNonRetryableFailure(
-        "Failed to initialize activities for all nodes. Expected ${uniqueNodeIds.size} but got ${activityMap.size}",
+        "Failed to initialize activities for all nodes. Expected ${continuumWorkflow.nodes.size} but got ${activityMap.size}",
         "InitializationFailed"
       )
     }
 
     return activityMap
+  }
+
+  /**
+   * Builds the effective [RetryOptions] for a single node, applying any node-level override
+   * on top of the workflow-wide default [retryOptions]. Fields left null on the override are
+   * inherited from the default; fields explicitly set (including maximumAttempts = 0, which
+   * Temporal treats as "unlimited") take precedence. Built field-by-field via explicit null
+   * checks rather than RetryOptions.merge(), which cannot distinguish "not set" from an
+   * intentionally-set Java-default value (e.g. maximumAttempts = 0).
+   */
+  private fun buildNodeRetryOptions(
+    override: ContinuumWorkflowModel.RetryOptionsConfig?
+  ): RetryOptions {
+    if (override == null) return retryOptions
+    val builder = RetryOptions.newBuilder(retryOptions)
+    override.initialIntervalSeconds?.let { builder.setInitialInterval(Duration.ofSeconds(it)) }
+    override.backoffCoefficient?.let { builder.setBackoffCoefficient(it) }
+    override.maximumIntervalSeconds?.let { builder.setMaximumInterval(Duration.ofSeconds(it)) }
+    override.maximumAttempts?.let { builder.setMaximumAttempts(it) }
+    override.doNotRetry?.let { builder.setDoNotRetry(*it.toTypedArray()) }
+    return builder.build()
   }
 
   /**
@@ -293,7 +318,7 @@ class ContinuumWorkflow : IContinuumWorkflow {
         // Start the activity asynchronously, catching ActivityFailure to treat it as a node error
         Pair(node, Async.function {
           try {
-            nodeIdToActivityMap[node.data.id!!]!!.run(node, nodeInputs)
+            nodeIdToActivityMap[node.id]!!.run(node, nodeInputs)
           } catch (e: ActivityFailure) {
             // Convert activity-level failure (e.g., retries exhausted, timeout) to node error
             // This allows the workflow to continue executing other independent nodes

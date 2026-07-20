@@ -392,6 +392,71 @@ class ContinuumWorkflowTest {
   }
 
   @Test
+  fun `node with maximumAttempts override fails faster than the workflow default`() {
+    newEnv().use { env ->
+      env.fakeNodeActivity.alwaysThrow["1"] = RuntimeException("Persistent error")
+
+      val baseModel = WorkflowFixtures.loadWorkflow("/test-workflows/single-node.cwf.json")
+      val overriddenNode = baseModel.nodes[0].copy(
+        data = baseModel.nodes[0].data.copy(
+          retryOptions = ContinuumWorkflowModel.RetryOptionsConfig(maximumAttempts = 2)
+        )
+      )
+      val model = baseModel.copy(nodes = listOf(overriddenNode))
+
+      val (_, future) = startWorkflow(env, model)
+
+      val executionException = assertFailsWith<ExecutionException> {
+        future.get(30, TimeUnit.SECONDS)
+      }
+      val workflowFailed = executionException.cause as WorkflowFailedException
+      assertTrue(workflowFailed.cause is ApplicationFailure)
+      assertEquals(
+        2, env.fakeNodeActivity.attemptCount["1"]!!.get(),
+        "Override should cap attempts at 2, got ${env.fakeNodeActivity.attemptCount["1"]!!.get()}"
+      )
+    }
+  }
+
+  @Test
+  fun `nodes of the same type in one workflow retry independently of each other`() {
+    newEnv().use { env ->
+      env.fakeNodeActivity.alwaysThrow["1"] = RuntimeException("fail-1")
+      env.fakeNodeActivity.alwaysThrow["2"] = RuntimeException("fail-2")
+
+      val baseModel = WorkflowFixtures.loadWorkflow("/test-workflows/single-node.cwf.json")
+      val baseNode = baseModel.nodes[0]
+      val nodeOne = baseNode.copy(
+        id = "1",
+        data = baseNode.data.copy(
+          retryOptions = ContinuumWorkflowModel.RetryOptionsConfig(maximumAttempts = 2)
+        )
+      )
+      val nodeTwo = baseNode.copy(
+        id = "2",
+        data = baseNode.data.copy(
+          retryOptions = ContinuumWorkflowModel.RetryOptionsConfig(maximumAttempts = 3)
+        )
+      )
+      val model = baseModel.copy(nodes = listOf(nodeOne, nodeTwo), edges = emptyList())
+
+      val (_, future) = startWorkflow(env, model)
+
+      assertFailsWith<ExecutionException> {
+        future.get(30, TimeUnit.SECONDS)
+      }
+      assertEquals(
+        2, env.fakeNodeActivity.attemptCount["1"]!!.get(),
+        "Node 1's override should cap attempts at 2, got ${env.fakeNodeActivity.attemptCount["1"]!!.get()}"
+      )
+      assertEquals(
+        3, env.fakeNodeActivity.attemptCount["2"]!!.get(),
+        "Node 2's override should cap attempts at 3, got ${env.fakeNodeActivity.attemptCount["2"]!!.get()}"
+      )
+    }
+  }
+
+  @Test
   fun `node throwing non-retryable exception immediately fails without retry`() {
     newEnv().use { env ->
       env.fakeNodeActivity.throwOnInvoke["1"] = {

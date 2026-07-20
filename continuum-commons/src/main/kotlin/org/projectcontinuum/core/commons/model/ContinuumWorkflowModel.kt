@@ -78,7 +78,22 @@ data class ContinuumWorkflowModel @JsonCreator constructor(
     @param:JsonProperty("propertiesSchema") val propertiesSchema: Map<String, Any> = mapOf(),
     @param:JsonProperty("propertiesUISchema") val propertiesUISchema: Map<String, Any> = mapOf(),
     @param:JsonProperty("status") var status: NodeStatus? = null,
-    @param:JsonProperty("nodeProgress") var nodeProgress: NodeProgress? = null
+    @param:JsonProperty("nodeProgress") var nodeProgress: NodeProgress? = null,
+    @param:JsonProperty("retryOptions") val retryOptions: RetryOptionsConfig? = null
+  )
+
+  /**
+   * Optional per-node override for Temporal activity retry behavior. Any field left null
+   * falls back to the workflow-wide default. Field names/units mirror io.temporal.common.RetryOptions
+   * to keep the mapping in the orchestration service trivial, without this model depending on the
+   * Temporal SDK.
+   */
+  data class RetryOptionsConfig(
+    @param:JsonProperty("initialIntervalSeconds") val initialIntervalSeconds: Long? = null,
+    @param:JsonProperty("backoffCoefficient") val backoffCoefficient: Double? = null,
+    @param:JsonProperty("maximumIntervalSeconds") val maximumIntervalSeconds: Long? = null,
+    @param:JsonProperty("maximumAttempts") val maximumAttempts: Int? = null,
+    @param:JsonProperty("doNotRetry") val doNotRetry: List<String>? = null
   )
 
   data class NodePort @JsonCreator constructor(
