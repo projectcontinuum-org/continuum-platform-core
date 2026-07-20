@@ -1,0 +1,30 @@
+{
+    "id": "single-node-test-workflow",
+    "name": "/test-workflows/single-node.cwf",
+    "active": false,
+    "nodes": [
+        {
+            "id": "1",
+            "type": "BaseNode",
+            "position": { "x": 100, "y": 100 },
+            "data": {
+                "id": "test.node.SingleNode",
+                "description": "Single standalone node for testing",
+                "title": "Single Node",
+                "nodeModel": "test.node.SingleNode",
+                "inputs": null,
+                "outputs": {
+                    "output-1": { "name": "output-1", "contentType": "text/plain" }
+                },
+                "properties": {},
+                "propertiesSchema": {},
+                "propertiesUISchema": {},
+                "status": null
+            },
+            "width": 224,
+            "height": 100,
+            "selected": false
+        }
+    ],
+    "edges": []
+}

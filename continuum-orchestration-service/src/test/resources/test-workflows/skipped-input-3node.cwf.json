@@ -1,0 +1,68 @@
+{
+    "id": "skipped-input-3node-test-workflow",
+    "name": "/test-workflows/skipped-input-3node.cwf",
+    "active": false,
+    "nodes": [
+        {
+            "id": "root",
+            "type": "BaseNode",
+            "position": { "x": 0, "y": 0 },
+            "data": {
+                "id": "test.node.RootNode",
+                "description": "Root node with no inputs",
+                "title": "Root",
+                "nodeModel": "test.node.RootNode",
+                "inputs": null,
+                "outputs": { "out-1": { "name": "out-1", "contentType": "text/plain" } },
+                "properties": {},
+                "propertiesSchema": {},
+                "propertiesUISchema": {},
+                "status": null
+            },
+            "width": 224,
+            "height": 100,
+            "selected": false
+        },
+        {
+            "id": "independent",
+            "type": "BaseNode",
+            "position": { "x": 0, "y": 200 },
+            "data": {
+                "id": "test.node.IndependentNode",
+                "description": "Independent node with no inputs, connected to nothing",
+                "title": "Independent",
+                "nodeModel": "test.node.IndependentNode",
+                "inputs": null,
+                "outputs": { "out-1": { "name": "out-1", "contentType": "text/plain" } },
+                "properties": {},
+                "propertiesSchema": {},
+                "propertiesUISchema": {},
+                "status": null
+            },
+            "width": 224,
+            "height": 100,
+            "selected": false
+        },
+        {
+            "id": "skip-me",
+            "type": "BaseNode",
+            "position": { "x": 0, "y": 400 },
+            "data": {
+                "id": "test.node.SkippedCandidateNode",
+                "description": "Declares an input port with no connecting edge",
+                "title": "SkippedCandidate",
+                "nodeModel": "test.node.SkippedCandidateNode",
+                "inputs": { "in-1": { "name": "in-1", "contentType": "text/plain" } },
+                "outputs": { "out-1": { "name": "out-1", "contentType": "text/plain" } },
+                "properties": {},
+                "propertiesSchema": {},
+                "propertiesUISchema": {},
+                "status": null
+            },
+            "width": 224,
+            "height": 100,
+            "selected": false
+        }
+    ],
+    "edges": []
+}

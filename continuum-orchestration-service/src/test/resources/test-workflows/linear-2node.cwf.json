@@ -1,0 +1,73 @@
+{
+    "id": "linear-2node-test-workflow",
+    "name": "/test-workflows/linear-2node.cwf",
+    "active": false,
+    "nodes": [
+        {
+            "id": "2",
+            "type": "BaseNode",
+            "position": { "x": 183, "y": 394 },
+            "data": {
+                "id": "org.projectcontinuum.core.worker.node.TimeTriggerNodeModel",
+                "description": "Starts the workflow execution with the current time as the output",
+                "title": "Start Node",
+                "subTitle": "Starts the workflow execution",
+                "icon": "mui/Bolt",
+                "nodeModel": "org.projectcontinuum.core.worker.node.TimeTriggerNodeModel",
+                "busy": null,
+                "inputs": null,
+                "outputs": {
+                    "output-1": { "name": "output-1", "contentType": "text/plain" }
+                },
+                "properties": {
+                    "message": "Logging at",
+                    "rowCount": 10
+                },
+                "propertiesSchema": {},
+                "propertiesUISchema": {},
+                "status": null
+            },
+            "width": 224,
+            "height": 100,
+            "selected": false
+        },
+        {
+            "id": "3",
+            "type": "BaseNode",
+            "position": { "x": 491, "y": 394 },
+            "data": {
+                "id": "org.projectcontinuum.core.worker.node.SplitNodeModel",
+                "description": "Split the input string into two parts",
+                "title": "Split Node",
+                "subTitle": "Split the input string into two parts",
+                "icon": "mui/CallSplit",
+                "nodeModel": "org.projectcontinuum.core.worker.node.SplitNodeModel",
+                "busy": null,
+                "inputs": {
+                    "input-1": { "name": "input string", "contentType": "string" }
+                },
+                "outputs": {
+                    "output-1": { "name": "part 1", "contentType": "string" },
+                    "output-2": { "name": "part 2", "contentType": "string" }
+                },
+                "properties": {},
+                "propertiesSchema": {},
+                "propertiesUISchema": {},
+                "status": null
+            },
+            "width": 224,
+            "height": 100,
+            "selected": false
+        }
+    ],
+    "edges": [
+        {
+            "type": "BaseEdge",
+            "source": "2",
+            "sourceHandle": "output-1",
+            "target": "3",
+            "targetHandle": "input-1",
+            "id": "reactflow__edge-2output-1-3input-1"
+        }
+    ]
+}

@@ -18,9 +18,9 @@ import io.temporal.workflow.Workflow
 import io.temporal.workflow.unsafe.WorkflowUnsafe
 import org.projectcontinuum.core.commons.activity.IInitializeActivity
 import org.projectcontinuum.core.commons.model.ContinuumWorkflowModel
-import org.projectcontinuum.core.commons.model.ContinuumWorkflowModel.NodeStatus
 import org.projectcontinuum.core.commons.model.ExecutionStatus
 import org.projectcontinuum.core.commons.model.PortData
+import org.projectcontinuum.core.commons.model.PortDataStatus
 import org.projectcontinuum.core.commons.model.WorkflowSnapshot
 import org.projectcontinuum.core.commons.model.WorkflowUpdate
 import org.projectcontinuum.core.commons.model.WorkflowUpdateEvent
@@ -165,14 +165,17 @@ class ContinuumWorkflow : IContinuumWorkflow {
       sendUpdateEvent("CANCELLED")
       throw e
     } catch (e: ActivityFailure) {
-      // Handle activity-level failures (e.g., activity timeout, retries exhausted)
-      LOGGER.error("Activity failure in workflow execution", e)
+      // Handle activity-level failures at the workflow level (e.g., initialization failures)
+      // Note: Node-level activity failures are now caught and converted to node errors,
+      // so this catch block should rarely be reached except for workflow-level activities
+      LOGGER.error("Unexpected activity failure in workflow execution", e)
       markBusyNodesAs(ContinuumWorkflowModel.NodeStatus.FAILED)
       Workflow.upsertTypedSearchAttributes(
         IContinuumWorkflow.WORKFLOW_STATUS
           .valueSet(ExecutionStatus.WORKFLOW_EXECUTION_FAILED.value)
       )
       sendUpdateEvent("FAILED")
+      throw e
     } catch (e: Exception) {
       // Handle unexpected workflow-level errors
       LOGGER.error("Error in executing workflow", e)
@@ -287,9 +290,26 @@ class ContinuumWorkflow : IContinuumWorkflow {
         val nodeInputs = getNodeInputs(continuumWorkflow, node)
         // Mark node as running and animate incoming edges
         setNodeAnimationAndStatus(node, ContinuumWorkflowModel.NodeStatus.BUSY)
-        // Start the activity asynchronously
+        // Start the activity asynchronously, catching ActivityFailure to treat it as a node error
         Pair(node, Async.function {
-          nodeIdToActivityMap[node.data.id!!]!!.run(node, nodeInputs)
+          try {
+            nodeIdToActivityMap[node.data.id!!]!!.run(node, nodeInputs)
+          } catch (e: ActivityFailure) {
+            // Convert activity-level failure (e.g., retries exhausted, timeout) to node error
+            // This allows the workflow to continue executing other independent nodes
+            LOGGER.error("Activity failure for node ${node.id}: ${e.message}", e)
+            IContinuumNodeActivity.NodeActivityOutput(
+              nodeId = node.id,
+              outputs = mapOf(
+                IContinuumNodeActivity.NodeOutputSystemPort.ERROR.key to PortData(
+                  tableSpec = emptyList(),
+                  data = "Activity failure: ${e.cause?.message ?: e.message}",
+                  contentType = "text/plain",
+                  status = PortDataStatus.FAILED
+                )
+              )
+            )
+          }
         })
       }
       nodeExecutionPromises.addAll(morePromises)
@@ -388,7 +408,7 @@ class ContinuumWorkflow : IContinuumWorkflow {
       } ?: true
 
       if(!allInputPortsConnected) {
-        node.data.status = NodeStatus.SKIPPED
+        node.data.status = ContinuumWorkflowModel.NodeStatus.SKIPPED
       }
 
       LOGGER.debug(
