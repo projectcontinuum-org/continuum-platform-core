@@ -457,6 +457,125 @@ class ContinuumWorkflowTest {
   }
 
   @Test
+  fun `node without a retryOptions override falls back to the workflow default even when a sibling node has a low override`() {
+    newEnv().use { env ->
+      env.fakeNodeActivity.alwaysThrow["1"] = RuntimeException("fail-1")
+      val attemptCount = AtomicInteger(0)
+      env.fakeNodeActivity.throwOnAttempt["2"] = {
+        if (attemptCount.incrementAndGet() < 4) {
+          throw ApplicationFailure.newFailure("Transient error", "NetworkError")
+        }
+      }
+      env.fakeNodeActivity.successOutputs["2"] = mapOf("output-1" to samplePortData("success"))
+
+      val baseModel = WorkflowFixtures.loadWorkflow("/test-workflows/single-node.cwf.json")
+      val baseNode = baseModel.nodes[0]
+      val overriddenNode = baseNode.copy(
+        id = "1",
+        data = baseNode.data.copy(
+          retryOptions = ContinuumWorkflowModel.RetryOptionsConfig(maximumAttempts = 2)
+        )
+      )
+      val defaultNode = baseNode.copy(id = "2")
+      val model = baseModel.copy(nodes = listOf(overriddenNode, defaultNode), edges = emptyList())
+
+      val (_, future) = startWorkflow(env, model)
+
+      val executionException = assertFailsWith<ExecutionException> {
+        future.get(30, TimeUnit.SECONDS)
+      }
+      val workflowFailed = executionException.cause as WorkflowFailedException
+      val appFailure = workflowFailed.cause as ApplicationFailure
+
+      @Suppress("UNCHECKED_CAST")
+      val details = appFailure.details.get(0, Map::class.java) as Map<String, Map<*, *>>
+      assertTrue(details.getValue("nodeErrors").containsKey("1"))
+      assertTrue(details.getValue("nodeToOutputsMap").containsKey("2"))
+
+      assertEquals(
+        2, env.fakeNodeActivity.attemptCount["1"]!!.get(),
+        "Overridden node should stop retrying at 2 attempts"
+      )
+      assertTrue(
+        env.fakeNodeActivity.attemptCount["2"]!!.get() >= 4,
+        "Default node should retry past the sibling's low cap, got ${env.fakeNodeActivity.attemptCount["2"]!!.get()}"
+      )
+    }
+  }
+
+  @Test
+  fun `doNotRetry override fails immediately for a normally-retryable error type`() {
+    newEnv().use { env ->
+      env.fakeNodeActivity.alwaysThrow["1"] =
+        ApplicationFailure.newFailure("Fatal but usually retryable", "SpecialErrorType")
+
+      val baseModel = WorkflowFixtures.loadWorkflow("/test-workflows/single-node.cwf.json")
+      val overriddenNode = baseModel.nodes[0].copy(
+        data = baseModel.nodes[0].data.copy(
+          retryOptions = ContinuumWorkflowModel.RetryOptionsConfig(doNotRetry = listOf("SpecialErrorType"))
+        )
+      )
+      val model = baseModel.copy(nodes = listOf(overriddenNode))
+
+      val (_, future) = startWorkflow(env, model)
+
+      val executionException = assertFailsWith<ExecutionException> {
+        future.get(10, TimeUnit.SECONDS)
+      }
+      val workflowFailed = executionException.cause as WorkflowFailedException
+      assertTrue(workflowFailed.cause is ApplicationFailure)
+      assertEquals(
+        1, env.fakeNodeActivity.attemptCount["1"]!!.get(),
+        "doNotRetry override should stop retries after the first attempt, got ${env.fakeNodeActivity.attemptCount["1"]!!.get()}"
+      )
+    }
+  }
+
+  @Test
+  fun `initialIntervalSeconds, backoffCoefficient, and maximumIntervalSeconds overrides shape the simulated backoff delay between attempts`() {
+    newEnv().use { env ->
+      val attemptCount = AtomicInteger(0)
+      env.fakeNodeActivity.throwOnAttempt["1"] = {
+        if (attemptCount.incrementAndGet() < 3) {
+          throw ApplicationFailure.newFailure("Transient error", "NetworkError")
+        }
+      }
+      env.fakeNodeActivity.successOutputs["1"] = mapOf("output-1" to samplePortData("success"))
+
+      val baseModel = WorkflowFixtures.loadWorkflow("/test-workflows/single-node.cwf.json")
+      val overriddenNode = baseModel.nodes[0].copy(
+        data = baseModel.nodes[0].data.copy(
+          retryOptions = ContinuumWorkflowModel.RetryOptionsConfig(
+            initialIntervalSeconds = 10,
+            backoffCoefficient = 2.0,
+            maximumIntervalSeconds = 100,
+            maximumAttempts = 5
+          )
+        )
+      )
+      val model = baseModel.copy(nodes = listOf(overriddenNode))
+
+      val startTimeMillis = env.testEnv.currentTimeMillis()
+      val (_, future) = startWorkflow(env, model)
+      val result = future.get(30, TimeUnit.SECONDS)
+      val elapsedSimulatedMillis = env.testEnv.currentTimeMillis() - startTimeMillis
+
+      assertTrue(result.containsKey("1"))
+      assertEquals(3, attemptCount.get())
+      // Expected backoff before the 3rd (successful) attempt: 10s (attempt 1->2) + 20s (attempt 2->3) = 30s.
+      // If the override weren't applied, the workflow default (initialInterval 1s, coefficient 2.0) would
+      // only need ~3s, so this lower bound also proves the override actually took effect. We only assert
+      // a lower bound (not an upper bound) since TestWorkflowEnvironment's auto-time-skipping clock can
+      // jump forward by unrelated amounts once the workflow completes (e.g. past other ActivityOptions'
+      // StartToCloseTimeout), which would make an upper-bound assertion flaky.
+      assertTrue(
+        elapsedSimulatedMillis >= 30_000,
+        "Expected at least 30s of simulated backoff delay from the override, got ${elapsedSimulatedMillis}ms"
+      )
+    }
+  }
+
+  @Test
   fun `node throwing non-retryable exception immediately fails without retry`() {
     newEnv().use { env ->
       env.fakeNodeActivity.throwOnInvoke["1"] = {
