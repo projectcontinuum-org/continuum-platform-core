@@ -1,31 +1,18 @@
 package org.projectcontinuum.core.orchestration.workflow
 
 import org.projectcontinuum.core.commons.activity.IContinuumNodeActivity
-import org.projectcontinuum.core.commons.constant.TaskQueues
 import org.projectcontinuum.core.commons.constant.TaskQueues.WORKFLOW_TASK_QUEUE
 import org.projectcontinuum.core.commons.protocol.progress.ContinuumNodeActivitySignal
 import org.projectcontinuum.core.commons.workflow.IContinuumWorkflow
-import org.projectcontinuum.core.orchestration.utils.StatusHelper
-import io.temporal.activity.ActivityOptions
-import io.temporal.common.RetryOptions
 import io.temporal.failure.ActivityFailure
 import io.temporal.failure.ApplicationFailure
 import io.temporal.failure.CanceledFailure
 import io.temporal.spring.boot.WorkflowImpl
-import io.temporal.workflow.Async
-import io.temporal.workflow.Promise
 import io.temporal.workflow.Workflow
-import io.temporal.workflow.unsafe.WorkflowUnsafe
-import org.projectcontinuum.core.commons.activity.IInitializeActivity
 import org.projectcontinuum.core.commons.model.ContinuumWorkflowModel
 import org.projectcontinuum.core.commons.model.ExecutionStatus
 import org.projectcontinuum.core.commons.model.PortData
-import org.projectcontinuum.core.commons.model.PortDataStatus
 import org.projectcontinuum.core.commons.model.WorkflowSnapshot
-import org.projectcontinuum.core.commons.model.WorkflowUpdate
-import org.projectcontinuum.core.commons.model.WorkflowUpdateEvent
-import java.time.Duration
-import java.time.Instant
 
 /**
  * Temporal workflow implementation for executing Continuum workflows.
@@ -34,6 +21,12 @@ import java.time.Instant
  * parallel execution of nodes, data flow between nodes, and status reporting.
  * It implements the [IContinuumWorkflow] interface and is registered as a Temporal
  * workflow on the configured task queue.
+ *
+ * Responsibilities are split across three collaborators so this class stays a thin
+ * orchestrator:
+ * - [WorkflowActivityInitializer] resolves task queues and builds per-node activity stubs
+ * - [WorkflowDagExecutor] runs the DAG scheduling loop
+ * - [WorkflowStatusReporter] publishes Kafka status updates and tracks node/edge animation
  *
  * ## Workflow Execution Model
  * The workflow uses a directed acyclic graph (DAG) execution model where:
@@ -75,43 +68,15 @@ class ContinuumWorkflow : IContinuumWorkflow {
 
   private var nodeIdToActivityMap: Map<String, IContinuumNodeActivity> = emptyMap()
 
-  /**
-   * Retry options for activity execution.
-   * Configures exponential backoff with a maximum of 500 attempts.
-   */
-  private val retryOptions: RetryOptions = RetryOptions {
-    setMaximumInterval(Duration.ofSeconds(100))
-    setBackoffCoefficient(2.0)
-    setMaximumAttempts(500)
-  }
+  private val activityInitializer = WorkflowActivityInitializer()
 
-  /**
-   * Base activity options for node execution.
-   * Activities can run for up to 60 days with the configured retry policy.
-   */
-  private val baseActivityOptions: ActivityOptions = ActivityOptions {
-    setStartToCloseTimeout(Duration.ofDays(60))
-    setRetryOptions(retryOptions)
-    setTaskQueue(TaskQueues.ACTIVITY_TASK_QUEUE)
-  }
-
-  /**
-   * Base activity options for node execution.
-   * Activities can run for up to 60 days with the configured retry policy.
-   */
-  private val initializeActivityOptions: ActivityOptions = ActivityOptions {
-    setStartToCloseTimeout(Duration.ofDays(60))
-    setRetryOptions(retryOptions)
-    setTaskQueue(TaskQueues.ACTIVITY_TASK_QUEUE_INITIALIZE)
-  }
-
-  /** Activity stub for executing initialization activities (e.g., fetching task queues) */
-  private val initializeActivity = Workflow.newActivityStub(
-    IInitializeActivity::class.java,
-    ActivityOptions {
-      mergeActivityOptions(initializeActivityOptions)
-    }
+  private val statusReporter = WorkflowStatusReporter(
+    currentRunningWorkflow = { currentRunningWorkflow },
+    nodeToOutputsMap = nodeToOutputsMap,
+    nodeErrorsMap = nodeErrorsMap
   )
+
+  private val dagExecutor = WorkflowDagExecutor(statusReporter)
 
   /**
    * Starts the workflow execution.
@@ -119,7 +84,7 @@ class ContinuumWorkflow : IContinuumWorkflow {
    * This is the main entry point for workflow execution. It performs the following:
    * 1. Initializes the workflow state and publishes "STARTED" event
    * 2. Updates Temporal search attributes to track execution status
-   * 3. Executes the workflow DAG via the [run] method
+   * 3. Executes the workflow DAG via [WorkflowDagExecutor.run]
    * 4. Publishes completion/failure events
    * 5. Returns all node outputs or throws an exception if any node failed
    *
@@ -132,12 +97,12 @@ class ContinuumWorkflow : IContinuumWorkflow {
   ): Map<String, Map<String, PortData>> {
     LOGGER.info("Starting ContinuumWorkflowImpl")
 
-    nodeIdToActivityMap = initializeNodeActivityStubs(continuumWorkflow)
+    nodeIdToActivityMap = activityInitializer.initializeNodeActivityStubs(continuumWorkflow)
 
     try {
       // Initialize workflow state
       currentRunningWorkflow = continuumWorkflow
-      sendUpdateEvent("STARTED")
+      statusReporter.publishUpdate("STARTED")
 
       // Update Temporal search attribute to indicate workflow has started
       Workflow.upsertTypedSearchAttributes(
@@ -146,45 +111,32 @@ class ContinuumWorkflow : IContinuumWorkflow {
       )
 
       // Execute the workflow DAG
-      run(continuumWorkflow)
+      dagExecutor.run(continuumWorkflow, nodeIdToActivityMap, nodeToOutputsMap, nodeErrorsMap)
 
       // Update search attribute to indicate successful completion
       Workflow.upsertTypedSearchAttributes(
         IContinuumWorkflow.WORKFLOW_STATUS
           .valueSet(ExecutionStatus.WORKFLOW_EXECUTION_COMPLETED.value)
       )
-      sendUpdateEvent("FINISHED")
+      statusReporter.publishUpdate("FINISHED")
     } catch (e: CanceledFailure) {
-      // Handle workflow cancellation or termination
-      LOGGER.warn("Workflow was cancelled or terminated", e)
-      markBusyNodesAs(ContinuumWorkflowModel.NodeStatus.CANCELLED)
-      Workflow.upsertTypedSearchAttributes(
-        IContinuumWorkflow.WORKFLOW_STATUS
-          .valueSet(ExecutionStatus.WORKFLOW_EXECUTION_CANCELED.value)
-      )
-      sendUpdateEvent("CANCELLED")
+      handleCancellation(e)
       throw e
     } catch (e: ActivityFailure) {
+      if (e.cause is CanceledFailure) {
+        // The activity was cancelled as part of workflow cancellation/termination
+        // propagating down to it, not an actual node failure.
+        handleCancellation(e)
+        throw e
+      }
       // Handle activity-level failures at the workflow level (e.g., initialization failures)
       // Note: Node-level activity failures are now caught and converted to node errors,
       // so this catch block should rarely be reached except for workflow-level activities
-      LOGGER.error("Unexpected activity failure in workflow execution", e)
-      markBusyNodesAs(ContinuumWorkflowModel.NodeStatus.FAILED)
-      Workflow.upsertTypedSearchAttributes(
-        IContinuumWorkflow.WORKFLOW_STATUS
-          .valueSet(ExecutionStatus.WORKFLOW_EXECUTION_FAILED.value)
-      )
-      sendUpdateEvent("FAILED")
+      handleUnexpectedFailure(e)
       throw e
     } catch (e: Exception) {
       // Handle unexpected workflow-level errors
-      LOGGER.error("Error in executing workflow", e)
-      markBusyNodesAs(ContinuumWorkflowModel.NodeStatus.FAILED)
-      Workflow.upsertTypedSearchAttributes(
-        IContinuumWorkflow.WORKFLOW_STATUS
-          .valueSet(ExecutionStatus.WORKFLOW_EXECUTION_FAILED.value)
-      )
-      sendUpdateEvent("FAILED")
+      handleUnexpectedFailure(e)
     }
 
     // If any nodes failed, throw an ApplicationFailure with details
@@ -203,339 +155,35 @@ class ContinuumWorkflow : IContinuumWorkflow {
   }
 
   /**
-   * Marks all nodes currently in BUSY status with the given status.
-   *
-   * This is used during workflow failure, cancellation, or termination to
-   * update any in-progress nodes so the UI reflects their final state.
-   *
-   * @param status The status to assign to busy nodes (e.g., FAILED, CANCELLED)
+   * Handles workflow cancellation or termination reaching [start] — either as a direct
+   * [CanceledFailure] or one wrapping an [ActivityFailure]. Marks in-progress nodes
+   * CANCELLED, pins the search attribute and all subsequent status updates to CANCELLED,
+   * and publishes the final event.
    */
-  private fun markBusyNodesAs(status: ContinuumWorkflowModel.NodeStatus) {
-    currentRunningWorkflow?.nodes
-      ?.filter { it.data.status == ContinuumWorkflowModel.NodeStatus.BUSY }
-      ?.forEach { setNodeAnimationAndStatus(it, status) }
-  }
-
-  /**
-   * Initializes activity stubs for each node by fetching task queue assignments from the API server.
-   *
-   * Queries the [IInitializeActivity] to resolve each node type's task queue, then creates a
-   * dedicated [IContinuumNodeActivity] stub per DAG node instance (keyed by [ContinuumWorkflowModel.Node.id],
-   * not the node type) routed to the correct task queue, with per-node retry overrides applied.
-   *
-   * @param continuumWorkflow The workflow model containing the nodes to initialize
-   * @return Map of node instance IDs to their configured activity stubs
-   * @throws ApplicationFailure if not all nodes could be resolved to a task queue
-   */
-  private fun initializeNodeActivityStubs(
-    continuumWorkflow: ContinuumWorkflowModel
-  ): Map<String, IContinuumNodeActivity> {
-    val uniqueNodeIds = continuumWorkflow.nodes.map { it.data.id!! }.toSet()
-    val nodeTypeToTaskQueueMap = initializeActivity.getNodeTaskQueue(uniqueNodeIds)
-
-    val activityMap = continuumWorkflow.nodes.mapNotNull { node ->
-      val taskQueue = nodeTypeToTaskQueueMap[node.data.id!!] ?: return@mapNotNull null
-      val nodeRetryOptions = buildNodeRetryOptions(node.data.retryOptions)
-      val activityStub = Workflow.newActivityStub(
-        IContinuumNodeActivity::class.java,
-        ActivityOptions {
-          mergeActivityOptions(baseActivityOptions)
-          setTaskQueue(taskQueue)
-          setHeartbeatTimeout(Duration.ofMinutes(5))
-          setRetryOptions(nodeRetryOptions)
-        }
-      )
-      node.id to activityStub
-    }.toMap()
-
-    if (activityMap.size != continuumWorkflow.nodes.size) {
-      throw ApplicationFailure.newNonRetryableFailure(
-        "Failed to initialize activities for all nodes. Expected ${continuumWorkflow.nodes.size} but got ${activityMap.size}",
-        "InitializationFailed"
-      )
-    }
-
-    return activityMap
-  }
-
-  /**
-   * Builds the effective [RetryOptions] for a single node, applying any node-level override
-   * on top of the workflow-wide default [retryOptions]. Fields left null on the override are
-   * inherited from the default; fields explicitly set (including maximumAttempts = 0, which
-   * Temporal treats as "unlimited") take precedence. Built field-by-field via explicit null
-   * checks rather than RetryOptions.merge(), which cannot distinguish "not set" from an
-   * intentionally-set Java-default value (e.g. maximumAttempts = 0).
-   */
-  private fun buildNodeRetryOptions(
-    override: ContinuumWorkflowModel.RetryOptionsConfig?
-  ): RetryOptions {
-    if (override == null) return retryOptions
-    val builder = RetryOptions.newBuilder(retryOptions)
-    override.initialIntervalSeconds?.let { builder.setInitialInterval(Duration.ofSeconds(it)) }
-    override.backoffCoefficient?.let { builder.setBackoffCoefficient(it) }
-    override.maximumIntervalSeconds?.let { builder.setMaximumInterval(Duration.ofSeconds(it)) }
-    override.maximumAttempts?.let { builder.setMaximumAttempts(it) }
-    override.doNotRetry?.let { builder.setDoNotRetry(*it.toTypedArray()) }
-    return builder.build()
-  }
-
-  /**
-   * Executes the workflow DAG by processing nodes in dependency order.
-   *
-   * This method implements the core workflow execution loop:
-   * 1. Find all nodes whose dependencies are satisfied (parents completed)
-   * 2. Start those nodes as async activities
-   * 3. Wait for any node to complete
-   * 4. Update status based on success/failure
-   * 5. Repeat until all nodes are processed
-   *
-   * Nodes are executed in parallel when possible - any nodes whose parent
-   * dependencies are satisfied will start concurrently.
-   *
-   * @param continuumWorkflow The workflow model to execute
-   */
-  private fun run(
-    continuumWorkflow: ContinuumWorkflowModel
-  ) {
-    // Track running node promises for parallel execution
-    val nodeExecutionPromises =
-      mutableListOf<Pair<ContinuumWorkflowModel.Node, Promise<IContinuumNodeActivity.NodeActivityOutput>>>()
-
-    do {
-      // Find nodes ready to execute (all parents have completed)
-      val nodesToExecute = getNextNodesToExecute(
-        continuumWorkflow,
-        nodeToOutputsMap
-      )
-      LOGGER.info("Nodes to execute: ${nodesToExecute.map { it.id }}")
-
-      // Start each ready node as an async activity
-      val morePromises = nodesToExecute.map { node ->
-        // Gather inputs from parent nodes' outputs
-        val nodeInputs = getNodeInputs(continuumWorkflow, node)
-        // Mark node as running and animate incoming edges
-        setNodeAnimationAndStatus(node, ContinuumWorkflowModel.NodeStatus.BUSY)
-        // Start the activity asynchronously, catching ActivityFailure to treat it as a node error
-        Pair(node, Async.function {
-          try {
-            nodeIdToActivityMap[node.id]!!.run(node, nodeInputs)
-          } catch (e: ActivityFailure) {
-            // Convert activity-level failure (e.g., retries exhausted, timeout) to node error
-            // This allows the workflow to continue executing other independent nodes
-            LOGGER.error("Activity failure for node ${node.id}: ${e.message}", e)
-            IContinuumNodeActivity.NodeActivityOutput(
-              nodeId = node.id,
-              outputs = mapOf(
-                IContinuumNodeActivity.NodeOutputSystemPort.ERROR.key to PortData(
-                  tableSpec = emptyList(),
-                  data = "Activity failure: ${e.cause?.message ?: e.message}",
-                  contentType = "text/plain",
-                  status = PortDataStatus.FAILED
-                )
-              )
-            )
-          }
-        })
-      }
-      nodeExecutionPromises.addAll(morePromises)
-
-      // Publish current state to Kafka
-      sendUpdateEvent()
-
-      if (nodeExecutionPromises.isNotEmpty()) {
-        // Wait for any node to complete (race condition)
-        val nodeOutput = Promise.anyOf(nodeExecutionPromises.map { it.second }).get()
-        val completedNode = continuumWorkflow.nodes.first { it.id == nodeOutput.nodeId }
-
-        // Check if node succeeded or failed based on error output port
-        if (!nodeOutput.outputs.containsKey(IContinuumNodeActivity.NodeOutputSystemPort.ERROR.key)) {
-          // Success: update status and store outputs
-          setNodeAnimationAndStatus(completedNode, ContinuumWorkflowModel.NodeStatus.SUCCESS)
-          nodeToOutputsMap[nodeOutput.nodeId] = nodeOutput.outputs
-        } else {
-          // Failure: update status and store error info
-          setNodeAnimationAndStatus(completedNode, ContinuumWorkflowModel.NodeStatus.FAILED)
-          nodeErrorsMap[nodeOutput.nodeId] = nodeOutput.outputs
-        }
-
-        // Remove completed node from pending promises
-        nodeExecutionPromises.removeAll { it.first.id == nodeOutput.nodeId }
-      }
-      LOGGER.info("NodeExecutionPromises size: ${nodeExecutionPromises.size}")
-    } while (getNextNodesToExecute(
-        continuumWorkflow,
-        nodeToOutputsMap
-      ).isNotEmpty() || nodeExecutionPromises.isNotEmpty()
+  private fun handleCancellation(e: Throwable) {
+    LOGGER.warn("Workflow was cancelled or terminated", e)
+    statusReporter.markBusyNodesAs(ContinuumWorkflowModel.NodeStatus.CANCELLED)
+    Workflow.upsertTypedSearchAttributes(
+      IContinuumWorkflow.WORKFLOW_STATUS
+        .valueSet(ExecutionStatus.WORKFLOW_EXECUTION_CANCELED.value)
     )
-    LOGGER.info("All nodes executed----------------------------------")
+    statusReporter.pinTerminalStatus("CANCELLED")
+    statusReporter.publishUpdate("CANCELLED")
   }
 
   /**
-   * Gathers input data for a node from its parent nodes' outputs.
-   *
-   * This method finds all edges connecting to the target node and maps
-   * the source node's output port data to the target node's input ports.
-   *
-   * @param continuumWorkflow The workflow model containing edge definitions
-   * @param node The node for which to gather inputs
-   * @return Map of input port IDs to their [PortData]
+   * Handles unexpected workflow-level failures reaching [start] (as opposed to node-level
+   * failures, which are already converted to node error outputs by [WorkflowDagExecutor]).
+   * Marks in-progress nodes FAILED and publishes the failure event.
    */
-  private fun getNodeInputs(
-    continuumWorkflow: ContinuumWorkflowModel,
-    node: ContinuumWorkflowModel.Node
-  ): Map<String, PortData> {
-    // Get all edges where this node is the target
-    val nodeParentEdges = continuumWorkflow.getParentEdges(node)
-    // Map each edge's source output to the target input port
-    val nodeInputs = nodeParentEdges.associate { edge ->
-      edge.targetHandle to nodeToOutputsMap[edge.source]!![edge.sourceHandle]!!
-    }
-    return nodeInputs
-  }
-
-  /**
-   * Determines which nodes are ready to execute.
-   *
-   * A node is ready to execute when:
-   * 1. All parent nodes have completed successfully
-   * 2. All required input ports have data available
-   * 3. The node hasn't been executed yet
-   * 4. The node doesn't have a status (not currently running)
-   *
-   * @param continuumWorkflow The workflow model containing node and edge definitions
-   * @param nodeOutputMap Map of completed node IDs to their outputs
-   * @return List of nodes ready for execution
-   */
-  private fun getNextNodesToExecute(
-    continuumWorkflow: ContinuumWorkflowModel,
-    nodeOutputMap: Map<String, Map<String, PortData>>
-  ): List<ContinuumWorkflowModel.Node> {
-    val nodesToExecute = mutableListOf<ContinuumWorkflowModel.Node>()
-
-    for (node in continuumWorkflow.nodes) {
-      // Get parent nodes and connecting edges
-      val nodeParents = continuumWorkflow.getParentNodes(node)
-      val nodeParentEdges = continuumWorkflow.getParentEdges(node)
-
-      // Check if all parent nodes have produced the required outputs
-      val allParentsProducedOutput = nodeParents.all { parent ->
-        val connectingEdgesToParent = nodeParentEdges.filter { it.source == parent.id }
-        // Parent must have outputs AND all connected output ports must have data
-        nodeOutputMap.containsKey(parent.id) &&
-            connectingEdgesToParent.all { edge ->
-              nodeOutputMap[parent.id]?.containsKey(edge.sourceHandle) ?: false
-            }
-      }
-
-      // Check if all input ports are connected to a parent node's output port
-      val allInputPortsConnected = node.data.inputs?.all { inputPort ->
-          nodeParentEdges.any { edge -> edge.targetHandle == inputPort.key }
-      } ?: true
-
-      if(!allInputPortsConnected) {
-        node.data.status = ContinuumWorkflowModel.NodeStatus.SKIPPED
-      }
-
-      LOGGER.debug(
-        "Node: {} allParentsProducedOutput: {} allInputPortsConnected: {} executed: {} status: {}",
-        node.id,
-        allParentsProducedOutput,
-        allInputPortsConnected,
-        nodeOutputMap.containsKey(node.id),
-        node.data.status
-      )
-
-      // Node is ready if: parents done, not yet executed, and not currently running
-      if (allParentsProducedOutput &&
-        allInputPortsConnected &&
-        !nodeOutputMap.containsKey(node.id) &&
-        node.data.status == null
-      ) {
-        nodesToExecute.add(node)
-      }
-    }
-    return nodesToExecute
-  }
-
-  /**
-   * Publishes a workflow status update event to Kafka.
-   *
-   * This method creates a [org.projectcontinuum.core.commons.model.WorkflowUpdateEvent] containing the current workflow state
-   * and publishes it via [StatusHelper] for real-time UI updates.
-   *
-   * **Note**: This method only publishes events during live execution, not during
-   * Temporal workflow replay to avoid duplicate events.
-   *
-   * @param status The workflow status string (e.g., "STARTED", "RUNNING", "FINISHED", "FAILED")
-   */
-  private fun sendUpdateEvent(
-    status: String = "RUNNING"
-  ) {
-    // Check if the Workflow is being replayed - skip publishing during replay
-    if (!WorkflowUnsafe.isReplaying()) {
-      // Combine successful outputs and error outputs for the event
-      val nodeToOutputsMapWithErr = mutableMapOf<String, Map<String, PortData>>()
-      nodeToOutputsMapWithErr.putAll(nodeToOutputsMap)
-      nodeToOutputsMapWithErr.putAll(nodeErrorsMap)
-
-      // Create the workflow update event with current state
-      val eventMetadata = WorkflowUpdateEvent(
-        jobId = Workflow.getInfo().workflowId,
-        data = WorkflowUpdate(
-          executionUUID = Workflow.getInfo().workflowId,
-          progressPercentage = calculateProgressPercentage(),
-          status = status,
-          nodeToOutputsMap = nodeToOutputsMapWithErr,
-          createdAtTimestampUtc = Workflow.getInfo().runStartedTimestampMillis,
-          updatesAtTimestampUtc = Instant.now().toEpochMilli(),
-          workflow = currentRunningWorkflow!!
-        )
-      )
-
-      // Publish to Kafka via StatusHelper
-      StatusHelper.Companion.publishWorkflowSnapshot(
-        Workflow.getInfo().workflowId,
-        eventMetadata
-      )
-    }
-  }
-
-  /**
-   * Calculates the overall workflow progress percentage.
-   *
-   * This method computes progress based on the number of completed nodes
-   * (both successful and failed) relative to the total number of nodes in the workflow.
-   *
-   * @return Progress percentage as an integer between 0 and 100
-   */
-  fun calculateProgressPercentage(): Int {
-    val totalNodes = currentRunningWorkflow?.nodes?.size ?: 0
-    if (totalNodes == 0) return 100
-    val completedNodes = nodeToOutputsMap.size + nodeErrorsMap.size
-    return (completedNodes * 100) / totalNodes
-  }
-
-  /**
-   * Updates a node's status and animates/de-animates its incoming edges.
-   *
-   * When a node starts execution (BUSY), its incoming edges are animated to show
-   * data flow. When execution completes (SUCCESS/FAILED), animation is removed.
-   *
-   * @param node The node to update
-   * @param nodeStatus The new status for the node
-   */
-  private fun setNodeAnimationAndStatus(
-    node: ContinuumWorkflowModel.Node,
-    nodeStatus: ContinuumWorkflowModel.NodeStatus
-  ) {
-    // Update node status
-    node.data.status = nodeStatus
-    // Animate/de-animate incoming edges based on node state
-    currentRunningWorkflow?.edges
-      ?.filter { it.target == node.id }
-      ?.forEach {
-        it.animated = nodeStatus == ContinuumWorkflowModel.NodeStatus.BUSY
-      }
+  private fun handleUnexpectedFailure(e: Throwable) {
+    LOGGER.error("Error in executing workflow", e)
+    statusReporter.markBusyNodesAs(ContinuumWorkflowModel.NodeStatus.FAILED)
+    Workflow.upsertTypedSearchAttributes(
+      IContinuumWorkflow.WORKFLOW_STATUS
+        .valueSet(ExecutionStatus.WORKFLOW_EXECUTION_FAILED.value)
+    )
+    statusReporter.publishUpdate("FAILED")
   }
 
   /**
@@ -579,6 +227,40 @@ class ContinuumWorkflow : IContinuumWorkflow {
     LOGGER.info("Node id: ${nodeToUpdate.data.id} Node title: ${nodeToUpdate.data.title} Node current progress: ${nodeToUpdate.data.nodeProgress?.progressPercentage ?: "null"}%")
 
     // Publish updated state to Kafka
-    sendUpdateEvent()
+    statusReporter.publishUpdate()
+  }
+
+  /**
+   * Signal handler invoked by the API server just before it issues a Temporal
+   * `cancel()` request. Pins all subsequent status updates to the real final
+   * "CANCELLED" status, closing the window where an in-flight DAG execution iteration
+   * or node progress signal could otherwise report a stale "RUNNING" status
+   * after cancellation has already been requested.
+   *
+   * @param reason Optional human-readable reason for the cancellation
+   */
+  override fun notifyCancelling(reason: String?) {
+    LOGGER.info("Received cancellation notice. Reason: ${reason ?: "none"}")
+    statusReporter.pinTerminalStatus("CANCELLED")
+    statusReporter.publishUpdate("CANCELLED")
+  }
+
+  /**
+   * Signal handler invoked by the API server just before it issues a Temporal
+   * `terminate()` request. Pins all subsequent status updates to the real final
+   * "TERMINATED" status and updates the search attribute directly, since this is
+   * the only workflow code that will ever run on the termination path — Temporal's
+   * `terminate()` gives the workflow no chance to run any code afterward.
+   *
+   * @param reason Optional human-readable reason for the termination
+   */
+  override fun notifyTerminating(reason: String?) {
+    LOGGER.info("Received termination notice. Reason: ${reason ?: "none"}")
+    statusReporter.pinTerminalStatus("TERMINATED")
+    Workflow.upsertTypedSearchAttributes(
+      IContinuumWorkflow.WORKFLOW_STATUS
+        .valueSet(ExecutionStatus.WORKFLOW_EXECUTION_TERMINATED.value)
+    )
+    statusReporter.publishUpdate("TERMINATED")
   }
 }

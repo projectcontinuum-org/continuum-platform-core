@@ -6,6 +6,8 @@ import org.projectcontinuum.core.api.server.model.WorkflowStatus
 import org.projectcontinuum.core.api.server.service.WorkflowService
 import org.projectcontinuum.core.api.server.utils.TreeHelper
 import org.projectcontinuum.core.commons.model.ContinuumWorkflowModel
+import io.temporal.client.WorkflowNotFoundException
+import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.*
 
 @RestController
@@ -36,6 +38,32 @@ class WorkflowController(
     workflowId: String
   ): WorkflowStatus {
     return workflowService.getWorkflowStatusById(workflowId)
+  }
+
+  @PostMapping("/{workflowId}/cancel")
+  fun cancelWorkflow(
+    @PathVariable workflowId: String,
+    @RequestParam(required = false) reason: String?
+  ): ResponseEntity<Void> {
+    return try {
+      workflowService.cancelWorkflow(workflowId, reason)
+      ResponseEntity.noContent().build()
+    } catch (e: WorkflowNotFoundException) {
+      ResponseEntity.notFound().build()
+    }
+  }
+
+  @PostMapping("/{workflowId}/terminate")
+  fun terminateWorkflow(
+    @PathVariable workflowId: String,
+    @RequestParam(required = false) reason: String?
+  ): ResponseEntity<Void> {
+    return try {
+      workflowService.terminateWorkflow(workflowId, reason)
+      ResponseEntity.noContent().build()
+    } catch (e: WorkflowNotFoundException) {
+      ResponseEntity.notFound().build()
+    }
   }
 
   @GetMapping("/list")

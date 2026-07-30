@@ -29,6 +29,12 @@ interface IContinuumWorkflow {
   fun updateNodeProgressSignal(
     continuumNodeActivitySignal: ContinuumNodeActivitySignal
   )
+
+  @SignalMethod
+  fun notifyCancelling(reason: String? = null)
+
+  @SignalMethod
+  fun notifyTerminating(reason: String? = null)
 }
 
 

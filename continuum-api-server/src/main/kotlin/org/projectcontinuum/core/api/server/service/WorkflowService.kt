@@ -20,7 +20,9 @@ import io.temporal.api.workflowservice.v1.CountWorkflowExecutionsResponse
 import io.temporal.api.workflowservice.v1.ListWorkflowExecutionsRequest
 import io.temporal.client.WorkflowClient
 import io.temporal.client.WorkflowException
+import io.temporal.client.WorkflowNotFoundException
 import io.temporal.client.WorkflowOptions
+import io.temporal.client.WorkflowStub
 import io.temporal.common.SearchAttributes
 import org.projectcontinuum.core.api.server.model.WorkflowRunData
 import org.projectcontinuum.core.commons.context.ContinuumOwnerContext
@@ -29,6 +31,8 @@ import org.springframework.scheduling.annotation.EnableScheduling
 import org.springframework.stereotype.Service
 import java.net.URI
 import java.time.Instant
+import java.util.Timer
+import java.util.TimerTask
 import java.util.UUID
 
 @Service
@@ -41,6 +45,8 @@ class WorkflowService(
 
   companion object {
     private val LOGGER = LoggerFactory.getLogger(WorkflowService::class.java)
+    private const val STOP_SIGNAL_GRACE_PERIOD_MS = 5000L
+    private val stopScheduler = Timer("workflow-stop-scheduler", true)
   }
 
   fun startWorkflow(
@@ -99,6 +105,50 @@ class WorkflowService(
     } finally {
       ContinuumOwnerContext.clear()
     }
+  }
+
+  fun cancelWorkflow(workflowId: String, reason: String?) {
+    val stub = workflowClient.newWorkflowStub(IContinuumWorkflow::class.java, workflowId)
+    try {
+      stub.notifyCancelling(reason)
+    } catch (e: WorkflowNotFoundException) {
+      throw e
+    } catch (e: Exception) {
+      LOGGER.warn("Failed to signal notifyCancelling for workflow $workflowId, proceeding with cancel anyway", e)
+    }
+    // Give the workflow a chance to process the signal before the hard-stop is issued.
+    stopScheduler.schedule(object : TimerTask() {
+      override fun run() {
+        try {
+          WorkflowStub.fromTyped(stub).cancel()
+        } catch (e: Exception) {
+          LOGGER.warn("Failed to cancel workflow $workflowId", e)
+        }
+      }
+    }, STOP_SIGNAL_GRACE_PERIOD_MS)
+  }
+
+  fun terminateWorkflow(workflowId: String, reason: String?) {
+    val stub = workflowClient.newWorkflowStub(IContinuumWorkflow::class.java, workflowId)
+    try {
+      stub.notifyTerminating(reason)
+    } catch (e: WorkflowNotFoundException) {
+      throw e
+    } catch (e: Exception) {
+      LOGGER.warn("Failed to signal notifyTerminating for workflow $workflowId, proceeding with terminate anyway", e)
+    }
+    // Give the workflow a chance to process the signal before the hard-stop is issued.
+    // This matters most for terminate() since it kills the workflow with no chance to
+    // run any code afterward.
+    stopScheduler.schedule(object : TimerTask() {
+      override fun run() {
+        try {
+          WorkflowStub.fromTyped(stub).terminate(reason ?: "Terminated via API")
+        } catch (e: Exception) {
+          LOGGER.warn("Failed to terminate workflow $workflowId", e)
+        }
+      }
+    }, STOP_SIGNAL_GRACE_PERIOD_MS)
   }
 
   fun getActiveWorkflows(): List<WorkflowStatus> {
