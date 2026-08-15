@@ -11,7 +11,6 @@ import org.springframework.data.domain.PageRequest
 import org.springframework.data.domain.Sort
 import org.springframework.data.jpa.domain.Specification
 import org.springframework.stereotype.Service
-import java.util.UUID
 
 @Service
 class WorkflowRunService(
@@ -45,9 +44,9 @@ class WorkflowRunService(
    * Get a single workflow run WITH the full `data` column.
    * Used by the execution viewer to display workflow snapshot and outputs.
    */
-  fun findById(ownedBy: String, workflowId: UUID): WorkflowRunEntity? {
+  fun findById(ownedBy: String, workflowId: String): WorkflowRunEntity? {
     val spec: Specification<WorkflowRunEntity> = Specification.where(ownedBySpec<WorkflowRunEntity>(ownedBy))
-      .and(Specification { root, _, cb -> cb.equal(root.get<UUID>("workflowId"), workflowId) })
+      .and(Specification { root, _, cb -> cb.equal(root.get<String>("workflowId"), workflowId) })
     return workflowRunRepository.findOne(spec).orElse(null)
   }
 

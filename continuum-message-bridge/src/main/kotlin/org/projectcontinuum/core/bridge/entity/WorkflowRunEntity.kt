@@ -13,10 +13,13 @@ import java.util.UUID
 data class WorkflowRunEntity(
   @Id
   @Column("workflow_id")
-  val workflowId: UUID,
+  val workflowId: String,
 
   @Column("owned_by")
   val ownedBy: String,
+
+  @Column("schedule_id")
+  val scheduleId: UUID? = null,
 
   @Column("status")
   var status: String = "PENDING",

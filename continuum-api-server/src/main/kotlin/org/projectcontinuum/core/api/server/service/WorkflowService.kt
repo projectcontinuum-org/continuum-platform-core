@@ -62,12 +62,12 @@ class WorkflowService(
       )
     }
 
-    val workflowId = UUID.randomUUID()
+    val workflowId = UUID.randomUUID().toString()
 
     val continuumWorkflow = workflowClient.newWorkflowStub(
       IContinuumWorkflow::class.java,
       WorkflowOptions.newBuilder()
-        .setWorkflowId(workflowId.toString())
+        .setWorkflowId(workflowId)
         .setTaskQueue(TaskQueues.WORKFLOW_TASK_QUEUE)
         .setTypedSearchAttributes(
           SearchAttributes.newBuilder()

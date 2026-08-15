@@ -6,7 +6,6 @@ import org.projectcontinuum.core.api.server.service.WorkflowRunService
 import org.springframework.data.domain.Page
 import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.*
-import java.util.UUID
 
 @RestController
 @RequestMapping("/api/v1/workflow-runs")
@@ -28,7 +27,7 @@ class WorkflowRunController(
   @GetMapping("/{workflowId}")
   fun findById(
     @RequestHeader("x-continuum-user-id", required = false, defaultValue = "anonymous") ownedBy: String,
-    @PathVariable workflowId: UUID
+    @PathVariable workflowId: String
   ): ResponseEntity<WorkflowRunEntity> {
     val entity = workflowRunService.findById(ownedBy, workflowId)
       ?: return ResponseEntity.notFound().build()

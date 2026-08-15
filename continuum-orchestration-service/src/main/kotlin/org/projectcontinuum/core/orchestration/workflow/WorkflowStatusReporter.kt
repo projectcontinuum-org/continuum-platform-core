@@ -1,5 +1,7 @@
 package org.projectcontinuum.core.orchestration.workflow
 
+import org.projectcontinuum.core.commons.context.ContinuumOwnerContext
+import org.projectcontinuum.core.commons.context.ContinuumScheduleContext
 import org.projectcontinuum.core.commons.model.ContinuumWorkflowModel
 import org.projectcontinuum.core.commons.model.PortData
 import org.projectcontinuum.core.commons.model.WorkflowUpdate
@@ -73,7 +75,11 @@ class WorkflowStatusReporter(
           nodeToOutputsMap = nodeToOutputsMapWithErr,
           createdAtTimestampUtc = Workflow.getInfo().runStartedTimestampMillis,
           updatesAtTimestampUtc = Instant.now().toEpochMilli(),
-          workflow = currentRunningWorkflow()!!
+          workflow = currentRunningWorkflow()!!,
+          ownedBy = ContinuumOwnerContext.get() ?: "anonymous",
+          workflowType = Workflow.getInfo().workflowType,
+          workflowUri = currentRunningWorkflow()!!.name,
+          scheduleId = ContinuumScheduleContext.get()
         )
       )
 

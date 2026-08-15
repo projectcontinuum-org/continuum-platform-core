@@ -7,5 +7,9 @@ data class WorkflowUpdate(
   val nodeToOutputsMap: Map<String, Any>,
   val createdAtTimestampUtc: Long,
   val updatesAtTimestampUtc: Long,
-  val workflow: ContinuumWorkflowModel
+  val workflow: ContinuumWorkflowModel,
+  val ownedBy: String,
+  val workflowType: String,
+  val workflowUri: String,
+  val scheduleId: String? = null
 )

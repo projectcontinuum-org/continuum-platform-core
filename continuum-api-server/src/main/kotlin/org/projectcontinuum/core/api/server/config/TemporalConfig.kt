@@ -2,6 +2,8 @@ package org.projectcontinuum.core.api.server.config
 
 import io.temporal.client.WorkflowClient
 import io.temporal.client.WorkflowClientOptions
+import io.temporal.client.schedules.ScheduleClient
+import io.temporal.client.schedules.ScheduleClientOptions
 import io.temporal.serviceclient.WorkflowServiceStubs
 import io.temporal.serviceclient.WorkflowServiceStubsOptions
 import org.projectcontinuum.core.commons.context.ContinuumContextPropagator
@@ -30,6 +32,21 @@ class TemporalConfig(
     return WorkflowClient.newInstance(
       workflowServiceStubs,
       WorkflowClientOptions.newBuilder()
+        .setNamespace(temporalNamespace)
+        .setContextPropagators(listOf(ContinuumContextPropagator()))
+        .build()
+    )
+  }
+
+  @Bean
+  fun scheduleClient(
+    @Value("\${temporal.connection.namespace}")
+    temporalNamespace: String,
+    workflowServiceStubs: WorkflowServiceStubs
+  ): ScheduleClient {
+    return ScheduleClient.newInstance(
+      workflowServiceStubs,
+      ScheduleClientOptions.newBuilder()
         .setNamespace(temporalNamespace)
         .setContextPropagators(listOf(ContinuumContextPropagator()))
         .build()

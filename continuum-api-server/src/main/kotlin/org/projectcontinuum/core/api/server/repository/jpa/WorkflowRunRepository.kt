@@ -7,9 +7,8 @@ import org.springframework.data.jpa.repository.JpaRepository
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor
 import org.springframework.data.jpa.repository.Query
 import org.springframework.data.repository.query.Param
-import java.util.UUID
 
-interface WorkflowRunRepository : JpaRepository<WorkflowRunEntity, UUID>, JpaSpecificationExecutor<WorkflowRunEntity> {
+interface WorkflowRunRepository : JpaRepository<WorkflowRunEntity, String>, JpaSpecificationExecutor<WorkflowRunEntity> {
     fun findByOwnedBy(ownedBy: String): List<WorkflowRunEntity>
 
     @Query(

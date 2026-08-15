@@ -13,7 +13,7 @@ import java.util.*
 class WorkflowRunEntity(
   @Id
     @Column(name = "workflow_id")
-    val workflowId: UUID,
+    val workflowId: String,
 
   @Column(name = "workflow_type", nullable = false)
     val workflowType: String,
@@ -24,6 +24,9 @@ class WorkflowRunEntity(
   @Column(name = "workflow_uri", nullable = false, columnDefinition = "VARCHAR(2048)")
     @Convert(converter = UriAttributeConverter::class)
     val workflowUri: URI,
+
+  @Column(name = "schedule_id")
+    val scheduleId: UUID? = null,
 
   @Column(name = "progress_percentage", nullable = false)
     val progressPercentage: Int = 0,

@@ -121,7 +121,7 @@ services:
       KAFKA_NODE_ID: 1
       KAFKA_CONTROLLER_QUORUM_VOTERS: '1@kafka1:9093,2@kafka2:9093,3@kafka3:9093'
       TOPIC_AUTO_CREATE: "true"
-      KAFKA_CONFLUENT_SCHEMA_REGISTRY_URL: http://schema-registry:8081
+      KAFKA_CONFLUENT_SCHEMA_REGISTRY_URL: http://schema-registry:8080
       CLUSTER_ID: 'ILFgVkHSQceRTtSEDPN7cQ'
     volumes:
       - kafka-data-1:/var/lib/kafka/data
@@ -143,7 +143,7 @@ services:
       KAFKA_NODE_ID: 2
       KAFKA_CONTROLLER_QUORUM_VOTERS: '1@kafka1:9093,2@kafka2:9093,3@kafka3:9093'
       TOPIC_AUTO_CREATE: "true"
-      KAFKA_CONFLUENT_SCHEMA_REGISTRY_URL: http://schema-registry:8081
+      KAFKA_CONFLUENT_SCHEMA_REGISTRY_URL: http://schema-registry:8080
       CLUSTER_ID: 'ILFgVkHSQceRTtSEDPN7cQ'
     volumes:
       - kafka-data-2:/var/lib/kafka/data
@@ -173,7 +173,7 @@ services:
     restart: unless-stopped
 
   schema-registry:
-    image: confluentinc/cp-schema-registry:7.2.2
+    image: confluentinc/cp-schema-registry:7.8.0
     hostname: schema-registry
     container_name: schema-registry
     ports:
@@ -202,38 +202,6 @@ services:
       - kafka1
       - kafka2
       - kafka3
-    restart: unless-stopped
-  credentials-server:
-    container_name: continuum-credentials-server
-    image: projectcontinuum/continuum-credentials-server:${CREDENTIALS_SERVER_VERSION:-latest}
-    depends_on:
-      - postgresql
-    environment:
-      - CONTINUUM_DB_URL=jdbc:postgresql://postgresql:5432/continuum
-      - CONTINUUM_DB_USERNAME=continuum_owner
-      - CONTINUUM_DB_PASSWORD=continuum-test-password
-      - CREDENTIALS_ENCRYPTION_MASTER_KEY=${CREDENTIALS_ENCRYPTION_MASTER_KEY:-dGVzdC1tYXN0ZXIta2V5LWZvci1sb2NhbC1kZXY=}
-    networks:
-      - temporal-network
-    ports:
-      - "38083:8080"
-    restart: unless-stopped
-
-  cloud-gateway:
-    container_name: continuum-cloud-gateway
-    image: projectcontinuum/continuum-cloud-gateway:${CLOUD_GATEWAY_VERSION:-latest}
-    depends_on:
-      - postgresql
-      - credentials-server
-    environment:
-      - CONTINUUM_DB_URL=jdbc:postgresql://postgresql:5432/continuum
-      - CONTINUUM_DB_USERNAME=continuum_owner
-      - CONTINUUM_DB_PASSWORD=continuum-test-password
-      - CONTINUUM_CREDENTIALS_SERVER_URL=http://credentials-server:8080
-    networks:
-      - temporal-network
-    ports:
-      - "38084:8080"
     restart: unless-stopped
 
   minio:
