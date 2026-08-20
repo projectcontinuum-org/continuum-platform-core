@@ -62,6 +62,19 @@ class KnimeWorkflowController(
       .body(InputStreamResource(objectStream))
   }
 
+  /**
+   * Same content as [downloadContent], but with the file name as a trailing path segment so the
+   * URL itself ends in `.knwf` — [KnimeWorkflowScheduleService] builds workflow-location URLs via
+   * this route because `KNIMEWorkflowExecutorNodeModel` validates `workflowLocation` by file
+   * extension. `fileName` is not used for lookup, only to shape the URL.
+   */
+  @GetMapping("/{workflowId}/content/{fileName}")
+  fun downloadContentWithFileName(
+    @RequestHeader(USER_ID_HEADER, required = false, defaultValue = "anonymous") userId: String,
+    @PathVariable workflowId: UUID,
+    @PathVariable fileName: String
+  ): ResponseEntity<InputStreamResource> = downloadContent(userId, workflowId)
+
   @PutMapping("/{workflowId}", consumes = [MediaType.MULTIPART_FORM_DATA_VALUE])
   fun replace(
     @RequestHeader(USER_ID_HEADER, required = false, defaultValue = "anonymous") userId: String,

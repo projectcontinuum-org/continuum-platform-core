@@ -5,7 +5,7 @@ import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
-import org.projectcontinuum.core.knime.scheduler.client.WorkflowModel
+import org.projectcontinuum.core.commons.model.ContinuumWorkflowModel
 import java.util.UUID
 
 class KnimeScheduleWorkflowMapperTest {
@@ -41,7 +41,7 @@ class KnimeScheduleWorkflowMapperTest {
       resetWorkflow = false,
       timeoutSeconds = 300
     )
-    val genericModel = WorkflowModel(id = "wf-2", name = "Generic workflow", nodes = emptyList())
+    val genericModel = ContinuumWorkflowModel(id = "wf-2", name = "Generic workflow", nodes = emptyList())
 
     assertTrue(KnimeScheduleWorkflowMapper.isKnimeExecutorWorkflow(knimeModel))
     assertFalse(KnimeScheduleWorkflowMapper.isKnimeExecutorWorkflow(genericModel))
@@ -63,7 +63,7 @@ class KnimeScheduleWorkflowMapperTest {
 
   @Test
   fun `extractKnimeWorkflowId returns null for a non-KNIME workflow`() {
-    val genericModel = WorkflowModel(id = "wf-2", name = "Generic workflow", nodes = emptyList())
+    val genericModel = ContinuumWorkflowModel(id = "wf-2", name = "Generic workflow", nodes = emptyList())
 
     assertNull(KnimeScheduleWorkflowMapper.extractKnimeWorkflowId(genericModel))
   }
@@ -85,7 +85,7 @@ class KnimeScheduleWorkflowMapperTest {
 
   @Test
   fun `extractResetWorkflow and extractTimeoutSeconds fall back to defaults for a non-KNIME workflow`() {
-    val genericModel = WorkflowModel(id = "wf-2", name = "Generic workflow", nodes = emptyList())
+    val genericModel = ContinuumWorkflowModel(id = "wf-2", name = "Generic workflow", nodes = emptyList())
 
     assertFalse(KnimeScheduleWorkflowMapper.extractResetWorkflow(genericModel))
     assertEquals(300L, KnimeScheduleWorkflowMapper.extractTimeoutSeconds(genericModel))

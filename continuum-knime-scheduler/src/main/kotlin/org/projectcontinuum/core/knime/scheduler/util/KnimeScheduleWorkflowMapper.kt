@@ -1,17 +1,16 @@
 package org.projectcontinuum.core.knime.scheduler.util
 
-import org.projectcontinuum.core.knime.scheduler.client.Position
-import org.projectcontinuum.core.knime.scheduler.client.WorkflowModel
-import org.projectcontinuum.core.knime.scheduler.client.WorkflowNode
-import org.projectcontinuum.core.knime.scheduler.client.WorkflowNodeData
+import org.projectcontinuum.core.commons.model.ContinuumWorkflowModel
 import java.util.UUID
 
 /**
- * Builds the single-node [WorkflowModel] DAG that api-server's generic Temporal schedule
+ * Builds the single-node [ContinuumWorkflowModel] DAG that api-server's generic Temporal schedule
  * executes for a KNIME workflow. The node's `nodeModel`/`propertiesSchema` mirror
  * `KNIMEWorkflowExecutorNodeModel` in the continuum-feature-knime repo — that contract is
  * duplicated here (not shared via a dependency) and must be kept in sync manually if the
- * executor node's properties ever change.
+ * executor node's properties ever change. `NodeData.id` must equal `NodeData.nodeModel`:
+ * `WorkflowActivityInitializer` in continuum-orchestration-service uses `data.id` as the node-type
+ * key to resolve task queues from api-server's node registry, which is keyed by `nodeModel`.
  */
 object KnimeScheduleWorkflowMapper {
 
@@ -22,7 +21,9 @@ object KnimeScheduleWorkflowMapper {
   private const val PROPERTY_TIMEOUT_SECONDS = "timeoutSeconds"
   private const val PROPERTY_RESET_WORKFLOW = "resetWorkflow"
 
-  private val CONTENT_URL_PATTERN = Regex(""".*/api/v1/knime-workflows/([^/]+)/content$""")
+  // Trailing /{fileName} segment is optional so schedules created before that segment was
+  // added (URL ending bare in /content) still resolve.
+  private val CONTENT_URL_PATTERN = Regex(""".*/api/v1/knime-workflows/([^/]+)/content(?:/[^/]+)?$""")
 
   val KNIME_EXECUTOR_PROPERTIES_SCHEMA: Map<String, Any> = mapOf(
     "type" to "object",
@@ -30,7 +31,7 @@ object KnimeScheduleWorkflowMapper {
       PROPERTY_WORKFLOW_LOCATION to mapOf(
         "type" to "string",
         "title" to "Workflow Location",
-        "description" to "Local path or URL to a KNIME .knwf workflow file: path/to/workflow.knwf, https://example.com/workflow.knwf, or s3://bucket/workflow.knwf"
+        "description" to "Local path or URL to a KNIME workflow: path/to/workflow.knwf, s3://bucket/workflow.knwf, or any http(s):// URL that returns a valid KNIME workflow archive (the .knwf extension is not required for http(s) URLs)"
       ),
       PROPERTY_TIMEOUT_SECONDS to mapOf(
         "type" to "integer",
@@ -54,15 +55,16 @@ object KnimeScheduleWorkflowMapper {
     contentUrl: String,
     resetWorkflow: Boolean,
     timeoutSeconds: Long
-  ): WorkflowModel {
-    val node = WorkflowNode(
+  ): ContinuumWorkflowModel {
+    val node = ContinuumWorkflowModel.Node(
       id = knimeWorkflowId.toString(),
       type = "process",
-      position = Position(0.0, 0.0),
+      position = ContinuumWorkflowModel.Position(0.0, 0.0),
       width = 100,
       height = 100,
       selected = false,
-      data = WorkflowNodeData(
+      data = ContinuumWorkflowModel.NodeData(
+        id = KNIME_EXECUTOR_NODE_MODEL,
         title = "KNIME Workflow Executor",
         description = "Download, execute, and upload KNIME workflows",
         nodeModel = KNIME_EXECUTOR_NODE_MODEL,
@@ -74,25 +76,25 @@ object KnimeScheduleWorkflowMapper {
         propertiesSchema = KNIME_EXECUTOR_PROPERTIES_SCHEMA
       )
     )
-    return WorkflowModel(id = knimeWorkflowId.toString(), name = name, nodes = listOf(node))
+    return ContinuumWorkflowModel(id = knimeWorkflowId.toString(), name = name, nodes = listOf(node))
   }
 
-  fun isKnimeExecutorWorkflow(model: WorkflowModel): Boolean =
+  fun isKnimeExecutorWorkflow(model: ContinuumWorkflowModel): Boolean =
     model.nodes.any { it.data.nodeModel == KNIME_EXECUTOR_NODE_MODEL }
 
-  fun extractKnimeWorkflowId(model: WorkflowModel): UUID? {
+  fun extractKnimeWorkflowId(model: ContinuumWorkflowModel): UUID? {
     val workflowLocation = executorNode(model)?.data?.properties?.get(PROPERTY_WORKFLOW_LOCATION) as? String
       ?: return null
     val match = CONTENT_URL_PATTERN.matchEntire(workflowLocation) ?: return null
     return match.groupValues[1].let { runCatching { UUID.fromString(it) }.getOrNull() }
   }
 
-  fun extractResetWorkflow(model: WorkflowModel): Boolean =
+  fun extractResetWorkflow(model: ContinuumWorkflowModel): Boolean =
     executorNode(model)?.data?.properties?.get(PROPERTY_RESET_WORKFLOW) as? Boolean ?: false
 
-  fun extractTimeoutSeconds(model: WorkflowModel): Long =
+  fun extractTimeoutSeconds(model: ContinuumWorkflowModel): Long =
     (executorNode(model)?.data?.properties?.get(PROPERTY_TIMEOUT_SECONDS) as? Number)?.toLong() ?: 300L
 
-  private fun executorNode(model: WorkflowModel): WorkflowNode? =
+  private fun executorNode(model: ContinuumWorkflowModel): ContinuumWorkflowModel.Node? =
     model.nodes.firstOrNull { it.data.nodeModel == KNIME_EXECUTOR_NODE_MODEL }
 }

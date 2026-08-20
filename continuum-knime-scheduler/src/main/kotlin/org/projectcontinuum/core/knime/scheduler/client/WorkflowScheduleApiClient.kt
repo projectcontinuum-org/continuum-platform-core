@@ -1,5 +1,6 @@
 package org.projectcontinuum.core.knime.scheduler.client
 
+import org.projectcontinuum.core.commons.model.ContinuumWorkflowModel
 import org.projectcontinuum.core.knime.scheduler.exception.KnimeWorkflowScheduleNotFoundException
 import org.projectcontinuum.core.knime.scheduler.exception.KnimeWorkflowScheduleRequestInvalidException
 import org.springframework.beans.factory.annotation.Value
@@ -15,37 +16,11 @@ import java.util.UUID
 
 private const val USER_ID_HEADER = "x-continuum-user-id"
 
-data class Position(val x: Double, val y: Double)
-
-data class WorkflowNodeData(
-  val title: String,
-  val description: String,
-  val nodeModel: String,
-  val properties: Map<String, Any> = emptyMap(),
-  val propertiesSchema: Map<String, Any> = emptyMap()
-)
-
-data class WorkflowNode(
-  val id: String,
-  val type: String,
-  val position: Position,
-  val data: WorkflowNodeData,
-  val width: Int,
-  val height: Int,
-  val selected: Boolean
-)
-
-data class WorkflowModel(
-  val id: String,
-  val name: String,
-  val nodes: List<WorkflowNode> = emptyList()
-)
-
 data class CreateWorkflowScheduleApiRequest(
   val name: String,
   val cronExpression: String,
   val timeZone: String? = null,
-  val continuumWorkflowModel: WorkflowModel
+  val continuumWorkflowModel: ContinuumWorkflowModel
 )
 
 data class WorkflowScheduleApiResponse(
@@ -58,7 +33,7 @@ data class WorkflowScheduleApiResponse(
   val nextRunTimes: List<Instant>,
   val createdAt: Instant,
   val updatedAt: Instant,
-  val continuumWorkflowModel: WorkflowModel
+  val continuumWorkflowModel: ContinuumWorkflowModel
 )
 
 @Component

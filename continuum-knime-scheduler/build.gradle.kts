@@ -25,6 +25,10 @@ repositories {
 }
 
 dependencies {
+    // Canonical ContinuumWorkflowModel — required so composing/deserializing the workflow
+    // model here uses the exact same schema api-server validates against.
+    implementation(project(":continuum-commons"))
+
     implementation("org.springframework.boot:spring-boot-starter")
     implementation("org.jetbrains.kotlin:kotlin-reflect")
     implementation("org.springframework.boot:spring-boot-starter-web")
@@ -54,6 +58,7 @@ dependencies {
 
 dependencyManagement {
     imports {
+        mavenBom("io.temporal:temporal-bom:1.28.0")
         mavenBom("software.amazon.awssdk:bom:2.30.7")
     }
 }

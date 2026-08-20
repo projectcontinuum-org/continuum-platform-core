@@ -21,10 +21,12 @@ class KnimeWorkflowScheduleService(
 ) {
 
   fun createSchedule(request: CreateKnimeWorkflowScheduleRequest, ownedBy: String): KnimeWorkflowScheduleResponse {
-    knimeWorkflowRepository.findByWorkflowIdAndOwnedBy(request.knimeWorkflowId, ownedBy)
+    val workflow = knimeWorkflowRepository.findByWorkflowIdAndOwnedBy(request.knimeWorkflowId, ownedBy)
       ?: throw KnimeWorkflowNotFoundException(request.knimeWorkflowId)
 
-    val contentUrl = "$publicBaseUrl/api/v1/knime-workflows/${request.knimeWorkflowId}/content"
+    // Path ends in the workflow's actual file name (always .knwf, enforced at upload) because
+    // KNIMEWorkflowExecutorNodeModel validates workflowLocation by file extension.
+    val contentUrl = "$publicBaseUrl/api/v1/knime-workflows/${request.knimeWorkflowId}/content/${workflow.fileName}"
     val model = KnimeScheduleWorkflowMapper.toWorkflowModel(
       name = request.name,
       knimeWorkflowId = request.knimeWorkflowId,

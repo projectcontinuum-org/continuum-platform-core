@@ -122,7 +122,7 @@ class KnimeWorkflowScheduleServiceTest {
   fun `listSchedules filters out non-KNIME-shaped schedules`() {
     val knimeWorkflowId = UUID.randomUUID()
     val nonKnimeResponse = knimeApiResponse(UUID.randomUUID(), knimeWorkflowId).copy(
-      continuumWorkflowModel = org.projectcontinuum.core.knime.scheduler.client.WorkflowModel(
+      continuumWorkflowModel = org.projectcontinuum.core.commons.model.ContinuumWorkflowModel(
         id = "wf-2", name = "Generic workflow", nodes = emptyList()
       )
     )
