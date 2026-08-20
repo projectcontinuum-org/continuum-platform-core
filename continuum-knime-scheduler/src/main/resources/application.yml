@@ -1,0 +1,38 @@
+spring.application.name: continuum-knime-scheduler
+server:
+  port: ${SERVER_PORT:8085}
+spring:
+  datasource:
+    url: ${CONTINUUM_DB_URL:jdbc:postgresql://localhost:35432/continuum}
+    username: ${CONTINUUM_DB_USERNAME:continuum_owner}
+    password: ${CONTINUUM_DB_PASSWORD:continuum-test-password}
+    driver-class-name: org.postgresql.Driver
+  sql:
+    init:
+      mode: always
+  jpa:
+    hibernate:
+      ddl-auto: none
+    open-in-view: false
+  servlet:
+    multipart:
+      max-file-size: ${CONTINUUM_KNIME_WORKFLOW_MAX_FILE_SIZE:200MB}
+      max-request-size: ${CONTINUUM_KNIME_WORKFLOW_MAX_REQUEST_SIZE:200MB}
+
+continuum.core:
+  knime-scheduler:
+    storage:
+      type: ${CONTINUUM_STORAGE_TYPE:minio}
+      bucket-name: ${CONTINUUM_KNIME_WORKFLOW_BUCKET_NAME:continuum-knime-workflows}
+      bucket-region: ${CONTINUUM_KNIME_WORKFLOW_BUCKET_REGION:us-east-2}
+      aws-profile-name: ${CONTINUUM_AWS_PROFILE_NAME:default}
+      minio:
+        endpoint: ${CONTINUUM_MINIO_ENDPOINT:http://localhost:39000}
+        access-key: ${CONTINUUM_MINIO_USERNAME:minioadmin}
+        secret-key: ${CONTINUUM_MINIO_PASSWORD:minioadmin}
+
+springdoc:
+  packages-to-scan: org.projectcontinuum.core.knime.scheduler.controller
+  swagger-ui:
+    config-url: ../v3/api-docs/swagger-config
+    url: ../v3/api-docs

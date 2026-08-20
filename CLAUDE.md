@@ -36,6 +36,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ./gradlew :continuum-credentials-server:bootRun
 ./gradlew :continuum-cluster-manager:bootRun
 ./gradlew :continuum-cloud-gateway:bootRun
+./gradlew :continuum-knime-scheduler:bootRun
 ```
 
 IntelliJ run configs in `.run/` cover: ApiServer, MessageBridge, OrchestrationService, CredentialServer, Gateway.
@@ -75,6 +76,7 @@ cd docker && docker compose up -d
 | `continuum-cluster-manager` | Kubernetes lifecycle manager for per-user workbench instances | — |
 | `continuum-cloud-gateway` | HTTP/WebSocket reverse proxy routing to per-user workbench pods | — |
 | `continuum-knime-base` | KNIME compatibility layer (experimental) | — |
+| `continuum-knime-scheduler` | Object-store CRUD proxy for KNIME `.knwf` workflow files + Postgres bookkeeping | 8085 |
 | `landing-page` | Static marketing landing page | — |
 
 ### Execution flow
