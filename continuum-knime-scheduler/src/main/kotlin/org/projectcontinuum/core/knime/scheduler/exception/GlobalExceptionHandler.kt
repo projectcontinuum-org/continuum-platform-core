@@ -19,4 +19,14 @@ class GlobalExceptionHandler {
   fun handleInvalidFile(ex: InvalidWorkflowFileException): ResponseEntity<ErrorResponse> =
     ResponseEntity.status(HttpStatus.BAD_REQUEST)
       .body(ErrorResponse(HttpStatus.BAD_REQUEST.value(), ex.message))
+
+  @ExceptionHandler(KnimeWorkflowScheduleNotFoundException::class)
+  fun handleScheduleNotFound(ex: KnimeWorkflowScheduleNotFoundException): ResponseEntity<ErrorResponse> =
+    ResponseEntity.status(HttpStatus.NOT_FOUND)
+      .body(ErrorResponse(HttpStatus.NOT_FOUND.value(), ex.message))
+
+  @ExceptionHandler(KnimeWorkflowScheduleRequestInvalidException::class)
+  fun handleScheduleRequestInvalid(ex: KnimeWorkflowScheduleRequestInvalidException): ResponseEntity<ErrorResponse> =
+    ResponseEntity.status(HttpStatus.BAD_REQUEST)
+      .body(ErrorResponse(HttpStatus.BAD_REQUEST.value(), ex.message))
 }

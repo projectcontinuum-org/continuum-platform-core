@@ -16,6 +16,7 @@ Core platform team. Container image: `projectcontinuum/continuum-api-server`. Ru
 - Two persistence layers: JPA (`WorkflowRunEntity`, `WorkflowRunSummaryEntity`) for workflow runs; JDBC (`RegisteredNodeRepository`) for node registry.
 - RSQL filter support on workflow run queries via `io.github.perplexhub:rsql-jpa-spring-boot-starter`.
 - `TreeHelper` — builds the hierarchical node explorer tree from flat registered node records.
+- `WorkflowScheduleController` — generic Temporal-`ScheduleClient`-backed cron scheduling for any `ContinuumWorkflowModel` DAG, backed by `workflow_schedules` (JSONB embed, no separate schedule entity per node type). This module has zero KNIME awareness — KNIME-specific scheduling lives entirely in `continuum-knime-scheduler`, which calls this controller's `/api/v1/workflow/schedule` API as a plain REST client.
 - Config defaults: PostgreSQL on `localhost:35432`, MinIO on `localhost:39000`, Temporal on `localhost:7233`.
 
 ## Work Guidance

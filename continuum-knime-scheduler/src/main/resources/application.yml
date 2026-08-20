@@ -1,6 +1,6 @@
 spring.application.name: continuum-knime-scheduler
 server:
-  port: ${SERVER_PORT:8085}
+  port: ${SERVER_PORT:8084}
 spring:
   datasource:
     url: ${CONTINUUM_DB_URL:jdbc:postgresql://localhost:35432/continuum}
@@ -21,6 +21,8 @@ spring:
 
 continuum.core:
   knime-scheduler:
+    api-server-base-url: ${CONTINUUM_API_SERVER_URL:http://localhost:8081}
+    public-base-url: ${CONTINUUM_KNIME_SCHEDULER_PUBLIC_URL:http://localhost:8084}
     storage:
       type: ${CONTINUUM_STORAGE_TYPE:minio}
       bucket-name: ${CONTINUUM_KNIME_WORKFLOW_BUCKET_NAME:continuum-knime-workflows}

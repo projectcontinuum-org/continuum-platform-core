@@ -11,6 +11,7 @@ import io.temporal.client.schedules.ScheduleOptions
 import io.temporal.client.schedules.ScheduleSpec
 import io.temporal.common.interceptors.Header
 import org.projectcontinuum.core.api.server.entity.jpa.WorkflowScheduleEntity
+import org.projectcontinuum.core.api.server.exception.WorkflowScheduleNotFoundException
 import org.projectcontinuum.core.api.server.model.CreateWorkflowScheduleRequest
 import org.projectcontinuum.core.api.server.model.WorkflowScheduleResponse
 import org.projectcontinuum.core.api.server.repository.jpa.WorkflowScheduleRepository
@@ -158,6 +159,7 @@ class WorkflowScheduleService(
       paused = description.schedule.state?.isPaused ?: false,
       nextRunTimes = description.info.nextActionTimes,
       createdAt = entity.createdAt,
-      updatedAt = entity.updatedAt
+      updatedAt = entity.updatedAt,
+      continuumWorkflowModel = entity.workflow
     )
 }
