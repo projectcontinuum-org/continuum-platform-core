@@ -1,5 +1,6 @@
 package org.projectcontinuum.core.knime.scheduler.controller
 
+import org.projectcontinuum.core.knime.scheduler.model.KnimeWorkflowExecutionResponse
 import org.projectcontinuum.core.knime.scheduler.model.KnimeWorkflowResponse
 import org.projectcontinuum.core.knime.scheduler.service.KnimeWorkflowService
 import org.springframework.core.io.InputStreamResource
@@ -89,5 +90,37 @@ class KnimeWorkflowController(
   ): ResponseEntity<Void> {
     knimeWorkflowService.delete(workflowId, userId)
     return ResponseEntity.noContent().build()
+  }
+
+  @PostMapping("/{workflowId}/executions", consumes = [MediaType.MULTIPART_FORM_DATA_VALUE])
+  fun uploadExecution(
+    @RequestHeader(USER_ID_HEADER, required = false, defaultValue = "anonymous") userId: String,
+    @PathVariable workflowId: UUID,
+    @RequestParam("file") file: MultipartFile,
+    @RequestParam("status") status: String
+  ): ResponseEntity<KnimeWorkflowExecutionResponse> {
+    val response = knimeWorkflowService.uploadExecution(workflowId, userId, file, status)
+    return ResponseEntity.status(201).body(response)
+  }
+
+  @GetMapping("/{workflowId}/executions")
+  fun listExecutions(
+    @RequestHeader(USER_ID_HEADER, required = false, defaultValue = "anonymous") userId: String,
+    @PathVariable workflowId: UUID,
+    pageable: Pageable
+  ): Page<KnimeWorkflowExecutionResponse> = knimeWorkflowService.listExecutions(workflowId, userId, pageable)
+
+  @GetMapping("/{workflowId}/executions/{executionId}/content")
+  fun downloadExecutionContent(
+    @RequestHeader(USER_ID_HEADER, required = false, defaultValue = "anonymous") userId: String,
+    @PathVariable workflowId: UUID,
+    @PathVariable executionId: UUID
+  ): ResponseEntity<InputStreamResource> {
+    val (entity, objectStream) = knimeWorkflowService.downloadExecution(workflowId, executionId, userId)
+    return ResponseEntity.ok()
+      .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"${entity.fileName}\"")
+      .contentType(MediaType.APPLICATION_OCTET_STREAM)
+      .contentLength(entity.sizeBytes)
+      .body(InputStreamResource(objectStream))
   }
 }

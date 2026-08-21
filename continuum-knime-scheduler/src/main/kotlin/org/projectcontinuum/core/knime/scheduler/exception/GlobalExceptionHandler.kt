@@ -29,4 +29,9 @@ class GlobalExceptionHandler {
   fun handleScheduleRequestInvalid(ex: KnimeWorkflowScheduleRequestInvalidException): ResponseEntity<ErrorResponse> =
     ResponseEntity.status(HttpStatus.BAD_REQUEST)
       .body(ErrorResponse(HttpStatus.BAD_REQUEST.value(), ex.message))
+
+  @ExceptionHandler(InvalidExecutionStatusException::class)
+  fun handleInvalidExecutionStatus(ex: InvalidExecutionStatusException): ResponseEntity<ErrorResponse> =
+    ResponseEntity.status(HttpStatus.BAD_REQUEST)
+      .body(ErrorResponse(HttpStatus.BAD_REQUEST.value(), ex.message))
 }

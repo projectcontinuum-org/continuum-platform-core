@@ -13,6 +13,12 @@ object KnimeWorkflowKeyBuilder {
   fun build(userId: String, workflowId: UUID): String =
     "knime-workflows/users/$userId/$workflowId$KNWF_EXTENSION"
 
+  // Deliberately does not nest under build()'s key (".../$workflowId.knwf") — on MinIO's
+  // filesystem/erasure-coded backend an object key can't also act as a directory prefix for
+  // other objects ("parent is object" conflict), so execution keys use the bare workflow id.
+  fun buildExecution(userId: String, workflowId: UUID, executionId: UUID): String =
+    "knime-workflows-executions/users/$userId/$workflowId/executions/$executionId$KNWF_EXTENSION"
+
   fun hasKnwfExtension(fileName: String): Boolean =
     fileName.lowercase().endsWith(KNWF_EXTENSION)
 }

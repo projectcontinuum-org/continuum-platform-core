@@ -18,6 +18,7 @@ object KnimeScheduleWorkflowMapper {
     "org.projectcontinuum.feature.knime.executor.node.KNIMEWorkflowExecutorNodeModel"
 
   private const val PROPERTY_WORKFLOW_LOCATION = "workflowLocation"
+  private const val PROPERTY_EXECUTION_UPLOAD_URL = "executionUploadUrl"
   private const val PROPERTY_TIMEOUT_SECONDS = "timeoutSeconds"
   private const val PROPERTY_RESET_WORKFLOW = "resetWorkflow"
 
@@ -33,6 +34,11 @@ object KnimeScheduleWorkflowMapper {
         "title" to "Workflow Location",
         "description" to "Local path or URL to a KNIME workflow: path/to/workflow.knwf, s3://bucket/workflow.knwf, or any http(s):// URL that returns a valid KNIME workflow archive (the .knwf extension is not required for http(s) URLs)"
       ),
+      PROPERTY_EXECUTION_UPLOAD_URL to mapOf(
+        "type" to "string",
+        "title" to "Execution Result Upload URL",
+        "description" to "HTTP(S) URL the executed .knwf is POSTed back to (multipart/form-data) once the workflow finishes, success or failure"
+      ),
       PROPERTY_TIMEOUT_SECONDS to mapOf(
         "type" to "integer",
         "title" to "Execution Timeout (seconds)",
@@ -46,13 +52,14 @@ object KnimeScheduleWorkflowMapper {
         "default" to false
       )
     ),
-    "required" to listOf(PROPERTY_WORKFLOW_LOCATION)
+    "required" to listOf(PROPERTY_WORKFLOW_LOCATION, PROPERTY_EXECUTION_UPLOAD_URL)
   )
 
   fun toWorkflowModel(
     name: String,
     knimeWorkflowId: UUID,
     contentUrl: String,
+    executionUploadUrl: String,
     resetWorkflow: Boolean,
     timeoutSeconds: Long
   ): ContinuumWorkflowModel {
@@ -70,6 +77,7 @@ object KnimeScheduleWorkflowMapper {
         nodeModel = KNIME_EXECUTOR_NODE_MODEL,
         properties = mapOf(
           PROPERTY_WORKFLOW_LOCATION to contentUrl,
+          PROPERTY_EXECUTION_UPLOAD_URL to executionUploadUrl,
           PROPERTY_TIMEOUT_SECONDS to timeoutSeconds,
           PROPERTY_RESET_WORKFLOW to resetWorkflow
         ),

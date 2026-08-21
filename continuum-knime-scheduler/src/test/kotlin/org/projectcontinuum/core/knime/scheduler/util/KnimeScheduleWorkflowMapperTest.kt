@@ -14,11 +14,13 @@ class KnimeScheduleWorkflowMapperTest {
   fun `toWorkflowModel builds a single-node DAG pointing at the given content URL`() {
     val knimeWorkflowId = UUID.randomUUID()
     val contentUrl = "http://localhost:8085/api/v1/knime-workflows/$knimeWorkflowId/content"
+    val executionUploadUrl = "http://localhost:8085/api/v1/knime-workflows/$knimeWorkflowId/executions"
 
     val model = KnimeScheduleWorkflowMapper.toWorkflowModel(
       name = "Nightly run",
       knimeWorkflowId = knimeWorkflowId,
       contentUrl = contentUrl,
+      executionUploadUrl = executionUploadUrl,
       resetWorkflow = true,
       timeoutSeconds = 600
     )
@@ -27,6 +29,7 @@ class KnimeScheduleWorkflowMapperTest {
     val node = model.nodes[0]
     assertEquals(KnimeScheduleWorkflowMapper.KNIME_EXECUTOR_NODE_MODEL, node.data.nodeModel)
     assertEquals(contentUrl, node.data.properties["workflowLocation"])
+    assertEquals(executionUploadUrl, node.data.properties["executionUploadUrl"])
     assertEquals(600L, node.data.properties["timeoutSeconds"])
     assertEquals(true, node.data.properties["resetWorkflow"])
   }
@@ -38,6 +41,7 @@ class KnimeScheduleWorkflowMapperTest {
       name = "Nightly run",
       knimeWorkflowId = knimeWorkflowId,
       contentUrl = "http://localhost:8085/api/v1/knime-workflows/$knimeWorkflowId/content",
+      executionUploadUrl = "http://localhost:8085/api/v1/knime-workflows/$knimeWorkflowId/executions",
       resetWorkflow = false,
       timeoutSeconds = 300
     )
@@ -54,6 +58,7 @@ class KnimeScheduleWorkflowMapperTest {
       name = "Nightly run",
       knimeWorkflowId = knimeWorkflowId,
       contentUrl = "http://localhost:8085/api/v1/knime-workflows/$knimeWorkflowId/content",
+      executionUploadUrl = "http://localhost:8085/api/v1/knime-workflows/$knimeWorkflowId/executions",
       resetWorkflow = false,
       timeoutSeconds = 300
     )
@@ -75,6 +80,7 @@ class KnimeScheduleWorkflowMapperTest {
       name = "Nightly run",
       knimeWorkflowId = knimeWorkflowId,
       contentUrl = "http://localhost:8085/api/v1/knime-workflows/$knimeWorkflowId/content",
+      executionUploadUrl = "http://localhost:8085/api/v1/knime-workflows/$knimeWorkflowId/executions",
       resetWorkflow = true,
       timeoutSeconds = 900
     )

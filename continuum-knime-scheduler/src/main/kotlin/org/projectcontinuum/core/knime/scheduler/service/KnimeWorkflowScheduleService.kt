@@ -11,6 +11,8 @@ import org.projectcontinuum.core.knime.scheduler.repository.KnimeWorkflowReposit
 import org.projectcontinuum.core.knime.scheduler.util.KnimeScheduleWorkflowMapper
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.stereotype.Service
+import org.springframework.web.util.UriUtils
+import java.nio.charset.StandardCharsets
 import java.util.UUID
 
 @Service
@@ -25,12 +27,17 @@ class KnimeWorkflowScheduleService(
       ?: throw KnimeWorkflowNotFoundException(request.knimeWorkflowId)
 
     // Path ends in the workflow's actual file name (always .knwf, enforced at upload) because
-    // KNIMEWorkflowExecutorNodeModel validates workflowLocation by file extension.
-    val contentUrl = "$publicBaseUrl/api/v1/knime-workflows/${request.knimeWorkflowId}/content/${workflow.fileName}"
+    // KNIMEWorkflowExecutorNodeModel validates workflowLocation by file extension. The file name
+    // is user-supplied and can contain spaces/special characters, so it must be percent-encoded
+    // as a path segment before being embedded in the URL.
+    val encodedFileName = UriUtils.encodePathSegment(workflow.fileName, StandardCharsets.UTF_8)
+    val contentUrl = "$publicBaseUrl/api/v1/knime-workflows/${request.knimeWorkflowId}/content/$encodedFileName"
+    val executionUploadUrl = "$publicBaseUrl/api/v1/knime-workflows/${request.knimeWorkflowId}/executions"
     val model = KnimeScheduleWorkflowMapper.toWorkflowModel(
       name = request.name,
       knimeWorkflowId = request.knimeWorkflowId,
       contentUrl = contentUrl,
+      executionUploadUrl = executionUploadUrl,
       resetWorkflow = request.resetWorkflow,
       timeoutSeconds = request.timeoutSeconds
     )

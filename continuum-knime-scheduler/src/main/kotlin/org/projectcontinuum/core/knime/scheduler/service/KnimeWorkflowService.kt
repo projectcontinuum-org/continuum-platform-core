@@ -1,9 +1,13 @@
 package org.projectcontinuum.core.knime.scheduler.service
 
 import org.projectcontinuum.core.knime.scheduler.entity.KnimeWorkflowEntity
+import org.projectcontinuum.core.knime.scheduler.entity.KnimeWorkflowExecutionEntity
+import org.projectcontinuum.core.knime.scheduler.exception.InvalidExecutionStatusException
 import org.projectcontinuum.core.knime.scheduler.exception.InvalidWorkflowFileException
 import org.projectcontinuum.core.knime.scheduler.exception.KnimeWorkflowNotFoundException
+import org.projectcontinuum.core.knime.scheduler.model.KnimeWorkflowExecutionResponse
 import org.projectcontinuum.core.knime.scheduler.model.KnimeWorkflowResponse
+import org.projectcontinuum.core.knime.scheduler.repository.KnimeWorkflowExecutionRepository
 import org.projectcontinuum.core.knime.scheduler.repository.KnimeWorkflowRepository
 import org.projectcontinuum.core.knime.scheduler.util.KnimeWorkflowKeyBuilder
 import org.springframework.data.domain.Page
@@ -15,9 +19,12 @@ import software.amazon.awssdk.services.s3.model.GetObjectResponse
 import java.time.Instant
 import java.util.UUID
 
+private val ALLOWED_EXECUTION_STATUSES = setOf("SUCCESS", "FAILED")
+
 @Service
 class KnimeWorkflowService(
   private val repository: KnimeWorkflowRepository,
+  private val executionRepository: KnimeWorkflowExecutionRepository,
   private val objectStorageService: ObjectStorageService
 ) {
 
@@ -70,6 +77,52 @@ class KnimeWorkflowService(
     repository.delete(entity)
   }
 
+  fun uploadExecution(
+    workflowId: UUID,
+    ownedBy: String,
+    file: MultipartFile,
+    status: String
+  ): KnimeWorkflowExecutionResponse {
+    findOwnedOrThrow(workflowId, ownedBy)
+    validateKnwfFile(file)
+    if (status !in ALLOWED_EXECUTION_STATUSES) {
+      throw InvalidExecutionStatusException("status must be one of $ALLOWED_EXECUTION_STATUSES, got: $status")
+    }
+
+    val executionId = UUID.randomUUID()
+    val objectKey = KnimeWorkflowKeyBuilder.buildExecution(ownedBy, workflowId, executionId)
+
+    file.inputStream.use { objectStorageService.putObject(objectKey, it, file.size, file.contentType) }
+
+    val entity = KnimeWorkflowExecutionEntity(
+      executionId = executionId,
+      workflowId = workflowId,
+      ownedBy = ownedBy,
+      fileName = file.originalFilename ?: "$executionId.knwf",
+      objectKey = objectKey,
+      bucketName = objectStorageService.bucketName,
+      sizeBytes = file.size,
+      contentType = file.contentType,
+      status = status
+    )
+    return executionRepository.save(entity).toResponse()
+  }
+
+  fun listExecutions(workflowId: UUID, ownedBy: String, pageable: Pageable): Page<KnimeWorkflowExecutionResponse> {
+    findOwnedOrThrow(workflowId, ownedBy)
+    return executionRepository.findAllByWorkflowIdAndOwnedBy(workflowId, ownedBy, pageable).map { it.toResponse() }
+  }
+
+  fun downloadExecution(
+    workflowId: UUID,
+    executionId: UUID,
+    ownedBy: String
+  ): Pair<KnimeWorkflowExecutionEntity, ResponseInputStream<GetObjectResponse>> {
+    val entity = executionRepository.findByExecutionIdAndWorkflowIdAndOwnedBy(executionId, workflowId, ownedBy)
+      ?: throw KnimeWorkflowNotFoundException(workflowId)
+    return entity to objectStorageService.getObject(entity.objectKey)
+  }
+
   private fun findOwnedOrThrow(workflowId: UUID, ownedBy: String): KnimeWorkflowEntity =
     repository.findByWorkflowIdAndOwnedBy(workflowId, ownedBy)
       ?: throw KnimeWorkflowNotFoundException(workflowId)
@@ -88,5 +141,15 @@ class KnimeWorkflowService(
     contentType = contentType,
     createdAt = createdAt,
     updatedAt = updatedAt
+  )
+
+  private fun KnimeWorkflowExecutionEntity.toResponse() = KnimeWorkflowExecutionResponse(
+    executionId = executionId,
+    workflowId = workflowId,
+    fileName = fileName,
+    sizeBytes = sizeBytes,
+    contentType = contentType,
+    status = status,
+    createdAt = createdAt
   )
 }

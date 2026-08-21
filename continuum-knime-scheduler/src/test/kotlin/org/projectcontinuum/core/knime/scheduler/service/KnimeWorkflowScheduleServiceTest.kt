@@ -35,6 +35,7 @@ class KnimeWorkflowScheduleServiceTest {
       name = "Nightly run",
       knimeWorkflowId = knimeWorkflowId,
       contentUrl = "$publicBaseUrl/api/v1/knime-workflows/$knimeWorkflowId/content",
+      executionUploadUrl = "$publicBaseUrl/api/v1/knime-workflows/$knimeWorkflowId/executions",
       resetWorkflow = false,
       timeoutSeconds = 300
     )
@@ -91,7 +92,9 @@ class KnimeWorkflowScheduleServiceTest {
       org.mockito.kotlin.argThat<CreateWorkflowScheduleApiRequest> { req ->
         req.name == "Nightly run" &&
           req.cronExpression == "0 0 * * *" &&
-          KnimeScheduleWorkflowMapper.extractKnimeWorkflowId(req.continuumWorkflowModel) == knimeWorkflowId
+          KnimeScheduleWorkflowMapper.extractKnimeWorkflowId(req.continuumWorkflowModel) == knimeWorkflowId &&
+          req.continuumWorkflowModel.nodes[0].data.properties["executionUploadUrl"] ==
+            "$publicBaseUrl/api/v1/knime-workflows/$knimeWorkflowId/executions"
       },
       eq(ownedBy)
     )

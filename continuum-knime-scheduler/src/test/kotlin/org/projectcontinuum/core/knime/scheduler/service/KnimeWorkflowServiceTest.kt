@@ -9,22 +9,27 @@ import org.mockito.kotlin.eq
 import org.mockito.kotlin.mock
 import org.mockito.kotlin.verify
 import org.mockito.kotlin.whenever
+import org.projectcontinuum.core.knime.scheduler.entity.KnimeWorkflowEntity
+import org.projectcontinuum.core.knime.scheduler.exception.InvalidExecutionStatusException
 import org.projectcontinuum.core.knime.scheduler.exception.InvalidWorkflowFileException
 import org.projectcontinuum.core.knime.scheduler.exception.KnimeWorkflowNotFoundException
+import org.projectcontinuum.core.knime.scheduler.repository.KnimeWorkflowExecutionRepository
 import org.projectcontinuum.core.knime.scheduler.repository.KnimeWorkflowRepository
+import org.springframework.data.domain.PageRequest
 import org.springframework.mock.web.MockMultipartFile
 import java.util.UUID
 
 class KnimeWorkflowServiceTest {
 
   private val repository: KnimeWorkflowRepository = mock()
+  private val executionRepository: KnimeWorkflowExecutionRepository = mock()
   private val objectStorageService: ObjectStorageService = mock()
   private lateinit var service: KnimeWorkflowService
 
   @BeforeEach
   fun setUp() {
     whenever(objectStorageService.bucketName).thenReturn("continuum-knime-workflows")
-    service = KnimeWorkflowService(repository, objectStorageService)
+    service = KnimeWorkflowService(repository, executionRepository, objectStorageService)
   }
 
   @Test
@@ -89,5 +94,76 @@ class KnimeWorkflowServiceTest {
     service.delete(created.workflowId, "alice")
 
     verify(objectStorageService).deleteObject("knime-workflows/users/alice/${created.workflowId}.knwf")
+  }
+
+  private fun ownedWorkflowEntity(workflowId: UUID) = KnimeWorkflowEntity(
+    workflowId = workflowId,
+    ownedBy = "alice",
+    fileName = "workflow.knwf",
+    objectKey = "knime-workflows/users/alice/$workflowId.knwf",
+    bucketName = "continuum-knime-workflows",
+    sizeBytes = 42L,
+    contentType = "application/octet-stream"
+  )
+
+  @Test
+  fun `uploadExecution throws when the source workflow is not owned by the caller`() {
+    val workflowId = UUID.randomUUID()
+    whenever(repository.findByWorkflowIdAndOwnedBy(workflowId, "alice")).thenReturn(null)
+    val file = MockMultipartFile("file", "result.knwf", "application/octet-stream", "content".toByteArray())
+
+    assertThrows(KnimeWorkflowNotFoundException::class.java) {
+      service.uploadExecution(workflowId, "alice", file, "SUCCESS")
+    }
+  }
+
+  @Test
+  fun `uploadExecution rejects an unrecognized status value`() {
+    val workflowId = UUID.randomUUID()
+    whenever(repository.findByWorkflowIdAndOwnedBy(workflowId, "alice")).thenReturn(ownedWorkflowEntity(workflowId))
+    val file = MockMultipartFile("file", "result.knwf", "application/octet-stream", "content".toByteArray())
+
+    assertThrows(InvalidExecutionStatusException::class.java) {
+      service.uploadExecution(workflowId, "alice", file, "BOGUS")
+    }
+  }
+
+  @Test
+  fun `uploadExecution stores the result under a per-execution key and persists the reported status`() {
+    val workflowId = UUID.randomUUID()
+    whenever(repository.findByWorkflowIdAndOwnedBy(workflowId, "alice")).thenReturn(ownedWorkflowEntity(workflowId))
+    whenever(executionRepository.save(any())).thenAnswer { it.arguments[0] }
+    val file = MockMultipartFile("file", "result.knwf", "application/octet-stream", "content".toByteArray())
+
+    val response = service.uploadExecution(workflowId, "alice", file, "FAILED")
+
+    assertEquals("FAILED", response.status)
+    assertEquals(workflowId, response.workflowId)
+    verify(objectStorageService).putObject(
+      eq("knime-workflows/users/alice/$workflowId/executions/${response.executionId}.knwf"),
+      any(), any(), any()
+    )
+  }
+
+  @Test
+  fun `listExecutions throws when the source workflow is not owned by the caller`() {
+    val workflowId = UUID.randomUUID()
+    whenever(repository.findByWorkflowIdAndOwnedBy(workflowId, "alice")).thenReturn(null)
+
+    assertThrows(KnimeWorkflowNotFoundException::class.java) {
+      service.listExecutions(workflowId, "alice", PageRequest.of(0, 10))
+    }
+  }
+
+  @Test
+  fun `downloadExecution throws when the execution is not owned by the caller`() {
+    val workflowId = UUID.randomUUID()
+    val executionId = UUID.randomUUID()
+    whenever(executionRepository.findByExecutionIdAndWorkflowIdAndOwnedBy(executionId, workflowId, "alice"))
+      .thenReturn(null)
+
+    assertThrows(KnimeWorkflowNotFoundException::class.java) {
+      service.downloadExecution(workflowId, executionId, "alice")
+    }
   }
 }
