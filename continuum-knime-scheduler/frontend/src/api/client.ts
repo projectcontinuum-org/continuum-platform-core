@@ -10,6 +10,12 @@ export class ApiError extends Error {
   }
 }
 
+export function extractFileName(response: Response, fallback: string): string {
+  const disposition = response.headers.get('content-disposition');
+  const match = disposition?.match(/filename="([^"]+)"/);
+  return match ? match[1] : fallback;
+}
+
 export async function handleResponse<T>(response: Response): Promise<T> {
   if (!response.ok) {
     const errorText = await response.text();

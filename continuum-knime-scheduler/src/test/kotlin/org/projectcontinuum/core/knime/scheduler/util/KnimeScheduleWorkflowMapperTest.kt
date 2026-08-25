@@ -35,6 +35,31 @@ class KnimeScheduleWorkflowMapperTest {
   }
 
   @Test
+  fun `toWorkflowModel produces a node the workflow editor can actually render`() {
+    val knimeWorkflowId = UUID.randomUUID()
+
+    val model = KnimeScheduleWorkflowMapper.toWorkflowModel(
+      name = "Nightly run",
+      knimeWorkflowId = knimeWorkflowId,
+      contentUrl = "http://localhost:8085/api/v1/knime-workflows/$knimeWorkflowId/content",
+      executionUploadUrl = "http://localhost:8085/api/v1/knime-workflows/$knimeWorkflowId/executions",
+      resetWorkflow = false,
+      timeoutSeconds = 300
+    )
+
+    val node = model.nodes[0]
+    // React Flow's nodeTypes map only recognizes "BaseNode" — anything else falls back to the
+    // unstyled default node, which is what made this render incorrectly in the UI.
+    assertEquals("BaseNode", node.type)
+    assertTrue(node.data.inputs!!.isEmpty())
+    assertTrue(node.data.outputs!!.containsKey("destinationPath"))
+    assertEquals("text/plain", node.data.outputs!!["destinationPath"]?.contentType)
+    assertFalse(node.data.icon.isNullOrBlank())
+    assertFalse(node.data.subTitle.isNullOrBlank())
+    assertTrue(node.data.propertiesUISchema.isNotEmpty())
+  }
+
+  @Test
   fun `isKnimeExecutorWorkflow is true only when a node uses the KNIME executor node model`() {
     val knimeWorkflowId = UUID.randomUUID()
     val knimeModel = KnimeScheduleWorkflowMapper.toWorkflowModel(

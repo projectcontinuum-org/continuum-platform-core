@@ -14,6 +14,7 @@ import { ReplaceWorkflowModal } from '../components/ReplaceWorkflowModal';
 import { ScheduleCard } from '../components/ScheduleCard';
 import { CreateScheduleModal } from '../components/CreateScheduleModal';
 import { ViewScheduleModal } from '../components/ViewScheduleModal';
+import { ExecutionsPanel } from '../components/ExecutionsPanel';
 import { knimeWorkflowsApi } from '../api/knimeWorkflows';
 import { knimeSchedulesApi } from '../api/knimeSchedules';
 import type { KnimeWorkflowResponse, KnimeWorkflowScheduleResponse } from '../types/api';
@@ -34,6 +35,7 @@ export function KnimeWorkflowsPage() {
   const [uploadModalOpen, setUploadModalOpen] = useState(false);
   const [replaceTarget, setReplaceTarget] = useState<KnimeWorkflowResponse | null>(null);
   const [deleteWorkflowTarget, setDeleteWorkflowTarget] = useState<KnimeWorkflowResponse | null>(null);
+  const [executionsWorkflow, setExecutionsWorkflow] = useState<KnimeWorkflowResponse | null>(null);
 
   const [createModalOpen, setCreateModalOpen] = useState(false);
   const [viewSchedule, setViewSchedule] = useState<KnimeWorkflowScheduleResponse | null>(null);
@@ -152,10 +154,11 @@ export function KnimeWorkflowsPage() {
   };
 
   return (
-    <div className="flex min-h-screen flex-col bg-base">
-      <Header />
+    <div className="flex min-h-screen bg-base">
+      <div className="flex min-h-screen min-w-0 flex-1 flex-col">
+        <Header />
 
-      <main className="mx-auto flex w-full max-w-6xl flex-1 flex-col px-4 py-10 sm:px-6 lg:px-8">
+        <main className="mx-auto flex w-full max-w-6xl flex-1 flex-col px-4 py-10 sm:px-6 lg:px-8">
         {/* Hero */}
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-fg sm:text-4xl">
@@ -244,6 +247,7 @@ export function KnimeWorkflowsPage() {
           ) : (
             <WorkflowTable
               workflows={filteredWorkflows}
+              onViewExecutions={setExecutionsWorkflow}
               onDownload={handleDownload}
               onReplace={setReplaceTarget}
               onDelete={setDeleteWorkflowTarget}
@@ -276,7 +280,15 @@ export function KnimeWorkflowsPage() {
         )}
       </main>
 
-      <Footer />
+        <Footer />
+      </div>
+
+      <ExecutionsPanel
+        workflow={executionsWorkflow}
+        isOpen={executionsWorkflow !== null}
+        onClose={() => setExecutionsWorkflow(null)}
+        onNotify={notify}
+      />
 
       {/* Workflow modals */}
       <UploadWorkflowModal

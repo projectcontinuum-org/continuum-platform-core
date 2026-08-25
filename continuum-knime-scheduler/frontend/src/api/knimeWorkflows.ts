@@ -1,16 +1,10 @@
 import type { KnimeWorkflowResponse, PageResponse } from '../types/api';
-import { SERVICE_BASE, handleResponse } from './client';
+import { SERVICE_BASE, handleResponse, extractFileName } from './client';
 
 const API_BASE = `${SERVICE_BASE}/api/v1/knime-workflows`;
 
 // Note: x-continuum-user-id is injected by the boundary service upstream.
 // Do not set it here.
-
-function extractFileName(response: Response, fallback: string): string {
-  const disposition = response.headers.get('content-disposition');
-  const match = disposition?.match(/filename="([^"]+)"/);
-  return match ? match[1] : fallback;
-}
 
 export const knimeWorkflowsApi = {
   async upload(file: File): Promise<KnimeWorkflowResponse> {

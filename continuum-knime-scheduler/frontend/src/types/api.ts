@@ -9,6 +9,16 @@ export interface KnimeWorkflowResponse {
   updatedAt: string;
 }
 
+export interface KnimeWorkflowExecutionResponse {
+  executionId: string;
+  workflowId: string;
+  fileName: string;
+  sizeBytes: number;
+  contentType: string | null;
+  status: string;
+  createdAt: string;
+}
+
 export interface PageResponse<T> {
   content: T[];
   totalElements: number;

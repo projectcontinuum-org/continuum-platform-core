@@ -3,6 +3,7 @@ import type { KnimeWorkflowResponse } from '../types/api';
 
 interface WorkflowTableProps {
   workflows: KnimeWorkflowResponse[];
+  onViewExecutions: (workflow: KnimeWorkflowResponse) => void;
   onDownload: (workflow: KnimeWorkflowResponse) => void;
   onReplace: (workflow: KnimeWorkflowResponse) => void;
   onDelete: (workflow: KnimeWorkflowResponse) => void;
@@ -27,7 +28,7 @@ const fadeInUp = {
   visible: { opacity: 1, y: 0 },
 };
 
-export function WorkflowTable({ workflows, onDownload, onReplace, onDelete }: WorkflowTableProps) {
+export function WorkflowTable({ workflows, onViewExecutions, onDownload, onReplace, onDelete }: WorkflowTableProps) {
   return (
     <>
       {/* Desktop Table */}
@@ -61,6 +62,16 @@ export function WorkflowTable({ workflows, onDownload, onReplace, onDelete }: Wo
                 <td className="px-4 py-3 text-sm text-fg-muted">{formatDate(wf.updatedAt)}</td>
                 <td className="px-4 py-3">
                   <div className="flex items-center justify-end gap-1">
+                    {/* View Executions */}
+                    <button
+                      onClick={() => onViewExecutions(wf)}
+                      className="flex h-8 w-8 items-center justify-center rounded-lg text-fg-muted transition-colors hover:bg-surface hover:text-fg"
+                      title="View executions"
+                    >
+                      <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
+                      </svg>
+                    </button>
                     {/* Download */}
                     <button
                       onClick={() => onDownload(wf)}
@@ -124,6 +135,15 @@ export function WorkflowTable({ workflows, onDownload, onReplace, onDelete }: Wo
             </div>
 
             <div className="mt-3 flex gap-2 border-t border-divider/50 pt-3">
+              <button
+                onClick={() => onViewExecutions(wf)}
+                className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium text-fg-muted transition-colors hover:bg-surface hover:text-fg"
+              >
+                <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
+                </svg>
+                Executions
+              </button>
               <button
                 onClick={() => onDownload(wf)}
                 className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium text-fg-muted transition-colors hover:bg-accent/10 hover:text-accent"

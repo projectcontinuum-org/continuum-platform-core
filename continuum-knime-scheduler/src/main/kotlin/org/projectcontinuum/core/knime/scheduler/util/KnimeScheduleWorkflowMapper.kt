@@ -5,12 +5,15 @@ import java.util.UUID
 
 /**
  * Builds the single-node [ContinuumWorkflowModel] DAG that api-server's generic Temporal schedule
- * executes for a KNIME workflow. The node's `nodeModel`/`propertiesSchema` mirror
- * `KNIMEWorkflowExecutorNodeModel` in the continuum-feature-knime repo — that contract is
- * duplicated here (not shared via a dependency) and must be kept in sync manually if the
- * executor node's properties ever change. `NodeData.id` must equal `NodeData.nodeModel`:
- * `WorkflowActivityInitializer` in continuum-orchestration-service uses `data.id` as the node-type
- * key to resolve task queues from api-server's node registry, which is keyed by `nodeModel`.
+ * executes for a KNIME workflow. The node's `nodeModel`/`propertiesSchema`/`icon`/`subTitle`/
+ * `inputs`/`outputs`/`propertiesUISchema` mirror `KNIMEWorkflowExecutorNodeModel.metadata` in the
+ * continuum-feature-knime repo — that contract is duplicated here (not shared via a dependency)
+ * and must be kept in sync manually if the executor node's properties ever change. `Node.type`
+ * must be `"BaseNode"`: that's the only node type the workflow-editor's React Flow instance has
+ * registered, so anything else silently falls back to React Flow's unstyled default node.
+ * `NodeData.id` must equal `NodeData.nodeModel`: `WorkflowActivityInitializer` in
+ * continuum-orchestration-service uses `data.id` as the node-type key to resolve task queues from
+ * api-server's node registry, which is keyed by `nodeModel`.
  */
 object KnimeScheduleWorkflowMapper {
 
@@ -21,6 +24,54 @@ object KnimeScheduleWorkflowMapper {
   private const val PROPERTY_EXECUTION_UPLOAD_URL = "executionUploadUrl"
   private const val PROPERTY_TIMEOUT_SECONDS = "timeoutSeconds"
   private const val PROPERTY_RESET_WORKFLOW = "resetWorkflow"
+
+  private const val NODE_SUB_TITLE = "Execute KNIME workflows from remote locations"
+
+  private val NODE_ICON = """
+    <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
+      <path d="m10.445 21.393 11.54 -0.775 0.451 0.775zM7.56 11.113l-5.092 10.28h-0.904Zm10.427 2.652 -6.43 -9.505 0.452 -0.775zm2.57 5.216 0.627 0.896 -10.652 0.707zM4.655 20.976l-1.143 0.09 4.709 -9.488Zm6.173 -14.667 0.476 -0.998 5.984 8.782zM19.1 17.364l0.847 1.015 -8.685 1.413zM6.76 20.532l-1.32 0.224 3.11 -8.162Zm3.406 -12.189 0.472 -1.207 5.558 6.732Zm7.403 7.54 1.13 1.016 -6.378 1.98zm-8.759 4.08 -1.46 0.448 1.46 -6.44zm0.8 -9.539 0.363 -1.48 4.868 4.477zm-0.348 9.402v-7.851l0.244 -1.085 6.864 3.926 0.834 0.758L10.34 19.5zM12.01 1.694 0 22.306h24z" fill="#000000" stroke-width="1"></path>
+    </svg>
+  """.trimIndent()
+
+  private val NODE_OUTPUTS: Map<String, ContinuumWorkflowModel.NodePort> = mapOf(
+    "destinationPath" to ContinuumWorkflowModel.NodePort(name = "destination path", contentType = "text/plain")
+  )
+
+  private val NODE_INPUTS: Map<String, ContinuumWorkflowModel.NodePort> = emptyMap()
+
+  val KNIME_EXECUTOR_PROPERTIES_UI_SCHEMA: Map<String, Any> = mapOf(
+    "type" to "Categorization",
+    "elements" to listOf(
+      mapOf(
+        "type" to "Category",
+        "label" to "Workflow Configuration",
+        "elements" to listOf(
+          mapOf(
+            "type" to "Control",
+            "scope" to "#/properties/$PROPERTY_WORKFLOW_LOCATION",
+            "options" to mapOf(
+              "placeholder" to "https://example.com/workflow.knwf or /path/to/workflow.knwf"
+            )
+          ),
+          mapOf(
+            "type" to "Control",
+            "scope" to "#/properties/$PROPERTY_EXECUTION_UPLOAD_URL",
+            "options" to mapOf(
+              "placeholder" to "https://example.com/api/v1/knime-workflows/{workflowId}/executions"
+            )
+          )
+        )
+      ),
+      mapOf(
+        "type" to "Category",
+        "label" to "Execution Settings",
+        "elements" to listOf(
+          mapOf("type" to "Control", "scope" to "#/properties/$PROPERTY_TIMEOUT_SECONDS"),
+          mapOf("type" to "Control", "scope" to "#/properties/$PROPERTY_RESET_WORKFLOW")
+        )
+      )
+    )
+  )
 
   // Trailing /{fileName} segment is optional so schedules created before that segment was
   // added (URL ending bare in /content) still resolve.
@@ -63,25 +114,33 @@ object KnimeScheduleWorkflowMapper {
     resetWorkflow: Boolean,
     timeoutSeconds: Long
   ): ContinuumWorkflowModel {
+    val position = ContinuumWorkflowModel.Position(0.0, 0.0)
     val node = ContinuumWorkflowModel.Node(
       id = knimeWorkflowId.toString(),
-      type = "process",
-      position = ContinuumWorkflowModel.Position(0.0, 0.0),
-      width = 100,
-      height = 100,
+      type = "BaseNode",
+      position = position,
+      positionAbsolute = position,
+      width = 255,
+      height = 123,
       selected = false,
+      dragging = false,
       data = ContinuumWorkflowModel.NodeData(
         id = KNIME_EXECUTOR_NODE_MODEL,
         title = "KNIME Workflow Executor",
+        subTitle = NODE_SUB_TITLE,
         description = "Download, execute, and upload KNIME workflows",
         nodeModel = KNIME_EXECUTOR_NODE_MODEL,
+        icon = NODE_ICON,
+        inputs = NODE_INPUTS,
+        outputs = NODE_OUTPUTS,
         properties = mapOf(
           PROPERTY_WORKFLOW_LOCATION to contentUrl,
           PROPERTY_EXECUTION_UPLOAD_URL to executionUploadUrl,
           PROPERTY_TIMEOUT_SECONDS to timeoutSeconds,
           PROPERTY_RESET_WORKFLOW to resetWorkflow
         ),
-        propertiesSchema = KNIME_EXECUTOR_PROPERTIES_SCHEMA
+        propertiesSchema = KNIME_EXECUTOR_PROPERTIES_SCHEMA,
+        propertiesUISchema = KNIME_EXECUTOR_PROPERTIES_UI_SCHEMA
       )
     )
     return ContinuumWorkflowModel(id = knimeWorkflowId.toString(), name = name, nodes = listOf(node))
