@@ -8,7 +8,7 @@ CREATE TABLE IF NOT EXISTS node_tree_entries (
     task_queue              VARCHAR(255) NULL,
     worker_id               VARCHAR(255) NULL,
     feature_id              VARCHAR(500) NULL,
-    node_manifest           JSONB NULL,
+    node_manifest           JSON NULL,
     documentation_markdown  TEXT NULL,
     extensions              JSONB NULL DEFAULT '{}',
     registered_at           TIMESTAMPTZ NULL,

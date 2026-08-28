@@ -97,9 +97,8 @@ abstract class ProcessNodeModel : ContinuumNodeModel {
    *     nodeProgressCallback: NodeProgressCallback,
    *     executionContext: ExecutionContext
    * ) {
-   *     val creds = executionContext.getCredential("AWS Credentials")
-   *         ?: throw NodeRuntimeException(...)
-   *     // use creds...
+   *     val creds = executionContext.getCredential<Map<String, Any>>("AWS Credentials")
+   *     // use creds... (throws CredentialsNotFoundException if not found)
    * }
    * ```
    */

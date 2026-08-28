@@ -18,7 +18,8 @@ import org.projectcontinuum.core.commons.protocol.progress.StageStatus
 import org.projectcontinuum.core.commons.utils.NodeInputReader
 import org.projectcontinuum.core.commons.utils.NodeOutputWriter
 import org.projectcontinuum.core.commons.workflow.IContinuumWorkflow
-import org.projectcontinuum.core.worker.starter.resolver.CredentialResolver
+import org.projectcontinuum.core.commons.context.CredentialFetcher
+import org.projectcontinuum.core.worker.starter.credential.CredentialFetcherService
 import io.temporal.activity.Activity
 import io.temporal.activity.ActivityExecutionContext
 import io.temporal.spring.boot.ActivityImpl
@@ -86,7 +87,7 @@ import kotlin.system.measureTimeMillis
 class ContinuumNodeActivity(
   private val applicationContext: ApplicationContext,
   private val s3TransferManager: S3TransferManager,
-  private val credentialResolver: CredentialResolver,
+  private val credentialFetcherService: CredentialFetcherService,
   @param:Value("\${continuum.core.worker.storage.bucket-name}")
   private val cacheBucketName: String,
   @param:Value("\${continuum.core.worker.storage.bucket-base-path}")
@@ -242,18 +243,17 @@ class ContinuumNodeActivity(
 
     executionStartTime.set(System.currentTimeMillis())
 
-    // Resolve credentials from UI Schema before node execution.
-    // Scans propertiesUISchema for fields with options.format == "credential",
-    // fetches the actual credential data from the Credentials Server,
-    // and passes it to the node via ExecutionContext.
+    // The node fetches whichever credential(s) it needs, by name, on demand via
+    // ExecutionContext.getCredential(name) — the framework does not scan propertiesUISchema.
     val ownerId = ContinuumOwnerContext.get()
-    val credentials = if (ownerId != null) {
-      credentialResolver.resolve(node.data.properties, node.data.propertiesUISchema, ownerId)
-    } else {
-      emptyMap()
-    }
-
-    val executionContext = ExecutionContext(ownerId = ownerId, credentials = credentials)
+    val executionContext = ExecutionContext(
+      ownerId = ownerId,
+      credentialFetcher = if (ownerId != null) {
+        CredentialFetcher { name -> credentialFetcherService.fetch(name, ownerId) }
+      } else {
+        CredentialFetcher { null }
+      }
+    )
 
     createProcessNode(nodeModel).run(
       node = node,

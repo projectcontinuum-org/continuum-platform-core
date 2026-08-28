@@ -124,10 +124,9 @@ Node documentation is auto-loaded from `resources/<package>/<ClassName>.doc.md` 
 
 ### Credentials
 
-Nodes needing external secrets use the credentials system:
-- The node's `propertiesUISchema` declares a control with `options.format = "credential"` and `options.credentialLabel = "My Label"`.
-- Before `execute()`, `CredentialResolver` scans the UI schema, fetches the named credential from `continuum-credentials-server` (`GET /api/v1/credentials/{name}` with `x-continuum-user-id` header), and passes it via `ExecutionContext`.
-- Inside `execute()`: `executionContext.getCredential("My Label")` returns the key-value map.
+Nodes needing external secrets fetch them on demand from `execute()`, by name:
+- The node's `propertiesUISchema` declares a control with `options.format = "credential"` (and optionally `options.credentialType`) purely so `continuum-workbench` renders a credential picker there — the backend does not read this schema.
+- Inside `execute()`, the node reads its own `properties` to find the credential name(s) it configured, then calls `executionContext.getCredential<T>(name)`. This fetches the named credential from `continuum-credentials-server` on demand (`GET /api/v1/credentials/{name}` with `x-continuum-user-id` header, via `CredentialFetcherService` in `continuum-worker-springboot-starter`) and deserializes its key-value data into `T` (Jackson), throwing `CredentialsNotFoundException` if not found.
 
 ### Task queues
 
