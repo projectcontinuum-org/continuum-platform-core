@@ -6,6 +6,8 @@ import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 import org.projectcontinuum.core.commons.model.ContinuumWorkflowModel
+import org.projectcontinuum.core.knime.scheduler.model.KnimeWorkflowCredentialRef
+import org.projectcontinuum.core.knime.scheduler.model.KnimeWorkflowVariable
 import java.util.UUID
 
 class KnimeScheduleWorkflowMapperTest {
@@ -120,5 +122,45 @@ class KnimeScheduleWorkflowMapperTest {
 
     assertFalse(KnimeScheduleWorkflowMapper.extractResetWorkflow(genericModel))
     assertEquals(300L, KnimeScheduleWorkflowMapper.extractTimeoutSeconds(genericModel))
+  }
+
+  @Test
+  fun `toWorkflowModel embeds workflow variables and credentials, extract helpers read them back`() {
+    val knimeWorkflowId = UUID.randomUUID()
+    val variables = listOf(KnimeWorkflowVariable(name = "foo", value = "bar", type = "String"))
+    val credentials = listOf(KnimeWorkflowCredentialRef(knimeCredentialName = "db", credential = "my-stored-cred"))
+
+    val model = KnimeScheduleWorkflowMapper.toWorkflowModel(
+      name = "Nightly run",
+      knimeWorkflowId = knimeWorkflowId,
+      contentUrl = "http://localhost:8085/api/v1/knime-workflows/$knimeWorkflowId/content",
+      executionUploadUrl = "http://localhost:8085/api/v1/knime-workflows/$knimeWorkflowId/executions",
+      resetWorkflow = false,
+      timeoutSeconds = 300,
+      workflowVariables = variables,
+      workflowCredentials = credentials
+    )
+
+    assertEquals(variables, KnimeScheduleWorkflowMapper.extractWorkflowVariables(model))
+    assertEquals(credentials, KnimeScheduleWorkflowMapper.extractWorkflowCredentials(model))
+  }
+
+  @Test
+  fun `extractWorkflowVariables and extractWorkflowCredentials default to empty lists when absent`() {
+    val knimeWorkflowId = UUID.randomUUID()
+    val model = KnimeScheduleWorkflowMapper.toWorkflowModel(
+      name = "Nightly run",
+      knimeWorkflowId = knimeWorkflowId,
+      contentUrl = "http://localhost:8085/api/v1/knime-workflows/$knimeWorkflowId/content",
+      executionUploadUrl = "http://localhost:8085/api/v1/knime-workflows/$knimeWorkflowId/executions",
+      resetWorkflow = false,
+      timeoutSeconds = 300
+    )
+    val genericModel = ContinuumWorkflowModel(id = "wf-2", name = "Generic workflow", nodes = emptyList())
+
+    assertTrue(KnimeScheduleWorkflowMapper.extractWorkflowVariables(model).isEmpty())
+    assertTrue(KnimeScheduleWorkflowMapper.extractWorkflowCredentials(model).isEmpty())
+    assertTrue(KnimeScheduleWorkflowMapper.extractWorkflowVariables(genericModel).isEmpty())
+    assertTrue(KnimeScheduleWorkflowMapper.extractWorkflowCredentials(genericModel).isEmpty())
   }
 }

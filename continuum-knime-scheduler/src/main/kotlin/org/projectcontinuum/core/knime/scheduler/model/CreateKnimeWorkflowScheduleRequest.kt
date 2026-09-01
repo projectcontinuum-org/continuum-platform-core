@@ -8,5 +8,7 @@ data class CreateKnimeWorkflowScheduleRequest(
   val timeZone: String? = null,
   val knimeWorkflowId: UUID,
   val resetWorkflow: Boolean = false,
-  val timeoutSeconds: Long = 300
+  val timeoutSeconds: Long = 300,
+  val workflowVariables: List<KnimeWorkflowVariable> = emptyList(),
+  val workflowCredentials: List<KnimeWorkflowCredentialRef> = emptyList()
 )

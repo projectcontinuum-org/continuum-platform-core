@@ -1,6 +1,8 @@
 package org.projectcontinuum.core.knime.scheduler.util
 
 import org.projectcontinuum.core.commons.model.ContinuumWorkflowModel
+import org.projectcontinuum.core.knime.scheduler.model.KnimeWorkflowCredentialRef
+import org.projectcontinuum.core.knime.scheduler.model.KnimeWorkflowVariable
 import java.util.UUID
 
 /**
@@ -24,6 +26,8 @@ object KnimeScheduleWorkflowMapper {
   private const val PROPERTY_EXECUTION_UPLOAD_URL = "executionUploadUrl"
   private const val PROPERTY_TIMEOUT_SECONDS = "timeoutSeconds"
   private const val PROPERTY_RESET_WORKFLOW = "resetWorkflow"
+  private const val PROPERTY_WORKFLOW_VARIABLES = "workflowVariables"
+  private const val PROPERTY_WORKFLOW_CREDENTIALS = "workflowCredentials"
 
   private const val NODE_SUB_TITLE = "Execute KNIME workflows from remote locations"
 
@@ -69,6 +73,35 @@ object KnimeScheduleWorkflowMapper {
           mapOf("type" to "Control", "scope" to "#/properties/$PROPERTY_TIMEOUT_SECONDS"),
           mapOf("type" to "Control", "scope" to "#/properties/$PROPERTY_RESET_WORKFLOW")
         )
+      ),
+      mapOf(
+        "type" to "Category",
+        "label" to "Workflow Variables & Credentials",
+        "elements" to listOf(
+          mapOf(
+            "type" to "Control",
+            "scope" to "#/properties/$PROPERTY_WORKFLOW_VARIABLES",
+            "options" to mapOf("showSortButtons" to true)
+          ),
+          mapOf(
+            "type" to "Control",
+            "scope" to "#/properties/$PROPERTY_WORKFLOW_CREDENTIALS",
+            "options" to mapOf(
+              "showSortButtons" to true,
+              "detail" to mapOf(
+                "type" to "VerticalLayout",
+                "elements" to listOf(
+                  mapOf("type" to "Control", "scope" to "#/properties/knimeCredentialName"),
+                  mapOf(
+                    "type" to "Control",
+                    "scope" to "#/properties/credential",
+                    "options" to mapOf("format" to "credential", "credentialType" to "GENERIC")
+                  )
+                )
+              )
+            )
+          )
+        )
       )
     )
   )
@@ -101,6 +134,48 @@ object KnimeScheduleWorkflowMapper {
         "title" to "Reset Workflow Before Execution",
         "description" to "Pass --reset to the KNIME batch executor to clear node outputs before running",
         "default" to false
+      ),
+      PROPERTY_WORKFLOW_VARIABLES to mapOf(
+        "type" to "array",
+        "title" to "Workflow Variables",
+        "description" to "Variables passed to the workflow at runtime via NodePit's --variable flag. Configure matching Workflow Variables in KNIME first (right-click workflow -> Workflow Variables...)",
+        "items" to mapOf(
+          "type" to "object",
+          "properties" to mapOf(
+            "name" to mapOf("type" to "string", "title" to "Name"),
+            "value" to mapOf("type" to "string", "title" to "Value"),
+            "type" to mapOf(
+              "type" to "string",
+              "title" to "Type",
+              "enum" to listOf("String", "int", "double"),
+              "default" to "String"
+            )
+          ),
+          "required" to listOf("name", "value", "type")
+        ),
+        "default" to emptyList<Any>()
+      ),
+      PROPERTY_WORKFLOW_CREDENTIALS to mapOf(
+        "type" to "array",
+        "title" to "Workflow Credentials",
+        "description" to "Login/password credentials injected into the workflow at runtime via NodePit's --credential flag. Configure a matching entry in KNIME first (right-click workflow -> Workflow Credentials...) - the Name below must exactly match the name configured there.",
+        "items" to mapOf(
+          "type" to "object",
+          "properties" to mapOf(
+            "knimeCredentialName" to mapOf(
+              "type" to "string",
+              "title" to "KNIME Credential Name",
+              "description" to "Must exactly match the name configured in this workflow's own Workflow Credentials dialog in KNIME"
+            ),
+            "credential" to mapOf(
+              "type" to "string",
+              "title" to "Credential",
+              "description" to "Continuum stored credential providing the login and password to inject"
+            )
+          ),
+          "required" to listOf("knimeCredentialName", "credential")
+        ),
+        "default" to emptyList<Any>()
       )
     ),
     "required" to listOf(PROPERTY_WORKFLOW_LOCATION, PROPERTY_EXECUTION_UPLOAD_URL)
@@ -112,7 +187,9 @@ object KnimeScheduleWorkflowMapper {
     contentUrl: String,
     executionUploadUrl: String,
     resetWorkflow: Boolean,
-    timeoutSeconds: Long
+    timeoutSeconds: Long,
+    workflowVariables: List<KnimeWorkflowVariable> = emptyList(),
+    workflowCredentials: List<KnimeWorkflowCredentialRef> = emptyList()
   ): ContinuumWorkflowModel {
     val position = ContinuumWorkflowModel.Position(0.0, 0.0)
     val node = ContinuumWorkflowModel.Node(
@@ -137,7 +214,13 @@ object KnimeScheduleWorkflowMapper {
           PROPERTY_WORKFLOW_LOCATION to contentUrl,
           PROPERTY_EXECUTION_UPLOAD_URL to executionUploadUrl,
           PROPERTY_TIMEOUT_SECONDS to timeoutSeconds,
-          PROPERTY_RESET_WORKFLOW to resetWorkflow
+          PROPERTY_RESET_WORKFLOW to resetWorkflow,
+          PROPERTY_WORKFLOW_VARIABLES to workflowVariables.map {
+            mapOf("name" to it.name, "value" to it.value, "type" to it.type)
+          },
+          PROPERTY_WORKFLOW_CREDENTIALS to workflowCredentials.map {
+            mapOf("knimeCredentialName" to it.knimeCredentialName, "credential" to it.credential)
+          }
         ),
         propertiesSchema = KNIME_EXECUTOR_PROPERTIES_SCHEMA,
         propertiesUISchema = KNIME_EXECUTOR_PROPERTIES_UI_SCHEMA
@@ -161,6 +244,29 @@ object KnimeScheduleWorkflowMapper {
 
   fun extractTimeoutSeconds(model: ContinuumWorkflowModel): Long =
     (executorNode(model)?.data?.properties?.get(PROPERTY_TIMEOUT_SECONDS) as? Number)?.toLong() ?: 300L
+
+  fun extractWorkflowVariables(model: ContinuumWorkflowModel): List<KnimeWorkflowVariable> =
+    (executorNode(model)?.data?.properties?.get(PROPERTY_WORKFLOW_VARIABLES) as? List<*>)
+      ?.mapNotNull { item ->
+        (item as? Map<*, *>)?.let { m ->
+          val name = m["name"] as? String ?: return@let null
+          KnimeWorkflowVariable(
+            name = name,
+            value = m["value"] as? String ?: "",
+            type = m["type"] as? String ?: "String"
+          )
+        }
+      } ?: emptyList()
+
+  fun extractWorkflowCredentials(model: ContinuumWorkflowModel): List<KnimeWorkflowCredentialRef> =
+    (executorNode(model)?.data?.properties?.get(PROPERTY_WORKFLOW_CREDENTIALS) as? List<*>)
+      ?.mapNotNull { item ->
+        (item as? Map<*, *>)?.let { m ->
+          val knimeCredentialName = m["knimeCredentialName"] as? String ?: return@let null
+          val credential = m["credential"] as? String ?: return@let null
+          KnimeWorkflowCredentialRef(knimeCredentialName = knimeCredentialName, credential = credential)
+        }
+      } ?: emptyList()
 
   private fun executorNode(model: ContinuumWorkflowModel): ContinuumWorkflowModel.Node? =
     model.nodes.firstOrNull { it.data.nodeModel == KNIME_EXECUTOR_NODE_MODEL }

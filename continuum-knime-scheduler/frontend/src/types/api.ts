@@ -27,6 +27,22 @@ export interface PageResponse<T> {
   size: number;
 }
 
+export interface KnimeWorkflowVariable {
+  name: string;
+  value: string;
+  type: string;
+}
+
+export interface KnimeWorkflowCredentialRef {
+  knimeCredentialName: string;
+  credential: string;
+}
+
+export interface CredentialSummary {
+  name: string;
+  type: string;
+}
+
 export interface CreateKnimeWorkflowScheduleRequest {
   name: string;
   cronExpression: string;
@@ -34,6 +50,8 @@ export interface CreateKnimeWorkflowScheduleRequest {
   knimeWorkflowId: string;
   resetWorkflow: boolean;
   timeoutSeconds: number;
+  workflowVariables: KnimeWorkflowVariable[];
+  workflowCredentials: KnimeWorkflowCredentialRef[];
 }
 
 export interface KnimeWorkflowScheduleResponse {
@@ -49,6 +67,8 @@ export interface KnimeWorkflowScheduleResponse {
   knimeWorkflowId: string;
   resetWorkflow: boolean;
   timeoutSeconds: number;
+  workflowVariables: KnimeWorkflowVariable[];
+  workflowCredentials: KnimeWorkflowCredentialRef[];
 }
 
 export interface ApiErrorBody {

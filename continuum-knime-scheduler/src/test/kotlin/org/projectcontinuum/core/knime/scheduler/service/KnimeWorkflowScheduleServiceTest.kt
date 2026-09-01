@@ -16,6 +16,8 @@ import org.projectcontinuum.core.knime.scheduler.entity.KnimeWorkflowEntity
 import org.projectcontinuum.core.knime.scheduler.exception.KnimeWorkflowNotFoundException
 import org.projectcontinuum.core.knime.scheduler.exception.KnimeWorkflowScheduleNotFoundException
 import org.projectcontinuum.core.knime.scheduler.model.CreateKnimeWorkflowScheduleRequest
+import org.projectcontinuum.core.knime.scheduler.model.KnimeWorkflowCredentialRef
+import org.projectcontinuum.core.knime.scheduler.model.KnimeWorkflowVariable
 import org.projectcontinuum.core.knime.scheduler.repository.KnimeWorkflowRepository
 import org.projectcontinuum.core.knime.scheduler.util.KnimeScheduleWorkflowMapper
 import java.time.Instant
@@ -168,5 +170,41 @@ class KnimeWorkflowScheduleServiceTest {
     service.deleteSchedule(ownedBy, scheduleId)
 
     verify(workflowScheduleApiClient).deleteSchedule(ownedBy, scheduleId)
+  }
+
+  @Test
+  fun `createSchedule forwards workflow variables and credentials into the built model and back out`() {
+    val knimeWorkflowId = UUID.randomUUID()
+    val scheduleId = UUID.randomUUID()
+    val variables = listOf(KnimeWorkflowVariable(name = "foo", value = "bar", type = "String"))
+    val credentials = listOf(KnimeWorkflowCredentialRef(knimeCredentialName = "db", credential = "my-stored-cred"))
+    whenever(knimeWorkflowRepository.findByWorkflowIdAndOwnedBy(knimeWorkflowId, ownedBy)).thenReturn(entity(knimeWorkflowId))
+    whenever(workflowScheduleApiClient.createSchedule(any(), eq(ownedBy))).thenAnswer { invocation ->
+      val req = invocation.arguments[0] as CreateWorkflowScheduleApiRequest
+      WorkflowScheduleApiResponse(
+        scheduleId = scheduleId,
+        name = req.name,
+        ownedBy = ownedBy,
+        cronExpression = req.cronExpression,
+        timeZone = req.timeZone,
+        paused = false,
+        nextRunTimes = emptyList(),
+        createdAt = Instant.now(),
+        updatedAt = Instant.now(),
+        continuumWorkflowModel = req.continuumWorkflowModel
+      )
+    }
+    val request = CreateKnimeWorkflowScheduleRequest(
+      name = "Nightly run",
+      cronExpression = "0 0 * * *",
+      knimeWorkflowId = knimeWorkflowId,
+      workflowVariables = variables,
+      workflowCredentials = credentials
+    )
+
+    val response = service.createSchedule(request, ownedBy)
+
+    assertEquals(variables, response.workflowVariables)
+    assertEquals(credentials, response.workflowCredentials)
   }
 }

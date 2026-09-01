@@ -48,7 +48,9 @@ class KnimeWorkflowScheduleControllerTest {
       updatedAt = Instant.now(),
       knimeWorkflowId = knimeWorkflowId,
       resetWorkflow = false,
-      timeoutSeconds = 300
+      timeoutSeconds = 300,
+      workflowVariables = emptyList(),
+      workflowCredentials = emptyList()
     )
 
   private fun createJson(knimeWorkflowId: UUID) = """

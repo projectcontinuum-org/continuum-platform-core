@@ -15,5 +15,7 @@ data class KnimeWorkflowScheduleResponse(
   val updatedAt: Instant,
   val knimeWorkflowId: UUID,
   val resetWorkflow: Boolean,
-  val timeoutSeconds: Long
+  val timeoutSeconds: Long,
+  val workflowVariables: List<KnimeWorkflowVariable>,
+  val workflowCredentials: List<KnimeWorkflowCredentialRef>
 )

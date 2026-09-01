@@ -34,7 +34,7 @@ export function ViewScheduleModal({ schedule, workflowFileName, isOpen, onClose 
   if (!schedule) return null;
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title="Schedule Details" size="md">
+    <Modal isOpen={isOpen} onClose={onClose} title="Schedule Details" size="lg">
       <div className="space-y-1 divide-y divide-divider/50">
         <DetailRow label="Name">{schedule.name}</DetailRow>
         <DetailRow label="Status">
@@ -66,6 +66,32 @@ export function ViewScheduleModal({ schedule, workflowFileName, isOpen, onClose 
           <p className="text-sm text-fg-muted">No upcoming runs scheduled.</p>
         )}
       </div>
+
+      {schedule.workflowVariables.length > 0 && (
+        <div className="mt-4">
+          <h3 className="mb-2 text-sm font-semibold text-fg">Workflow Variables</h3>
+          <ul className="space-y-1 rounded-lg border border-divider bg-surface/30 p-3">
+            {schedule.workflowVariables.map((v, i) => (
+              <li key={i} className="text-sm text-fg-muted">
+                <code>{v.name}</code> = <code>{v.value}</code> ({v.type})
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {schedule.workflowCredentials.length > 0 && (
+        <div className="mt-4">
+          <h3 className="mb-2 text-sm font-semibold text-fg">Workflow Credentials</h3>
+          <ul className="space-y-1 rounded-lg border border-divider bg-surface/30 p-3">
+            {schedule.workflowCredentials.map((c, i) => (
+              <li key={i} className="text-sm text-fg-muted">
+                <code>{c.knimeCredentialName}</code> → <code>{c.credential}</code>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
 
       <div className="mt-6 flex justify-end">
         <Button variant="secondary" onClick={onClose}>

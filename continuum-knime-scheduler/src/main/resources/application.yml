@@ -22,6 +22,7 @@ spring:
 continuum.core:
   knime-scheduler:
     api-server-base-url: ${CONTINUUM_API_SERVER_URL:http://localhost:8081}
+    credentials-server-base-url: ${CONTINUUM_CREDENTIALS_SERVER_URL:http://localhost:8083}
     public-base-url: ${CONTINUUM_KNIME_SCHEDULER_PUBLIC_URL:http://localhost:8084}
     storage:
       type: ${CONTINUUM_STORAGE_TYPE:minio}

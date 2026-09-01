@@ -39,7 +39,9 @@ class KnimeWorkflowScheduleService(
       contentUrl = contentUrl,
       executionUploadUrl = executionUploadUrl,
       resetWorkflow = request.resetWorkflow,
-      timeoutSeconds = request.timeoutSeconds
+      timeoutSeconds = request.timeoutSeconds,
+      workflowVariables = request.workflowVariables,
+      workflowCredentials = request.workflowCredentials
     )
 
     val response = workflowScheduleApiClient.createSchedule(
@@ -109,6 +111,8 @@ class KnimeWorkflowScheduleService(
       knimeWorkflowId = KnimeScheduleWorkflowMapper.extractKnimeWorkflowId(response.continuumWorkflowModel)
         ?: response.scheduleId,
       resetWorkflow = KnimeScheduleWorkflowMapper.extractResetWorkflow(response.continuumWorkflowModel),
-      timeoutSeconds = KnimeScheduleWorkflowMapper.extractTimeoutSeconds(response.continuumWorkflowModel)
+      timeoutSeconds = KnimeScheduleWorkflowMapper.extractTimeoutSeconds(response.continuumWorkflowModel),
+      workflowVariables = KnimeScheduleWorkflowMapper.extractWorkflowVariables(response.continuumWorkflowModel),
+      workflowCredentials = KnimeScheduleWorkflowMapper.extractWorkflowCredentials(response.continuumWorkflowModel)
     )
 }
