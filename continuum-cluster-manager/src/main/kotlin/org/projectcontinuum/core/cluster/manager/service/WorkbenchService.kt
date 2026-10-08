@@ -11,6 +11,7 @@ import org.projectcontinuum.core.cluster.manager.exception.WorkbenchNotFoundExce
 import org.projectcontinuum.core.cluster.manager.model.*
 import org.projectcontinuum.core.cluster.manager.repository.WorkbenchInstanceRepository
 import org.slf4j.LoggerFactory
+import org.springframework.beans.factory.annotation.Qualifier
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import org.springframework.transaction.support.TransactionTemplate
@@ -25,7 +26,7 @@ class WorkbenchService(
   private val freemarkerConfig: Configuration,
   private val transactionTemplate: TransactionTemplate,
   private val workbenchProperties: WorkbenchProperties,
-  private val overlayService: OverlayService
+  @Qualifier("workbenchOverlayService") private val overlayService: OverlayService
 ) {
 
   private val logger = LoggerFactory.getLogger(WorkbenchService::class.java)

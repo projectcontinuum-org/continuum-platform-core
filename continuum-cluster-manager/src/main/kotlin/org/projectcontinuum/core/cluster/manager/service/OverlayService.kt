@@ -7,10 +7,7 @@ import com.fasterxml.jackson.dataformat.yaml.YAMLFactory
 import com.fasterxml.jackson.dataformat.yaml.YAMLGenerator
 import freemarker.template.Configuration
 import freemarker.template.Template
-import jakarta.annotation.PostConstruct
-import org.projectcontinuum.core.cluster.manager.config.OverlayProperties
 import org.slf4j.LoggerFactory
-import org.springframework.stereotype.Service
 import java.io.StringReader
 import java.io.StringWriter
 import java.nio.file.Files
@@ -25,7 +22,17 @@ enum class ResourceType(val filename: String) {
   DEPLOYMENT("deployment.yaml"),
   SERVICE("service.yaml"),
   PVC("pvc.yaml"),
-  INGRESS("ingress.yaml")
+  INGRESS("ingress.yaml"),
+  HPA("hpa.yaml")
+}
+
+/**
+ * Properties for a single overlay domain: whether overlays are enabled, and
+ * the directory they are mounted/loaded from.
+ */
+interface OverlayDomainProperties {
+  val enabled: Boolean
+  val path: String
 }
 
 /**
@@ -34,22 +41,27 @@ enum class ResourceType(val filename: String) {
  * resource YAML before it is applied to the cluster.
  *
  * Overlay files follow the naming convention `{variant}--{resource}.yaml`
- * (e.g. `gpu-enabled--deployment.yaml`). When no variant is specified for
- * a workbench, no overlay is applied.
+ * (e.g. `gpu-enabled--deployment.yaml`). When no variant is specified,
+ * no overlay is applied.
  *
  * Merge semantics:
  * - Object fields merge recursively (maps are merged key-by-key)
  * - Arrays and scalars replace entirely
- * - Critical identity fields (name, namespace, lifecycle labels) are protected
- *   and restored from the base after the merge
+ * - Critical identity fields (name, namespace, and the given [protectedLabels])
+ *   are protected and restored from the base after the merge
  *
  * Error handling is fail-open: overlay failures degrade to the un-overlaid
- * base YAML rather than blocking workbench operations.
+ * base YAML rather than blocking operations.
+ *
+ * This class is domain-agnostic — [overlayProperties] and [protectedLabels]
+ * are supplied per domain (e.g. workbench vs. feature-worker) by distinct
+ * beans wired in [org.projectcontinuum.core.cluster.manager.config.OverlayConfig],
+ * so the merge/snapshot/restore logic is shared rather than duplicated.
  */
-@Service
 class OverlayService(
-  private val overlayProperties: OverlayProperties,
-  private val freemarkerConfig: Configuration
+  private val overlayProperties: OverlayDomainProperties,
+  private val freemarkerConfig: Configuration,
+  private val protectedLabels: List<String>
 ) {
 
   private val logger = LoggerFactory.getLogger(OverlayService::class.java)
@@ -59,10 +71,6 @@ class OverlayService(
       .disable(YAMLGenerator.Feature.WRITE_DOC_START_MARKER)
   )
 
-  /** Labels that must never be changed by an overlay */
-  private val protectedLabels = listOf("instance-id", "app", "managed-by")
-
-  @PostConstruct
   fun init() {
     if (!overlayProperties.enabled) {
       logger.info("K8s resource overlays are disabled")
@@ -241,7 +249,7 @@ class OverlayService(
     val selectorMatchLabels = when (resourceType) {
       ResourceType.DEPLOYMENT -> snapshotLabels(base.at("/spec/selector/matchLabels"))
       ResourceType.SERVICE -> snapshotLabels(base.at("/spec/selector"))
-      ResourceType.PVC, ResourceType.INGRESS -> emptyMap()
+      ResourceType.PVC, ResourceType.INGRESS, ResourceType.HPA -> emptyMap()
     }
 
     val templateLabels = when (resourceType) {
@@ -293,7 +301,7 @@ class OverlayService(
       ResourceType.SERVICE -> {
         restoreLabelsOnNode(merged.at("/spec/selector"), snapshot.selectorMatchLabels)
       }
-      ResourceType.PVC, ResourceType.INGRESS -> { /* no additional protected fields */ }
+      ResourceType.PVC, ResourceType.INGRESS, ResourceType.HPA -> { /* no additional protected fields */ }
     }
   }
 

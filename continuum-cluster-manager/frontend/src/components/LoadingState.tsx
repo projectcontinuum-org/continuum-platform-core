@@ -1,6 +1,10 @@
 import { motion } from 'framer-motion';
 
-export function LoadingState() {
+interface LoadingStateProps {
+  message?: string;
+}
+
+export function LoadingState({ message = 'Loading workbenches...' }: LoadingStateProps = {}) {
   return (
     <div className="flex flex-col items-center justify-center py-16">
       <motion.div
@@ -27,7 +31,7 @@ export function LoadingState() {
           />
         </svg>
       </motion.div>
-      <p className="text-fg-muted">Loading workbenches...</p>
+      <p className="text-fg-muted">{message}</p>
     </div>
   );
 }

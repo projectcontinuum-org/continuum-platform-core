@@ -1,9 +1,11 @@
+import { Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useTheme } from '../hooks/useTheme';
 import { assetPath } from '../basePath';
 
 const NAV_LINKS: Array<{ label: string; href: string; external?: boolean }> = [
-  { label: 'Workbenches', href: '/' },
+  { label: 'Workbenches', href: '/workbench-manager' },
+  { label: 'Feature Workers', href: '/feature-manager' },
   { label: 'Documentation', href: 'https://github.com/projectcontinuum/continuum-platform-core', external: true },
 ];
 
@@ -16,22 +18,33 @@ export function Header() {
         aria-label="Main navigation"
         className="mx-auto flex max-w-6xl items-center justify-between px-4 py-4 sm:px-6 lg:px-8"
       >
-        <a href="/" className="flex items-center gap-2 text-gradient text-xl font-bold">
+        <Link to="/workbench-manager" className="flex items-center gap-2 text-gradient text-xl font-bold">
           <img src={assetPath('Logo.png')} alt="Continuum logo" className="h-8 w-8" />
           Continuum
-        </a>
+        </Link>
 
         <div className="flex items-center gap-6">
-          {NAV_LINKS.map((link) => (
-            <a
-              key={link.href}
-              href={link.href}
-              {...(link.external ? { target: '_blank', rel: 'noopener noreferrer' } : {})}
-              className="text-sm text-fg-muted transition-colors hover:text-fg"
-            >
-              {link.label}
-            </a>
-          ))}
+          {NAV_LINKS.map((link) =>
+            link.external ? (
+              <a
+                key={link.href}
+                href={link.href}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-sm text-fg-muted transition-colors hover:text-fg"
+              >
+                {link.label}
+              </a>
+            ) : (
+              <Link
+                key={link.href}
+                to={link.href}
+                className="text-sm text-fg-muted transition-colors hover:text-fg"
+              >
+                {link.label}
+              </Link>
+            ),
+          )}
 
           {/* Theme toggle */}
           <button

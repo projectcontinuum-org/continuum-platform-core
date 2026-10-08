@@ -21,6 +21,15 @@ class GlobalExceptionHandlerTest {
   }
 
   @Test
+  fun `handleFeatureWorkerNotFound returns 404 with error message`() {
+    val ex = FeatureWorkerNotFoundException("Feature worker 'test-fw' not found")
+    val response = handler.handleFeatureWorkerNotFound(ex)
+
+    assertEquals(HttpStatus.NOT_FOUND, response.statusCode)
+    assertEquals("Feature worker 'test-fw' not found", response.body!!["error"])
+  }
+
+  @Test
   fun `handleKubernetesError returns 500 with K8s error details`() {
     val ex = KubernetesClientException("connection refused")
     val response = handler.handleKubernetesError(ex)

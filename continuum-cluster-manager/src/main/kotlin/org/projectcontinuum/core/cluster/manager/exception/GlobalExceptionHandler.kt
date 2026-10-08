@@ -20,6 +20,12 @@ class GlobalExceptionHandler {
       .body(mapOf("error" to (ex.message ?: "Not found")))
   }
 
+  @ExceptionHandler(FeatureWorkerNotFoundException::class)
+  fun handleFeatureWorkerNotFound(ex: FeatureWorkerNotFoundException): ResponseEntity<Map<String, String>> {
+    return ResponseEntity.status(HttpStatus.NOT_FOUND)
+      .body(mapOf("error" to (ex.message ?: "Not found")))
+  }
+
   @ExceptionHandler(KubernetesClientException::class)
   fun handleKubernetesError(ex: KubernetesClientException): ResponseEntity<Map<String, String>> {
     logger.error("Kubernetes client error", ex)

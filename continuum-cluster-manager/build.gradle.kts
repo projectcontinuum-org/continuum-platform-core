@@ -40,6 +40,7 @@ dependencies {
 
   // JSON
   implementation("com.fasterxml.jackson.module:jackson-module-kotlin")
+  implementation("tools.jackson.module:jackson-module-kotlin")
 
   // Database
   implementation("org.springframework.boot:spring-boot-starter-data-jdbc")

@@ -1,5 +1,7 @@
 package org.projectcontinuum.core.cluster.manager
 
+import org.projectcontinuum.core.cluster.manager.config.FeatureWorkerOverlayProperties
+import org.projectcontinuum.core.cluster.manager.config.FeatureWorkerProperties
 import org.projectcontinuum.core.cluster.manager.config.OverlayProperties
 import org.projectcontinuum.core.cluster.manager.config.WorkbenchProperties
 import org.springframework.boot.autoconfigure.SpringBootApplication
@@ -7,7 +9,12 @@ import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.boot.runApplication
 
 @SpringBootApplication
-@EnableConfigurationProperties(WorkbenchProperties::class, OverlayProperties::class)
+@EnableConfigurationProperties(
+  WorkbenchProperties::class,
+  OverlayProperties::class,
+  FeatureWorkerProperties::class,
+  FeatureWorkerOverlayProperties::class
+)
 class App
 
 fun main(args: Array<String>) {

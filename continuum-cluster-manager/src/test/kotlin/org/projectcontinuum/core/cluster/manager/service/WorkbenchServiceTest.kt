@@ -55,7 +55,7 @@ class WorkbenchServiceTest {
       namespace = "default"
     )
 
-    val overlayService = OverlayService(OverlayProperties(enabled = false), freemarkerCfg)
+    val overlayService = OverlayService(OverlayProperties(enabled = false), freemarkerCfg, listOf("instance-id", "app", "managed-by"))
 
     service = WorkbenchService(repository, client, freemarkerCfg, transactionTemplate, workbenchProperties, overlayService)
   }
@@ -863,7 +863,7 @@ class WorkbenchServiceTest {
           cluster.example.com/team: platform
     """.trimIndent())
 
-    val overlayService = OverlayService(OverlayProperties(enabled = true, path = overlayDir.toString()), freemarkerCfg)
+    val overlayService = OverlayService(OverlayProperties(enabled = true, path = overlayDir.toString()), freemarkerCfg, listOf("instance-id", "app", "managed-by"))
     val overlayEnabledService = WorkbenchService(repository, client, freemarkerCfg, transactionTemplate, workbenchProperties, overlayService)
 
     val response = overlayEnabledService.createWorkbench("user-overlay-1", WorkbenchCreateRequest(instanceName = "overlay-wb", variant = "gpu"))
@@ -910,7 +910,7 @@ class WorkbenchServiceTest {
               workload-type: workbench
     """.trimIndent())
 
-    val overlayService = OverlayService(OverlayProperties(enabled = true, path = overlayDir.toString()), freemarkerCfg)
+    val overlayService = OverlayService(OverlayProperties(enabled = true, path = overlayDir.toString()), freemarkerCfg, listOf("instance-id", "app", "managed-by"))
     val overlayEnabledService = WorkbenchService(repository, client, freemarkerCfg, transactionTemplate, workbenchProperties, overlayService)
 
     val response = overlayEnabledService.createWorkbench("user-overlay-2", WorkbenchCreateRequest(instanceName = "toleration-wb", variant = "gpu"))
@@ -938,7 +938,7 @@ class WorkbenchServiceTest {
           cluster.example.com/resumed: "true"
     """.trimIndent())
 
-    val overlayService = OverlayService(OverlayProperties(enabled = true, path = overlayDir.toString()), freemarkerCfg)
+    val overlayService = OverlayService(OverlayProperties(enabled = true, path = overlayDir.toString()), freemarkerCfg, listOf("instance-id", "app", "managed-by"))
     val overlayEnabledService = WorkbenchService(repository, client, freemarkerCfg, transactionTemplate, workbenchProperties, overlayService)
 
     val response = overlayEnabledService.createWorkbench("user-overlay-3", WorkbenchCreateRequest(instanceName = "resume-overlay-wb", variant = "gpu"))
@@ -962,7 +962,7 @@ class WorkbenchServiceTest {
           cluster.example.com/team: platform
     """.trimIndent())
 
-    val overlayService = OverlayService(OverlayProperties(enabled = true, path = overlayDir.toString()), freemarkerCfg)
+    val overlayService = OverlayService(OverlayProperties(enabled = true, path = overlayDir.toString()), freemarkerCfg, listOf("instance-id", "app", "managed-by"))
     val overlayEnabledService = WorkbenchService(repository, client, freemarkerCfg, transactionTemplate, workbenchProperties, overlayService)
 
     val response = overlayEnabledService.createWorkbench("user-no-variant", WorkbenchCreateRequest(instanceName = "no-variant-wb"))
@@ -982,7 +982,7 @@ class WorkbenchServiceTest {
     java.nio.file.Files.writeString(overlayDir.resolve("gpu--ingress.yaml"),
       "metadata:\n  annotations:\n    owner: \"\${userId}\"")
 
-    val overlayService = OverlayService(OverlayProperties(enabled = true, path = overlayDir.toString()), freemarkerCfg)
+    val overlayService = OverlayService(OverlayProperties(enabled = true, path = overlayDir.toString()), freemarkerCfg, listOf("instance-id", "app", "managed-by"))
     val overlayEnabledService = WorkbenchService(repository, client, freemarkerCfg, transactionTemplate, workbenchProperties, overlayService)
 
     val response = overlayEnabledService.createWorkbench("user-freemarker", WorkbenchCreateRequest(instanceName = "fm-wb", variant = "gpu"))

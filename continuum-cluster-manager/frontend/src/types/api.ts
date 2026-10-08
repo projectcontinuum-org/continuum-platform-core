@@ -70,3 +70,80 @@ export interface DockerHubTag {
   fullSize: number | null;
 }
 
+// ── Feature Workers ──────────────────────────────────────────────────
+
+export interface FeatureWorkerResourceSpec {
+  cpuRequest: string;
+  cpuLimit: string;
+  memoryRequest: string;
+  memoryLimit: string;
+  storageSize: string | null;
+  storageClassName: string | null;
+}
+
+export interface AutoscalingSpec {
+  enabled: boolean;
+  minReplicas: number | null;
+  maxReplicas: number | null;
+  targetCPUUtilizationPercentage: number | null;
+}
+
+export interface FeatureWorkerCreateRequest {
+  workerName: string;
+  image: string;
+  taskQueue: string;
+  resources?: Partial<FeatureWorkerResourceSpec>;
+  replicas?: number;
+  autoscaling?: AutoscalingSpec;
+  pvcEnabled?: boolean;
+  envVars?: Record<string, string>;
+  variant?: string;
+}
+
+export interface FeatureWorkerUpdateRequest {
+  image?: string;
+  taskQueue: string;
+  resources?: Partial<FeatureWorkerResourceSpec>;
+  replicas?: number;
+  autoscaling?: AutoscalingSpec;
+  pvcEnabled?: boolean;
+  envVars?: Record<string, string>;
+}
+
+export interface FeatureWorkerResponse {
+  workerId: string;
+  workerName: string;
+  namespace: string;
+  createdBy: string;
+  status: FeatureWorkerStatus;
+  image: string;
+  taskQueue: string;
+  replicas: number;
+  autoscaling: AutoscalingSpec;
+  resources: FeatureWorkerResourceSpec;
+  pvcEnabled: boolean;
+  envVars: Record<string, string>;
+  overlayVariant: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export type FeatureWorkerStatus =
+  | 'PENDING'
+  | 'RUNNING'
+  | 'FAILED'
+  | 'UNKNOWN'
+  | 'TERMINATING'
+  | 'DELETED';
+
+export const DEFAULT_FEATURE_WORKER_RESOURCES: FeatureWorkerResourceSpec = {
+  cpuRequest: '500m',
+  cpuLimit: '2',
+  memoryRequest: '512Mi',
+  memoryLimit: '1Gi',
+  storageSize: '5Gi',
+  storageClassName: null,
+};
+
+export const TASK_QUEUE_PATTERN = /^CONTINUUM-FEATURE-[A-Z0-9-]+-TASK-QUEUE$/;
+

@@ -1,12 +1,12 @@
 import { motion } from 'framer-motion';
-import type { WorkbenchStatus } from '../types/api';
+import type { WorkbenchStatus, FeatureWorkerStatus } from '../types/api';
 
 interface StatusBadgeProps {
-  status: WorkbenchStatus;
+  status: WorkbenchStatus | FeatureWorkerStatus;
   showPulse?: boolean;
 }
 
-const STATUS_CONFIG: Record<WorkbenchStatus, { label: string; className: string }> = {
+const STATUS_CONFIG: Record<WorkbenchStatus | FeatureWorkerStatus, { label: string; className: string }> = {
   RUNNING: { label: 'Running', className: 'status-running' },
   PENDING: { label: 'Pending', className: 'status-pending' },
   SUSPENDED: { label: 'Suspended', className: 'status-suspended' },

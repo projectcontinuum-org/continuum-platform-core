@@ -5,6 +5,7 @@ import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
+import org.projectcontinuum.core.cluster.manager.config.FeatureWorkerOverlayProperties
 import org.projectcontinuum.core.cluster.manager.config.OverlayProperties
 import java.nio.file.Files
 import java.nio.file.Path
@@ -16,6 +17,8 @@ class OverlayServiceTest {
 
   private lateinit var service: OverlayService
   private lateinit var freemarkerCfg: Configuration
+  private val workbenchProtectedLabels = listOf("instance-id", "app", "managed-by")
+  private val featureWorkerProtectedLabels = listOf("worker-id", "app", "managed-by")
 
   private val baseDeploymentYaml = """
     apiVersion: apps/v1
@@ -131,6 +134,79 @@ class OverlayServiceTest {
     "storageClassName" to ""
   )
 
+  private val baseHpaYaml = """
+    apiVersion: autoscaling/v2
+    kind: HorizontalPodAutoscaler
+    metadata:
+      name: fw-test-456-hpa
+      namespace: default
+      labels:
+        app: continuum-feature-worker
+        worker-id: "test-456"
+        managed-by: continuum-cluster-manager
+    spec:
+      scaleTargetRef:
+        apiVersion: apps/v1
+        kind: Deployment
+        name: fw-test-456-deployment
+      minReplicas: 1
+      maxReplicas: 5
+      metrics:
+        - type: Resource
+          resource:
+            name: cpu
+            target:
+              type: Utilization
+              averageUtilization: 70
+  """.trimIndent()
+
+  private val baseFeatureWorkerDeploymentYaml = """
+    apiVersion: apps/v1
+    kind: Deployment
+    metadata:
+      name: fw-test-456-deployment
+      namespace: default
+      labels:
+        app: continuum-feature-worker
+        worker-id: "test-456"
+        managed-by: continuum-cluster-manager
+    spec:
+      replicas: 1
+      selector:
+        matchLabels:
+          app: continuum-feature-worker
+          worker-id: "test-456"
+      template:
+        metadata:
+          labels:
+            app: continuum-feature-worker
+            worker-id: "test-456"
+            managed-by: continuum-cluster-manager
+        spec:
+          containers:
+            - name: feature-worker
+              image: projectcontinuum/feature-worker:latest
+              env:
+                - name: CONTINUUM_NODE_TASK_QUEUE
+                  value: "CONTINUUM-FEATURE-TEST-TASK-QUEUE"
+              resources:
+                requests:
+                  cpu: "500m"
+                  memory: "512Mi"
+                limits:
+                  cpu: "2"
+                  memory: "1Gi"
+  """.trimIndent()
+
+  private val featureWorkerModel = mapOf<String, Any?>(
+    "workerId" to "test-456",
+    "namespace" to "default",
+    "image" to "projectcontinuum/feature-worker:latest",
+    "imagePullPolicy" to "IfNotPresent",
+    "taskQueue" to "CONTINUUM-FEATURE-TEST-TASK-QUEUE",
+    "replicas" to 1
+  )
+
   @BeforeEach
   fun setUp() {
     freemarkerCfg = Configuration(Configuration.VERSION_2_3_34)
@@ -138,14 +214,14 @@ class OverlayServiceTest {
     freemarkerCfg.defaultEncoding = "UTF-8"
 
     val properties = OverlayProperties(enabled = true, path = overlayDir.toString())
-    service = OverlayService(properties, freemarkerCfg)
+    service = OverlayService(properties, freemarkerCfg, workbenchProtectedLabels)
   }
 
   // ── disabled / no-op scenarios ─────────────────────────────────────────
 
   @Test
   fun `returns base unchanged when overlays disabled`() {
-    val disabledService = OverlayService(OverlayProperties(enabled = false), freemarkerCfg)
+    val disabledService = OverlayService(OverlayProperties(enabled = false), freemarkerCfg, workbenchProtectedLabels)
     val result = disabledService.applyOverlay(baseDeploymentYaml, ResourceType.DEPLOYMENT, defaultModel, "gpu")
     assertEquals(baseDeploymentYaml, result)
   }
@@ -184,7 +260,7 @@ class OverlayServiceTest {
 
   @Test
   fun `returns base unchanged when overlay directory does not exist`() {
-    val missingDir = OverlayService(OverlayProperties(enabled = true, path = "/nonexistent/path"), freemarkerCfg)
+    val missingDir = OverlayService(OverlayProperties(enabled = true, path = "/nonexistent/path"), freemarkerCfg, workbenchProtectedLabels)
     val result = missingDir.applyOverlay(baseDeploymentYaml, ResourceType.DEPLOYMENT, defaultModel, "gpu")
     assertEquals(baseDeploymentYaml, result)
   }
@@ -694,7 +770,7 @@ class OverlayServiceTest {
 
   @Test
   fun `listVariants returns empty list when disabled`() {
-    val disabledService = OverlayService(OverlayProperties(enabled = false), freemarkerCfg)
+    val disabledService = OverlayService(OverlayProperties(enabled = false), freemarkerCfg, workbenchProtectedLabels)
     val variants = disabledService.listVariants()
     assertTrue(variants.isEmpty())
   }
@@ -713,5 +789,193 @@ class OverlayServiceTest {
     val variants = service.listVariants()
 
     assertEquals(listOf("gpu"), variants)
+  }
+
+  // ── feature-worker protected-label set (generalized constructor) ──────
+
+  @Test
+  fun `feature-worker overlay service merges annotations onto deployment`() {
+    val featureWorkerService = OverlayService(
+      FeatureWorkerOverlayProperties(enabled = true, path = overlayDir.toString()),
+      freemarkerCfg,
+      featureWorkerProtectedLabels
+    )
+    val overlay = """
+      metadata:
+        annotations:
+          custom.io/team: data-science
+    """.trimIndent()
+    Files.writeString(overlayDir.resolve("gpu--deployment.yaml"), overlay)
+
+    val result = featureWorkerService.applyOverlay(baseFeatureWorkerDeploymentYaml, ResourceType.DEPLOYMENT, featureWorkerModel, "gpu")
+
+    assertTrue(result.contains("custom.io/team"))
+    assertTrue(result.contains("data-science"))
+  }
+
+  @Test
+  fun `feature-worker overlay cannot change worker-id label`() {
+    val featureWorkerService = OverlayService(
+      FeatureWorkerOverlayProperties(enabled = true, path = overlayDir.toString()),
+      freemarkerCfg,
+      featureWorkerProtectedLabels
+    )
+    val overlay = """
+      metadata:
+        labels:
+          worker-id: "hacked-id"
+    """.trimIndent()
+    Files.writeString(overlayDir.resolve("gpu--deployment.yaml"), overlay)
+
+    val result = featureWorkerService.applyOverlay(baseFeatureWorkerDeploymentYaml, ResourceType.DEPLOYMENT, featureWorkerModel, "gpu")
+
+    assertTrue(result.contains("test-456"))
+    assertFalse(result.contains("hacked-id"))
+  }
+
+  @Test
+  fun `feature-worker overlay cannot change app or managed-by labels`() {
+    val featureWorkerService = OverlayService(
+      FeatureWorkerOverlayProperties(enabled = true, path = overlayDir.toString()),
+      freemarkerCfg,
+      featureWorkerProtectedLabels
+    )
+    val overlay = """
+      metadata:
+        labels:
+          app: hacked-app
+          managed-by: hacked-manager
+    """.trimIndent()
+    Files.writeString(overlayDir.resolve("gpu--deployment.yaml"), overlay)
+
+    val result = featureWorkerService.applyOverlay(baseFeatureWorkerDeploymentYaml, ResourceType.DEPLOYMENT, featureWorkerModel, "gpu")
+
+    assertTrue(result.contains("continuum-feature-worker"))
+    assertTrue(result.contains("continuum-cluster-manager"))
+    assertFalse(result.contains("hacked-app"))
+    assertFalse(result.contains("hacked-manager"))
+  }
+
+  @Test
+  fun `feature-worker overlay cannot change deployment selector matchLabels`() {
+    val featureWorkerService = OverlayService(
+      FeatureWorkerOverlayProperties(enabled = true, path = overlayDir.toString()),
+      freemarkerCfg,
+      featureWorkerProtectedLabels
+    )
+    val overlay = """
+      spec:
+        selector:
+          matchLabels:
+            worker-id: "hacked-selector"
+    """.trimIndent()
+    Files.writeString(overlayDir.resolve("gpu--deployment.yaml"), overlay)
+
+    val result = featureWorkerService.applyOverlay(baseFeatureWorkerDeploymentYaml, ResourceType.DEPLOYMENT, featureWorkerModel, "gpu")
+
+    assertFalse(result.contains("hacked-selector"))
+  }
+
+  @Test
+  fun `feature-worker overlay disabled returns base unchanged`() {
+    val disabledService = OverlayService(FeatureWorkerOverlayProperties(enabled = false), freemarkerCfg, featureWorkerProtectedLabels)
+    val result = disabledService.applyOverlay(baseFeatureWorkerDeploymentYaml, ResourceType.DEPLOYMENT, featureWorkerModel, "gpu")
+    assertEquals(baseFeatureWorkerDeploymentYaml, result)
+  }
+
+  // ── ResourceType.HPA overlay ────────────────────────────────────────────
+
+  @Test
+  fun `hpa overlay adds annotations`() {
+    val featureWorkerService = OverlayService(
+      FeatureWorkerOverlayProperties(enabled = true, path = overlayDir.toString()),
+      freemarkerCfg,
+      featureWorkerProtectedLabels
+    )
+    val overlay = """
+      metadata:
+        annotations:
+          custom.io/scaling-policy: aggressive
+    """.trimIndent()
+    Files.writeString(overlayDir.resolve("gpu--hpa.yaml"), overlay)
+
+    val result = featureWorkerService.applyOverlay(baseHpaYaml, ResourceType.HPA, featureWorkerModel, "gpu")
+
+    assertTrue(result.contains("custom.io/scaling-policy"))
+    assertTrue(result.contains("aggressive"))
+  }
+
+  @Test
+  fun `hpa overlay can change minReplicas and maxReplicas since they are not protected`() {
+    val featureWorkerService = OverlayService(
+      FeatureWorkerOverlayProperties(enabled = true, path = overlayDir.toString()),
+      freemarkerCfg,
+      featureWorkerProtectedLabels
+    )
+    val overlay = """
+      spec:
+        minReplicas: 3
+        maxReplicas: 10
+    """.trimIndent()
+    Files.writeString(overlayDir.resolve("gpu--hpa.yaml"), overlay)
+
+    val result = featureWorkerService.applyOverlay(baseHpaYaml, ResourceType.HPA, featureWorkerModel, "gpu")
+
+    assertTrue(result.contains("minReplicas: 3"))
+    assertTrue(result.contains("maxReplicas: 10"))
+  }
+
+  @Test
+  fun `hpa overlay still protects worker-id, app, and managed-by labels`() {
+    val featureWorkerService = OverlayService(
+      FeatureWorkerOverlayProperties(enabled = true, path = overlayDir.toString()),
+      freemarkerCfg,
+      featureWorkerProtectedLabels
+    )
+    val overlay = """
+      metadata:
+        labels:
+          worker-id: "hacked-id"
+          app: hacked-app
+          managed-by: hacked-manager
+    """.trimIndent()
+    Files.writeString(overlayDir.resolve("gpu--hpa.yaml"), overlay)
+
+    val result = featureWorkerService.applyOverlay(baseHpaYaml, ResourceType.HPA, featureWorkerModel, "gpu")
+
+    assertTrue(result.contains("test-456"))
+    assertTrue(result.contains("continuum-feature-worker"))
+    assertTrue(result.contains("continuum-cluster-manager"))
+    assertFalse(result.contains("hacked-id"))
+    assertFalse(result.contains("hacked-app"))
+    assertFalse(result.contains("hacked-manager"))
+  }
+
+  @Test
+  fun `hpa overlay returns base unchanged when no variant specified`() {
+    val featureWorkerService = OverlayService(
+      FeatureWorkerOverlayProperties(enabled = true, path = overlayDir.toString()),
+      freemarkerCfg,
+      featureWorkerProtectedLabels
+    )
+    Files.writeString(overlayDir.resolve("gpu--hpa.yaml"), "spec:\n  minReplicas: 9")
+
+    val result = featureWorkerService.applyOverlay(baseHpaYaml, ResourceType.HPA, featureWorkerModel, null)
+
+    assertEquals(baseHpaYaml, result)
+  }
+
+  @Test
+  fun `malformed hpa overlay YAML returns base unchanged`() {
+    val featureWorkerService = OverlayService(
+      FeatureWorkerOverlayProperties(enabled = true, path = overlayDir.toString()),
+      freemarkerCfg,
+      featureWorkerProtectedLabels
+    )
+    Files.writeString(overlayDir.resolve("gpu--hpa.yaml"), "this: is: not: valid: yaml: [[[")
+
+    val result = featureWorkerService.applyOverlay(baseHpaYaml, ResourceType.HPA, featureWorkerModel, "gpu")
+
+    assertTrue(result.contains("fw-test-456-hpa"))
   }
 }

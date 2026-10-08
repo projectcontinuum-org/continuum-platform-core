@@ -3,9 +3,10 @@ import { Button } from './Button';
 interface ErrorStateProps {
   message: string;
   onRetry: () => void;
+  title?: string;
 }
 
-export function ErrorState({ message, onRetry }: ErrorStateProps) {
+export function ErrorState({ message, onRetry, title = 'Failed to Load Workbenches' }: ErrorStateProps) {
   return (
     <div className="flex flex-col items-center justify-center rounded-xl border border-red-200 bg-red-50 px-6 py-12 dark:border-red-900/50 dark:bg-red-900/10">
       <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-red-100 dark:bg-red-900/30">
@@ -14,7 +15,7 @@ export function ErrorState({ message, onRetry }: ErrorStateProps) {
         </svg>
       </div>
       <h3 className="mb-2 text-lg font-semibold text-red-800 dark:text-red-400">
-        Failed to Load Workbenches
+        {title}
       </h3>
       <p className="mb-6 max-w-md text-center text-sm text-red-700 dark:text-red-300">
         {message}

@@ -8,6 +8,7 @@ import org.projectcontinuum.core.cluster.manager.service.DockerHubService
 import org.projectcontinuum.core.cluster.manager.service.DockerHubTag
 import org.projectcontinuum.core.cluster.manager.service.OverlayService
 import org.projectcontinuum.core.cluster.manager.service.WorkbenchService
+import org.springframework.beans.factory.annotation.Qualifier
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.*
@@ -17,7 +18,7 @@ import org.springframework.web.bind.annotation.*
 class WorkbenchController(
   private val workbenchService: WorkbenchService,
   private val dockerHubService: DockerHubService,
-  private val overlayService: OverlayService
+  @Qualifier("workbenchOverlayService") private val overlayService: OverlayService
 ) {
 
   @GetMapping("/tags")

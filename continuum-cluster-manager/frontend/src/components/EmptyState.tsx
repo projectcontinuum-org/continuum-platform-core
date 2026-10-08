@@ -1,6 +1,18 @@
 import { motion, useReducedMotion } from 'framer-motion';
 
-export function EmptyState({ onCreateClick }: { onCreateClick: () => void }) {
+interface EmptyStateProps {
+  onCreateClick: () => void;
+  title?: string;
+  description?: string;
+  createLabel?: string;
+}
+
+export function EmptyState({
+  onCreateClick,
+  title = 'No Workbenches Yet',
+  description = 'Create your first Continuum workbench to start building visual workflows. Each workbench is an isolated environment with persistent storage.',
+  createLabel = 'Create Your First Workbench',
+}: EmptyStateProps) {
   const reducedMotion = useReducedMotion() ?? false;
 
   return (
@@ -45,10 +57,9 @@ export function EmptyState({ onCreateClick }: { onCreateClick: () => void }) {
         </svg>
       </div>
 
-      <h3 className="mb-2 text-xl font-semibold text-fg">No Workbenches Yet</h3>
+      <h3 className="mb-2 text-xl font-semibold text-fg">{title}</h3>
       <p className="mb-6 max-w-md text-center text-fg-muted">
-        Create your first Continuum workbench to start building visual workflows.
-        Each workbench is an isolated environment with persistent storage.
+        {description}
       </p>
 
       <motion.button
@@ -60,7 +71,7 @@ export function EmptyState({ onCreateClick }: { onCreateClick: () => void }) {
         <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
           <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
         </svg>
-        Create Your First Workbench
+        {createLabel}
       </motion.button>
     </motion.div>
   );

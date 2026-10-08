@@ -38,7 +38,7 @@ class WorkbenchControllerTest {
   @MockitoBean
   private lateinit var dockerHubService: DockerHubService
 
-  @MockitoBean
+  @MockitoBean(name = "workbenchOverlayService")
   private lateinit var overlayService: OverlayService
 
   private val objectMapper = jacksonObjectMapper()
