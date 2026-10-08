@@ -9,6 +9,7 @@ import org.mockito.kotlin.verify
 import org.mockito.kotlin.whenever
 import org.projectcontinuum.core.cluster.manager.exception.WorkbenchNotFoundException
 import org.projectcontinuum.core.cluster.manager.model.ResourceSpec
+import org.projectcontinuum.core.cluster.manager.model.WorkbenchLivenessResponse
 import org.projectcontinuum.core.cluster.manager.model.WorkbenchResponse
 import org.projectcontinuum.core.cluster.manager.model.WorkbenchStatus
 import org.projectcontinuum.core.cluster.manager.service.DockerHubService
@@ -509,6 +510,61 @@ class WorkbenchControllerTest {
       .andExpect(status().isOk)
 
     verify(workbenchService).resumeWorkbench("anonymous", "my-workbench")
+  }
+
+  // ── GET /api/v1/workbench/{instanceName}/liveness ──────────────────
+
+  @Test
+  fun `GET liveness returns ready true`() {
+    whenever(workbenchService.getWorkbenchLiveness("user-1", "my-workbench"))
+      .thenReturn(WorkbenchLivenessResponse(ready = true, status = WorkbenchStatus.RUNNING.name))
+
+    mockMvc.perform(
+      get("/api/v1/workbench/my-workbench/liveness")
+        .header("x-continuum-user-id", "user-1")
+    )
+      .andExpect(status().isOk)
+      .andExpect(jsonPath("$.ready").value(true))
+      .andExpect(jsonPath("$.status").value("RUNNING"))
+  }
+
+  @Test
+  fun `GET liveness returns ready false with 200 when not yet ready`() {
+    whenever(workbenchService.getWorkbenchLiveness("user-1", "starting-wb"))
+      .thenReturn(WorkbenchLivenessResponse(ready = false, status = WorkbenchStatus.RUNNING.name))
+
+    mockMvc.perform(
+      get("/api/v1/workbench/starting-wb/liveness")
+        .header("x-continuum-user-id", "user-1")
+    )
+      .andExpect(status().isOk)
+      .andExpect(jsonPath("$.ready").value(false))
+  }
+
+  @Test
+  fun `GET liveness returns 404 when workbench not found`() {
+    whenever(workbenchService.getWorkbenchLiveness("user-1", "missing"))
+      .thenThrow(WorkbenchNotFoundException("Workbench 'missing' not found for user 'user-1'"))
+
+    mockMvc.perform(
+      get("/api/v1/workbench/missing/liveness")
+        .header("x-continuum-user-id", "user-1")
+    )
+      .andExpect(status().isNotFound)
+      .andExpect(jsonPath("$.error").exists())
+  }
+
+  @Test
+  fun `GET liveness without user-id header defaults to anonymous`() {
+    whenever(workbenchService.getWorkbenchLiveness("anonymous", "my-workbench"))
+      .thenReturn(WorkbenchLivenessResponse(ready = true, status = WorkbenchStatus.RUNNING.name))
+
+    mockMvc.perform(
+      get("/api/v1/workbench/my-workbench/liveness")
+    )
+      .andExpect(status().isOk)
+
+    verify(workbenchService).getWorkbenchLiveness("anonymous", "my-workbench")
   }
 
   // ── GET /api/v1/workbench/tags ──────────────────────────────────────

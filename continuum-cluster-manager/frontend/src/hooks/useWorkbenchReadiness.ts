@@ -4,7 +4,7 @@ import { workbenchApi } from '../api/workbench';
 const POLL_INTERVAL_MS = 3000; // poll every 3 seconds
 
 /**
- * Polls `{instanceName}/open/index.html` until it returns 200.
+ * Polls cluster-manager's own liveness endpoint until the workbench reports ready.
  * Only starts polling when the workbench status is RUNNING.
  *
  * Returns `ready` (boolean) and `checking` (true while still polling).

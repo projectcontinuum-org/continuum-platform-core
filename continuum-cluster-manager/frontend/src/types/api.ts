@@ -36,6 +36,11 @@ export interface WorkbenchResponse {
   updatedAt: string;
 }
 
+export interface WorkbenchLivenessResponse {
+  ready: boolean;
+  status: WorkbenchStatus;
+}
+
 export type WorkbenchStatus =
   | 'PENDING'
   | 'RUNNING'

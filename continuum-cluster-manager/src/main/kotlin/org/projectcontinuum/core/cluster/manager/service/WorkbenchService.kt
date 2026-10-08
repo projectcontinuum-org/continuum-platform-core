@@ -482,6 +482,36 @@ class WorkbenchService(
     return toResponse(savedEntity)
   }
 
+  fun getWorkbenchLiveness(userId: String, instanceName: String): WorkbenchLivenessResponse {
+    val entity = repository.findByUserIdAndInstanceName(userId, instanceName)
+      ?: throw WorkbenchNotFoundException("Workbench '$instanceName' not found for user '$userId'")
+
+    if (entity.status != WorkbenchStatus.RUNNING.name) {
+      return WorkbenchLivenessResponse(ready = false, status = entity.status)
+    }
+
+    val ready = isDeploymentReady(entity.instanceId.toString(), entity.namespace)
+    return WorkbenchLivenessResponse(ready = ready, status = entity.status)
+  }
+
+  /**
+   * True when the workbench's K8s Deployment reports at least one ready replica.
+   * Shared by refreshStatusFromK8s() and getWorkbenchLiveness() to avoid duplicating
+   * the Fabric8 lookup.
+   */
+  private fun isDeploymentReady(instanceId: String, namespace: String): Boolean {
+    return try {
+      val deployment = kubernetesClient.apps().deployments()
+        .inNamespace(namespace)
+        .withName("wb-${instanceId}-deployment")
+        .get()
+      (deployment?.status?.readyReplicas ?: 0) > 0
+    } catch (ex: Exception) {
+      logger.warn("Could not query deployment readiness for workbench $instanceId", ex)
+      false
+    }
+  }
+
   private fun refreshStatusFromK8s(entity: WorkbenchInstanceEntity): WorkbenchInstanceEntity {
     return try {
       val deployment = kubernetesClient.apps().deployments()

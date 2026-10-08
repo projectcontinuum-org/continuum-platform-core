@@ -337,6 +337,93 @@ class WorkbenchServiceTest {
     assertEquals(versionAfterSave, dbEntity.entityVersion)
   }
 
+  // ── getWorkbenchLiveness ────────────────────────────────────────────
+
+  @Test
+  fun `getWorkbenchLiveness throws WorkbenchNotFoundException for missing workbench`() {
+    assertThrows<WorkbenchNotFoundException> {
+      service.getWorkbenchLiveness("user-1", "nonexistent")
+    }
+  }
+
+  @Test
+  fun `getWorkbenchLiveness returns ready false without K8s call when status is not RUNNING`() {
+    val entity = createSampleEntity(
+      instanceName = "suspended-wb",
+      status = WorkbenchStatus.SUSPENDED.name
+    )
+    repository.save(entity)
+
+    val response = service.getWorkbenchLiveness("user-1", "suspended-wb")
+
+    assertFalse(response.ready)
+    assertEquals(WorkbenchStatus.SUSPENDED.name, response.status)
+  }
+
+  @Test
+  fun `getWorkbenchLiveness returns ready true when deployment has ready replicas`() {
+    val instanceId = UUID.randomUUID()
+    val entity = createSampleEntity(
+      instanceName = "live-wb",
+      instanceId = instanceId,
+      status = WorkbenchStatus.RUNNING.name
+    )
+    repository.save(entity)
+
+    val deployment = DeploymentBuilder()
+      .withNewMetadata()
+      .withName("wb-$instanceId-deployment")
+      .withNamespace("default")
+      .endMetadata()
+      .withStatus(DeploymentStatusBuilder().withReadyReplicas(1).build())
+      .build()
+    client.apps().deployments().inNamespace("default").resource(deployment).create()
+
+    val response = service.getWorkbenchLiveness("user-1", "live-wb")
+
+    assertTrue(response.ready)
+    assertEquals(WorkbenchStatus.RUNNING.name, response.status)
+  }
+
+  @Test
+  fun `getWorkbenchLiveness returns ready false when deployment has zero ready replicas`() {
+    val instanceId = UUID.randomUUID()
+    val entity = createSampleEntity(
+      instanceName = "notyet-wb",
+      instanceId = instanceId,
+      status = WorkbenchStatus.RUNNING.name
+    )
+    repository.save(entity)
+
+    val deployment = DeploymentBuilder()
+      .withNewMetadata()
+      .withName("wb-$instanceId-deployment")
+      .withNamespace("default")
+      .endMetadata()
+      .withStatus(DeploymentStatusBuilder().withReadyReplicas(0).build())
+      .build()
+    client.apps().deployments().inNamespace("default").resource(deployment).create()
+
+    val response = service.getWorkbenchLiveness("user-1", "notyet-wb")
+
+    assertFalse(response.ready)
+    assertEquals(WorkbenchStatus.RUNNING.name, response.status)
+  }
+
+  @Test
+  fun `getWorkbenchLiveness returns ready false when no deployment found`() {
+    val entity = createSampleEntity(
+      instanceName = "missing-deployment-wb",
+      status = WorkbenchStatus.RUNNING.name
+    )
+    repository.save(entity)
+
+    val response = service.getWorkbenchLiveness("user-1", "missing-deployment-wb")
+
+    assertFalse(response.ready)
+    assertEquals(WorkbenchStatus.RUNNING.name, response.status)
+  }
+
   // ── deleteWorkbench ─────────────────────────────────────────────────
 
   @Test

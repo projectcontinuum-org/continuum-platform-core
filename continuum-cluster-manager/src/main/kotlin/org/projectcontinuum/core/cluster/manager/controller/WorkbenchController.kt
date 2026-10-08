@@ -1,6 +1,7 @@
 package org.projectcontinuum.core.cluster.manager.controller
 
 import org.projectcontinuum.core.cluster.manager.model.WorkbenchCreateRequest
+import org.projectcontinuum.core.cluster.manager.model.WorkbenchLivenessResponse
 import org.projectcontinuum.core.cluster.manager.model.WorkbenchResponse
 import org.projectcontinuum.core.cluster.manager.model.WorkbenchUpdateRequest
 import org.projectcontinuum.core.cluster.manager.service.DockerHubService
@@ -46,6 +47,15 @@ class WorkbenchController(
     @PathVariable instanceName: String
   ): ResponseEntity<WorkbenchResponse> {
     val response = workbenchService.getWorkbenchStatus(userId, instanceName)
+    return ResponseEntity.ok(response)
+  }
+
+  @GetMapping("/{instanceName}/liveness")
+  fun getWorkbenchLiveness(
+    @RequestHeader("x-continuum-user-id", required = false, defaultValue = "anonymous") userId: String,
+    @PathVariable instanceName: String
+  ): ResponseEntity<WorkbenchLivenessResponse> {
+    val response = workbenchService.getWorkbenchLiveness(userId, instanceName)
     return ResponseEntity.ok(response)
   }
 
