@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { Modal } from './Modal';
 import { Button } from './Button';
+import { CustomSelect } from './CustomSelect';
 import { DEFAULT_IMAGE_TAG, WORKBENCH_IMAGE_REPOSITORY } from '../types/api';
 import type { WorkbenchCreateRequest, ResourceSpec, DockerHubTag } from '../types/api';
 import { workbenchApi } from '../api/workbench';
@@ -150,11 +151,16 @@ export function CreateWorkbenchModal({ isOpen, onClose, onCreate }: CreateWorkbe
   const [showTagDropdown, setShowTagDropdown] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
+  // Variant state
+  const [variant, setVariant] = useState('');
+  const [availableVariants, setAvailableVariants] = useState<string[]>([]);
+  const [variantsLoading, setVariantsLoading] = useState(false);
+
   const filteredTags = availableTags.filter(
     (tag) => tag.name.toLowerCase().includes(imageTag.toLowerCase())
   );
 
-  // Fetch tags when modal opens
+  // Fetch tags and variants when modal opens
   useEffect(() => {
     if (isOpen) {
       setTagsLoading(true);
@@ -163,6 +169,12 @@ export function CreateWorkbenchModal({ isOpen, onClose, onCreate }: CreateWorkbe
         .then((tags) => setAvailableTags(tags))
         .catch(() => setTagsError(true))
         .finally(() => setTagsLoading(false));
+
+      setVariantsLoading(true);
+      workbenchApi.getAvailableVariants()
+        .then((v) => setAvailableVariants(v))
+        .catch(() => setAvailableVariants([]))
+        .finally(() => setVariantsLoading(false));
     }
   }, [isOpen]);
 
@@ -198,6 +210,7 @@ export function CreateWorkbenchModal({ isOpen, onClose, onCreate }: CreateWorkbe
         instanceName: instanceName.trim(),
         image: `${WORKBENCH_IMAGE_REPOSITORY}:${imageTag}`,
         resources,
+        ...(variant && { variant }),
       });
 
       setInstanceName('');
@@ -205,6 +218,7 @@ export function CreateWorkbenchModal({ isOpen, onClose, onCreate }: CreateWorkbe
       setResources(SIZE_PRESETS[0].resources);
       setSelectedPreset(0);
       setShowAdvanced(false);
+      setVariant('');
       onClose();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to create workbench');
@@ -251,6 +265,33 @@ export function CreateWorkbenchModal({ isOpen, onClose, onCreate }: CreateWorkbe
             Lowercase letters, numbers, and hyphens only
           </p>
         </div>
+
+        {/* Workbench Type (variant) — only shown when variants are available */}
+        {!variantsLoading && availableVariants.length > 0 && (
+          <div>
+            <label htmlFor="variant" className="block text-sm font-medium text-fg">
+              Workbench Type
+            </label>
+            <div className="mt-1">
+              <CustomSelect
+                id="variant"
+                value={variant}
+                onChange={setVariant}
+                options={[
+                  { value: '', label: 'Default (no overlay)' },
+                  ...availableVariants.map((v) => ({
+                    value: v,
+                    label: v.split('-').map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join(' '),
+                  })),
+                ]}
+                placeholder="Select workbench type..."
+              />
+            </div>
+            <p className="mt-1 text-xs text-fg-muted">
+              Choose a pre-configured workbench variant
+            </p>
+          </div>
+        )}
 
         {/* Image */}
         <div>

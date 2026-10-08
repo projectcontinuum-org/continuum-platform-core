@@ -74,6 +74,12 @@ export function WorkbenchCard({ workbench, onSuspend, onResume, onDelete, onOpen
               {workbench.image.includes(':') ? workbench.image.split(':').pop() : workbench.image.split('/').pop()}
             </span>
           </div>
+          {workbench.overlayVariant && (
+            <div className="flex items-center justify-between">
+              <span className="text-fg-muted">Type:</span>
+              <span className="text-fg">{workbench.overlayVariant}</span>
+            </div>
+          )}
           <div className="flex items-center justify-between">
             <span className="text-fg-muted">Resources:</span>
             <span className="text-fg">

@@ -13,6 +13,7 @@ export interface WorkbenchCreateRequest {
   instanceName: string;
   resources?: Partial<ResourceSpec>;
   image?: string;
+  variant?: string;
 }
 
 export interface WorkbenchUpdateRequest {
@@ -28,9 +29,16 @@ export interface WorkbenchResponse {
   status: WorkbenchStatus;
   image: string;
   resources: ResourceSpec;
+  overlayVariant: string | null;
   serviceEndpoint: string | null;
+  ingressUrl: string | null;
   createdAt: string;
   updatedAt: string;
+}
+
+export interface WorkbenchLivenessResponse {
+  ready: boolean;
+  status: WorkbenchStatus;
 }
 
 export type WorkbenchStatus =

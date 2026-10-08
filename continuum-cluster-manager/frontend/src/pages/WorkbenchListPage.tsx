@@ -77,8 +77,10 @@ export function WorkbenchListPage() {
   };
 
   const handleOpen = (workbench: WorkbenchResponse) => {
-    if (workbench.serviceEndpoint) {
-      // Open workbench in a new tab via the cluster-manager reverse proxy
+    if (workbench.ingressUrl) {
+      window.open(workbench.ingressUrl, '_blank');
+    } else if (workbench.serviceEndpoint) {
+      // Fallback: open via the cluster-manager reverse proxy
       const externalUrl = `/workbench/${workbench.instanceName}/open/#/workspace`;
       window.open(externalUrl, '_blank');
     }
