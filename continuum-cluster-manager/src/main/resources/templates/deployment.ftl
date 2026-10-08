@@ -28,6 +28,9 @@ spec:
         - name: theia
           image: ${image}
           imagePullPolicy: ${imagePullPolicy}
+          env:
+            - name: NODE_ENV
+              value: "production"
           ports:
             - containerPort: 8080
           resources:
@@ -40,18 +43,23 @@ spec:
           volumeMounts:
             - name: workspace-storage
               mountPath: /workspace
-          livenessProbe:
+          startupProbe:
             httpGet:
               path: /
               port: 8080
-            initialDelaySeconds: 30
-            periodSeconds: 10
+            failureThreshold: 30
+            periodSeconds: 5
+          livenessProbe:
+            tcpSocket:
+              port: 8080
+            periodSeconds: 30
           readinessProbe:
             httpGet:
               path: /
               port: 8080
-            initialDelaySeconds: 10
-            periodSeconds: 5
+            periodSeconds: 10
+            timeoutSeconds: 5
+
       volumes:
         - name: workspace-storage
           persistentVolumeClaim:

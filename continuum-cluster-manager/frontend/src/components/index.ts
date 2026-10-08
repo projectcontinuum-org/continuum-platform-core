@@ -3,6 +3,7 @@ export { Footer } from './Footer';
 export { Button } from './Button';
 export { Modal } from './Modal';
 export { StatusBadge } from './StatusBadge';
+export { CustomSelect } from './CustomSelect';
 export { WorkbenchCard } from './WorkbenchCard';
 export { CreateWorkbenchModal } from './CreateWorkbenchModal';
 export { EmptyState } from './EmptyState';

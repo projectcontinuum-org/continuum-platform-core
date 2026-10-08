@@ -2,6 +2,7 @@ import type {
   WorkbenchCreateRequest,
   WorkbenchUpdateRequest,
   WorkbenchResponse,
+  WorkbenchLivenessResponse,
   DockerHubTag,
 } from '../types/api';
 import { SERVICE_BASE } from '../basePath';
@@ -116,16 +117,20 @@ export const workbenchApi = {
   },
 
   /**
-   * Check if the workbench UI is ready by probing its index.html
-   * Returns true if the response is 200, false otherwise.
+   * Check if the workbench is ready to accept connections, via
+   * cluster-manager's own liveness endpoint (backed by K8s deployment readiness).
    */
   async checkReady(instanceName: string): Promise<boolean> {
     try {
       const response = await fetch(
-        `/workbench/${encodeURIComponent(instanceName)}/open/index.html`,
-        { method: 'GET', redirect: 'manual' },
+        `${API_BASE}/${encodeURIComponent(instanceName)}/liveness`,
+        { method: 'GET', headers: getHeaders() },
       );
-      return response.status === 200;
+      if (!response.ok) {
+        return false;
+      }
+      const data: WorkbenchLivenessResponse = await response.json();
+      return data.ready === true;
     } catch {
       return false;
     }
@@ -140,6 +145,17 @@ export const workbenchApi = {
       headers: getHeaders(),
     });
     return handleResponse<DockerHubTag[]>(response);
+  },
+
+  /**
+   * Fetch available overlay variant names
+   */
+  async getAvailableVariants(): Promise<string[]> {
+    const response = await fetch(`${API_BASE}/variants`, {
+      method: 'GET',
+      headers: getHeaders(),
+    });
+    return handleResponse<string[]>(response);
   },
 };
 

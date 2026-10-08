@@ -1,10 +1,12 @@
 package org.projectcontinuum.core.cluster.manager.controller
 
 import org.projectcontinuum.core.cluster.manager.model.WorkbenchCreateRequest
+import org.projectcontinuum.core.cluster.manager.model.WorkbenchLivenessResponse
 import org.projectcontinuum.core.cluster.manager.model.WorkbenchResponse
 import org.projectcontinuum.core.cluster.manager.model.WorkbenchUpdateRequest
 import org.projectcontinuum.core.cluster.manager.service.DockerHubService
 import org.projectcontinuum.core.cluster.manager.service.DockerHubTag
+import org.projectcontinuum.core.cluster.manager.service.OverlayService
 import org.projectcontinuum.core.cluster.manager.service.WorkbenchService
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
@@ -14,13 +16,20 @@ import org.springframework.web.bind.annotation.*
 @RequestMapping("/api/v1/workbench")
 class WorkbenchController(
   private val workbenchService: WorkbenchService,
-  private val dockerHubService: DockerHubService
+  private val dockerHubService: DockerHubService,
+  private val overlayService: OverlayService
 ) {
 
   @GetMapping("/tags")
   fun getAvailableTags(): ResponseEntity<List<DockerHubTag>> {
     val tags = dockerHubService.getAvailableTags()
     return ResponseEntity.ok(tags)
+  }
+
+  @GetMapping("/variants")
+  fun getAvailableVariants(): ResponseEntity<List<String>> {
+    val variants = overlayService.listVariants()
+    return ResponseEntity.ok(variants)
   }
 
   @PostMapping
@@ -38,6 +47,15 @@ class WorkbenchController(
     @PathVariable instanceName: String
   ): ResponseEntity<WorkbenchResponse> {
     val response = workbenchService.getWorkbenchStatus(userId, instanceName)
+    return ResponseEntity.ok(response)
+  }
+
+  @GetMapping("/{instanceName}/liveness")
+  fun getWorkbenchLiveness(
+    @RequestHeader("x-continuum-user-id", required = false, defaultValue = "anonymous") userId: String,
+    @PathVariable instanceName: String
+  ): ResponseEntity<WorkbenchLivenessResponse> {
+    val response = workbenchService.getWorkbenchLiveness(userId, instanceName)
     return ResponseEntity.ok(response)
   }
 

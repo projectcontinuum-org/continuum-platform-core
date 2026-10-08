@@ -24,6 +24,9 @@ continuum.core:
       namespace: ${WORKBENCH_NAMESPACE:default}
       image-repository: ${WORKBENCH_IMAGE_REPOSITORY:projectcontinuum/continuum-workbench}
       image-pull-policy: ${WORKBENCH_IMAGE_PULL_POLICY:IfNotPresent}
+      overlays:
+        enabled: ${OVERLAY_ENABLED:false}
+        path: ${OVERLAY_PATH:./.data/overlays/workbench}
 
 springdoc:
   packages-to-scan: org.projectcontinuum.core.cluster.manager.controller
