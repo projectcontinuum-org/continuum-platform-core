@@ -13,8 +13,6 @@ on:
           - continuum-avro-schemas
           - continuum-cloud-gateway
           - continuum-commons
-          - continuum-knime-base
-          - continuum-knime-scheduler
           - continuum-message-bridge
           - continuum-worker-springboot-starter
           - continuum-gradle-plugin
