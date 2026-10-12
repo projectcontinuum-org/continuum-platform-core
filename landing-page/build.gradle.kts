@@ -41,7 +41,7 @@ tasks.register("publish") {
 tasks.register<Exec>("jib") {
     description = "Docker build and push to Docker Hub"
     group = "Jib tasks"
-    val dockerRepoOwner = (System.getenv("GITHUB_REPOSITORY_OWNER") ?: property("repoOwner").toString()).lowercase()
+    val dockerRepoOwner = "projectcontinuum"
     val dockerRepoName = "docker.io/$dockerRepoOwner/${project.name.lowercase()}"
     val imageName = "$dockerRepoName:${project.version}"
     val latestImageName = "$dockerRepoName:latest"
