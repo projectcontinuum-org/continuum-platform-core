@@ -71,6 +71,11 @@ class NodeExplorerService(
     return doc
   }
 
+  fun getNodeMetadata(nodeId: String): ContinuumWorkflowModel.NodeData? {
+    val entity = repository.findByNodeId(nodeId) ?: return null
+    return objectMapper.readValue(entity.nodeManifest!!, ContinuumWorkflowModel.NodeData::class.java)
+  }
+
   fun getTaskQueues(nodeIds: List<String>): Map<String, String> {
     if (nodeIds.isEmpty()) return emptyMap()
     return repository.findByNodeIdIn(nodeIds)

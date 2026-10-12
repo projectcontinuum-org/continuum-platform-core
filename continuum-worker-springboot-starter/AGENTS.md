@@ -13,7 +13,7 @@ Core platform team. Published to Maven Central as `org.projectcontinuum.core:con
 - Progress reporting is rate-limited (`continuum.core.worker.progress-report-rate-limit-ms`, default 5000 ms). Always reports 0%, 100%, and stage changes regardless of rate limit. Progress signals are sent to the parent Temporal workflow via `IContinuumWorkflow.updateNodeProgressSignal()`.
 - Background heartbeat scheduler (`continuum.core.worker.heartbeat-interval-ms`, default 60000 ms) keeps long-running activities alive in Temporal even when the node doesn't call `report()`.
 - `NodeRuntimeException(isRetriable = false)` causes immediate non-retryable failure. Other exceptions allow Temporal's retry mechanism.
-- `CredentialResolver` — scans `propertiesUISchema` for controls where `options.format == "credential"`, fetches from credentials server via `GET {credentialsServerBaseUrl}/api/v1/credentials/{name}` with `x-continuum-user-id` header, passes result as `ExecutionContext.credentials`.
+- `CredentialFetcherService` — fetches a named credential on demand via `GET {credentialsServerBaseUrl}/api/v1/credentials/{name}` with `x-continuum-user-id` header. `ContinuumNodeActivity` wraps it in a `CredentialFetcher` on `ExecutionContext`, so nodes call `executionContext.getCredential(name)` from `execute()` by whatever name they parsed from their own `properties` — the framework does not scan `propertiesUISchema` to find credentials.
 - `FeatureRegistrationPublisher` — publishes node metadata to Kafka at startup so the API server can discover the worker's task queue and node list.
 
 ## Work Guidance

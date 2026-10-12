@@ -1,5 +1,6 @@
 package org.projectcontinuum.core.api.server.model
 
+import org.projectcontinuum.core.commons.model.ContinuumWorkflowModel
 import java.time.Instant
 import java.util.UUID
 
@@ -12,5 +13,6 @@ data class WorkflowScheduleResponse(
   val paused: Boolean,
   val nextRunTimes: List<Instant>,
   val createdAt: Instant,
-  val updatedAt: Instant
+  val updatedAt: Instant,
+  val continuumWorkflowModel: ContinuumWorkflowModel
 )

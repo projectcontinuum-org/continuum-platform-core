@@ -40,6 +40,9 @@ class GatewayConfig(
 
   @param:Value("\${CONTINUUM_CREDENTIALS_SERVER_URL:http://localhost:8083}")
   private val credentialsServerUrl: String,
+
+  @param:Value("\${CONTINUUM_KNIME_SCHEDULER_URL:http://localhost:8085}")
+  private val knimeSchedulerUrl: String,
 ) {
 
   private val logger = LoggerFactory.getLogger(GatewayConfig::class.java)
@@ -79,6 +82,12 @@ class GatewayConfig(
   fun credentialsServerRoute(): RouterFunction<ServerResponse> =
     route("credentials-manager")
       .route(path("/credentials-manager/**")) { request -> proxy(request, credentialsServerUrl, "/credentials-manager") }
+      .build()
+
+  @Bean
+  fun knimeSchedulerRoute(): RouterFunction<ServerResponse> =
+    route("knime-scheduler")
+      .route(path("/knime-scheduler/**")) { request -> proxy(request, knimeSchedulerUrl, "/knime-scheduler") }
       .build()
 
   private fun proxy(request: ServerRequest, backendUrl: String, prefixToStrip: String): ServerResponse {

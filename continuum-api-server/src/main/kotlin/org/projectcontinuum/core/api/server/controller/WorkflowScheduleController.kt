@@ -3,7 +3,7 @@ package org.projectcontinuum.core.api.server.controller
 import io.temporal.client.schedules.ScheduleException
 import org.projectcontinuum.core.api.server.model.CreateWorkflowScheduleRequest
 import org.projectcontinuum.core.api.server.model.WorkflowScheduleResponse
-import org.projectcontinuum.core.api.server.service.WorkflowScheduleNotFoundException
+import org.projectcontinuum.core.api.server.exception.WorkflowScheduleNotFoundException
 import org.projectcontinuum.core.api.server.service.WorkflowScheduleService
 import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.*

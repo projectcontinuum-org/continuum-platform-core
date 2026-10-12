@@ -37,6 +37,9 @@ dependencies {
     implementation("io.temporal:temporal-sdk")
     implementation("io.temporal:temporal-kotlin")
 
+    // MCP server (Spring AI) — exposes the continuum node registry as MCP tools/resources
+    implementation("org.springframework.ai:spring-ai-starter-mcp-server-webmvc")
+
     // DuckDB Dependencies
     implementation("org.duckdb:duckdb_jdbc:1.2.2.0")
 
@@ -72,12 +75,13 @@ dependencyManagement {
     imports {
         mavenBom("io.temporal:temporal-bom:1.28.0")
         mavenBom("software.amazon.awssdk:bom:2.30.7")
+        mavenBom("org.springframework.ai:spring-ai-bom:2.0.0")
     }
 }
 
 kotlin {
     compilerOptions {
-        freeCompilerArgs.addAll("-Xjsr305=strict")
+        freeCompilerArgs.addAll("-Xjsr305=strict", "-java-parameters")
     }
 }
 

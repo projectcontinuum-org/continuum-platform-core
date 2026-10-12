@@ -36,6 +36,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ./gradlew :continuum-credentials-server:bootRun
 ./gradlew :continuum-cluster-manager:bootRun
 ./gradlew :continuum-cloud-gateway:bootRun
+./gradlew :continuum-knime-scheduler:bootRun
 ```
 
 IntelliJ run configs in `.run/` cover: ApiServer, MessageBridge, OrchestrationService, CredentialServer, Gateway.
@@ -75,6 +76,7 @@ cd docker && docker compose up -d
 | `continuum-cluster-manager` | Kubernetes lifecycle manager for per-user workbench instances | — |
 | `continuum-cloud-gateway` | HTTP/WebSocket reverse proxy routing to per-user workbench pods | — |
 | `continuum-knime-base` | KNIME compatibility layer (experimental) | — |
+| `continuum-knime-scheduler` | Object-store CRUD proxy for KNIME `.knwf` workflow files + Postgres bookkeeping | 8085 |
 | `landing-page` | Static marketing landing page | — |
 
 ### Execution flow
@@ -122,10 +124,9 @@ Node documentation is auto-loaded from `resources/<package>/<ClassName>.doc.md` 
 
 ### Credentials
 
-Nodes needing external secrets use the credentials system:
-- The node's `propertiesUISchema` declares a control with `options.format = "credential"` and `options.credentialLabel = "My Label"`.
-- Before `execute()`, `CredentialResolver` scans the UI schema, fetches the named credential from `continuum-credentials-server` (`GET /api/v1/credentials/{name}` with `x-continuum-user-id` header), and passes it via `ExecutionContext`.
-- Inside `execute()`: `executionContext.getCredential("My Label")` returns the key-value map.
+Nodes needing external secrets fetch them on demand from `execute()`, by name:
+- The node's `propertiesUISchema` declares a control with `options.format = "credential"` (and optionally `options.credentialType`) purely so `continuum-workbench` renders a credential picker there — the backend does not read this schema.
+- Inside `execute()`, the node reads its own `properties` to find the credential name(s) it configured, then calls `executionContext.getCredential<T>(name)`. This fetches the named credential from `continuum-credentials-server` on demand (`GET /api/v1/credentials/{name}` with `x-continuum-user-id` header, via `CredentialFetcherService` in `continuum-worker-springboot-starter`) and deserializes its key-value data into `T` (Jackson), throwing `CredentialsNotFoundException` if not found.
 
 ### Task queues
 

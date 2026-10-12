@@ -7,8 +7,9 @@ import org.mockito.kotlin.anyOrNull
 import org.mockito.kotlin.eq
 import org.mockito.kotlin.whenever
 import org.projectcontinuum.core.api.server.model.WorkflowScheduleResponse
-import org.projectcontinuum.core.api.server.service.WorkflowScheduleNotFoundException
+import org.projectcontinuum.core.api.server.exception.WorkflowScheduleNotFoundException
 import org.projectcontinuum.core.api.server.service.WorkflowScheduleService
+import org.projectcontinuum.core.commons.model.ContinuumWorkflowModel
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest
 import org.springframework.http.MediaType
@@ -41,7 +42,13 @@ class WorkflowScheduleControllerTest {
       paused = false,
       nextRunTimes = emptyList(),
       createdAt = Instant.now(),
-      updatedAt = Instant.now()
+      updatedAt = Instant.now(),
+      continuumWorkflowModel = ContinuumWorkflowModel(
+        id = "wf-1",
+        name = "My Workflow",
+        nodes = emptyList(),
+        edges = emptyList()
+      )
     )
 
   private val workflowJson = """
