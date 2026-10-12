@@ -1,3 +1,3 @@
-package org.projectcontinuum.core.api.server.service
+package org.projectcontinuum.core.api.server.exception
 
 class WorkflowScheduleNotFoundException(message: String) : RuntimeException(message)

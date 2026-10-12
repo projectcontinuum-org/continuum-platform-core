@@ -1,6 +1,6 @@
 ## Purpose
 
-AES-GCM encrypted credential store with REST API and embedded React UI. Manages named credentials (key-value bundles) and credential types. Credentials are encrypted at rest with a master key. Accessed by workers via `CredentialResolver` before node execution.
+AES-GCM encrypted credential store with REST API and embedded React UI. Manages named credentials (key-value bundles) and credential types. Credentials are encrypted at rest with a master key. Accessed by workers on demand via `CredentialFetcherService` (`continuum-worker-springboot-starter`), called from within a node's `execute()`.
 
 ## Ownership
 

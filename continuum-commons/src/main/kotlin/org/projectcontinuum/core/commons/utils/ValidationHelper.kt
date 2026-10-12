@@ -2,8 +2,8 @@ package org.projectcontinuum.core.commons.utils
 
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.networknt.schema.InputFormat
-import com.networknt.schema.JsonSchemaFactory
-import com.networknt.schema.SpecVersion
+import com.networknt.schema.SchemaRegistry
+import com.networknt.schema.SpecificationVersion
 
 class ValidationHelper {
   companion object {
@@ -15,11 +15,12 @@ class ValidationHelper {
       propertiesSchema: Map<String, Any>
     ) {
 
-      val factory = JsonSchemaFactory.getInstance(
-        SpecVersion.VersionFlag.V4
+      val registry = SchemaRegistry.withDefaultDialect(
+        SpecificationVersion.DRAFT_4
       )
-      val schema = factory.getSchema(
-        mapper.writeValueAsString(propertiesSchema)
+      val schema = registry.getSchema(
+        mapper.writeValueAsString(propertiesSchema),
+        InputFormat.JSON
       )
 
       val errorMessages = schema.validate(

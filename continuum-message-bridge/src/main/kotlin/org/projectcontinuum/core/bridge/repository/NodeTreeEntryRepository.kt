@@ -37,7 +37,7 @@ interface NodeTreeEntryRepository : CrudRepository<NodeTreeEntryEntity, Long> {
     )
     VALUES (
       :parentId, 'CONTINUUM_NODE', :name, :nodeId, :taskQueue, :workerId, :featureId,
-      CAST(:nodeManifest AS JSONB), :documentationMarkdown, CAST(:extensions AS JSONB), :registeredAt, :lastSeenAt
+      CAST(:nodeManifest AS JSON), :documentationMarkdown, CAST(:extensions AS JSONB), :registeredAt, :lastSeenAt
     )
     ON CONFLICT (node_id, COALESCE(parent_id, -1)) WHERE type = 'CONTINUUM_NODE'
     DO UPDATE SET
@@ -45,7 +45,7 @@ interface NodeTreeEntryRepository : CrudRepository<NodeTreeEntryEntity, Long> {
       task_queue = :taskQueue,
       worker_id = :workerId,
       feature_id = :featureId,
-      node_manifest = CAST(:nodeManifest AS JSONB),
+      node_manifest = CAST(:nodeManifest AS JSON),
       documentation_markdown = :documentationMarkdown,
       extensions = CAST(:extensions AS JSONB),
       last_seen_at = :lastSeenAt

@@ -243,6 +243,36 @@ class NodeExplorerServiceTest {
     assertNull(result)
   }
 
+  // --- getNodeMetadata ---
+
+  @Test
+  fun `getNodeMetadata returns parsed NodeData for existing node`() {
+    whenever(repository.findByNodeId("org.test.Node")).thenReturn(
+      nodeEntity(
+        id = nextEntryId(),
+        parentId = null,
+        nodeId = "org.test.Node",
+        title = "Node",
+        description = "A test node"
+      )
+    )
+
+    val result = service.getNodeMetadata("org.test.Node")
+
+    assertEquals("Node", result?.title)
+    assertEquals("A test node", result?.description)
+    assertEquals("org.test.Node", result?.nodeModel)
+  }
+
+  @Test
+  fun `getNodeMetadata returns null for non-existing node`() {
+    whenever(repository.findByNodeId("org.test.NonExistent")).thenReturn(null)
+
+    val result = service.getNodeMetadata("org.test.NonExistent")
+
+    assertNull(result)
+  }
+
   // --- getTaskQueues ---
 
   @Test

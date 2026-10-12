@@ -16,6 +16,13 @@ temporal:
   connection:
     target: ${TEMPORAL_SERVER_ADDRESS:localhost:7233}
     namespace: ${TEMPORAL_NAMESPACE:default}
+spring.ai.mcp.server:
+  name: continuum-node-registry-mcp-server
+  version: 1.0.0
+  type: SYNC
+  protocol: STREAMABLE
+  annotation-scanner:
+    enabled: true
 continuum.core:
   api-server:
     cache-directory-base-path: ${CONTINUUM_CACHE_DIRECTORY:./.continuum-cache/workflow-data}

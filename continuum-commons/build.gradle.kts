@@ -58,7 +58,7 @@ dependencies {
     implementation("org.freemarker:freemarker:2.3.34")
 
     // JSON schema validation
-    implementation("com.networknt:json-schema-validator:1.5.6")
+    implementation("com.networknt:json-schema-validator:3.0.0")
 
     // Spring dependencies — provided by the consuming application
     compileOnly("org.springframework:spring-context")

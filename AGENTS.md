@@ -88,6 +88,7 @@ When the user requests a durable behavior change, record it here or in the relev
 - [continuum-cluster-manager/AGENTS.md](continuum-cluster-manager/AGENTS.md) — Kubernetes lifecycle manager for per-user workbench pods
 - [continuum-cloud-gateway/AGENTS.md](continuum-cloud-gateway/AGENTS.md) — HTTP + WebSocket reverse proxy routing to per-user workbench pods
 - [continuum-gradle-plugin/AGENTS.md](continuum-gradle-plugin/AGENTS.md) — convention plugins for feature modules and workers; @ContinuumNode annotation validator
+- [continuum-knime-scheduler/AGENTS.md](continuum-knime-scheduler/AGENTS.md) — object-store CRUD proxy for KNIME `.knwf` workflow files, with per-user Postgres bookkeeping
 
 Modules without child AGENTS.md (minimal, self-contained):
 - `continuum-avro-schemas` — Avro schema definitions only; no logic
