@@ -30,4 +30,14 @@ abstract class ContinuumExtension {
 
     /** Whether to configure Maven Central publishing via JReleaser */
     abstract val publishToMavenCentral: Property<Boolean>
+
+    /** Jib `from` (base) image for worker container builds. Default: "eclipse-temurin:21-jre" */
+    abstract val jibFromImage: Property<String>
+
+    /**
+     * Jib `to` (target) image reference for worker container builds, e.g. "docker.io/myorg/myapp:1.0".
+     * No default. If left unset, the `jib` plugin is not applied and no container image is built.
+     * Set via `continuum { jibToImage.set(...) }` to opt in.
+     */
+    abstract val jibToImage: Property<String>
 }
