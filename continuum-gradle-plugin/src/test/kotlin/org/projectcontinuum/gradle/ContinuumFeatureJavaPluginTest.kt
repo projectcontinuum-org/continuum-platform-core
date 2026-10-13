@@ -107,7 +107,6 @@ class ContinuumFeatureJavaPluginTest {
 
         assertTrue(result.output.contains("BUILD SUCCESSFUL"))
         assertTrue(result.output.contains("bootJar"))
-        assertTrue(result.output.contains("jib"))
     }
 
     @Test

@@ -1,6 +1,7 @@
 package org.projectcontinuum.gradle
 
 import org.gradle.testkit.runner.GradleRunner
+import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
@@ -67,7 +68,57 @@ class ContinuumWorkerPluginTest {
     }
 
     @Test
-    fun `worker plugin configures jib task`() {
+    fun `worker plugin configures jib task when jibToImage is set`() {
+        buildFile.writeText("""
+            plugins {
+                id("org.projectcontinuum.worker")
+            }
+            group = "com.test.worker"
+            version = "0.0.1"
+            continuum {
+                jibToImage.set("test/test-worker:0.0.1")
+            }
+        """.trimIndent())
+
+        val result = GradleRunner.create()
+            .withProjectDir(projectDir)
+            .withPluginClasspath()
+            .withArguments("tasks", "--all", "--stacktrace")
+            .build()
+
+        assertTrue(result.output.contains("jib"))
+    }
+
+    @Test
+    fun `jibToImage can be overridden via continuum extension`() {
+        buildFile.writeText("""
+            plugins {
+                id("org.projectcontinuum.worker")
+            }
+            group = "com.test.worker"
+            version = "0.0.1"
+            continuum {
+                jibToImage.set("myorg/custom-image:0.0.1")
+            }
+            tasks.register("printJibImage") {
+                doLast {
+                    val jib = project.extensions.getByType(com.google.cloud.tools.jib.gradle.JibExtension::class.java)
+                    println("JIB_IMAGE=" + jib.to.image)
+                }
+            }
+        """.trimIndent())
+
+        val result = GradleRunner.create()
+            .withProjectDir(projectDir)
+            .withPluginClasspath()
+            .withArguments("printJibImage", "--stacktrace")
+            .build()
+
+        assertTrue(result.output.contains("JIB_IMAGE=myorg/custom-image:0.0.1"))
+    }
+
+    @Test
+    fun `jib plugin is not applied when jibToImage is not set`() {
         buildFile.writeText("""
             plugins {
                 id("org.projectcontinuum.worker")
@@ -82,7 +133,8 @@ class ContinuumWorkerPluginTest {
             .withArguments("tasks", "--all", "--stacktrace")
             .build()
 
-        assertTrue(result.output.contains("jib"))
+        assertTrue(result.output.contains("BUILD SUCCESSFUL"))
+        assertFalse(result.output.contains("jib - "))
     }
 
     @Test

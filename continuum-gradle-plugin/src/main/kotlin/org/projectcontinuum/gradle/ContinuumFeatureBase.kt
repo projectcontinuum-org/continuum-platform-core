@@ -30,6 +30,7 @@ object ContinuumFeatureBase {
     const val DEFAULT_TEMPORAL_VERSION = "1.28.0"
     const val DEFAULT_AWS_SDK_VERSION = "2.30.7"
     const val DEFAULT_JACKSON_VERSION = "3.1.2"
+    const val DEFAULT_JIB_FROM_IMAGE = "eclipse-temurin:21-jre"
 
     /**
      * Creates and configures the shared ContinuumExtension if it doesn't already exist.
@@ -48,6 +49,9 @@ object ContinuumFeatureBase {
             awsSdkVersion.convention(DEFAULT_AWS_SDK_VERSION)
             jacksonVersion.convention(DEFAULT_JACKSON_VERSION)
             publishToMavenCentral.convention(true)
+            jibFromImage.convention(DEFAULT_JIB_FROM_IMAGE)
+            // jibToImage is intentionally left unset — no inferred default. Worker plugins
+            // only apply the jib plugin and configure container builds when it's set.
         }
     }
 
