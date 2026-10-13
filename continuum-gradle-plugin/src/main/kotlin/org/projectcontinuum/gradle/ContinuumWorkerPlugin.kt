@@ -14,7 +14,6 @@ class ContinuumWorkerPlugin : Plugin<Project> {
 
         // Apply worker-specific plugins
         project.pluginManager.apply("org.springframework.boot")
-        project.pluginManager.apply("com.google.cloud.tools.jib")
 
         // Get the shared extension (already created by feature plugin)
         val ext = project.extensions.getByType<ContinuumExtension>()
@@ -36,22 +35,22 @@ class ContinuumWorkerPlugin : Plugin<Project> {
                 add("implementation", "$continuumGrp:continuum-worker-springboot-starter:$continuumVer")
             }
 
-            // Configure Jib
-            configureJib(project)
+            // Only apply/configure Jib if the module actually wants a container image
+            if (ext.jibToImage.isPresent) {
+                configureJib(project, ext)
+            }
         }
     }
 
-    private fun configureJib(project: Project) {
-        val repoName = (System.getenv("GITHUB_REPOSITORY")
-            ?: project.findProperty("repoName")?.toString()
-            ?: "").lowercase()
+    private fun configureJib(project: Project, ext: ContinuumExtension) {
+        project.pluginManager.apply("com.google.cloud.tools.jib")
 
         project.extensions.configure<JibExtension> {
             from {
-                image = "eclipse-temurin:21-jre"
+                image = ext.jibFromImage.get()
             }
             to {
-                image = "docker.io/$repoName:${project.version}"
+                image = ext.jibToImage.get()
                 auth {
                     username = System.getenv("DOCKER_REPO_USERNAME") ?: ""
                     password = System.getenv("DOCKER_REPO_PASSWORD") ?: ""
