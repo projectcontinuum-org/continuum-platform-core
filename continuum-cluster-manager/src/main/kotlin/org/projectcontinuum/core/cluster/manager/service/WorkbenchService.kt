@@ -31,6 +31,10 @@ class WorkbenchService(
   private val logger = LoggerFactory.getLogger(WorkbenchService::class.java)
   private val objectMapper = jacksonObjectMapper()
 
+  companion object {
+    private val INSTANCE_ID_HOST_PATTERN = Regex("^wb-([0-9a-fA-F-]{36})-")
+  }
+
   /**
    * Audit operation types for workbench lifecycle events
    */
@@ -188,6 +192,44 @@ class WorkbenchService(
     )
 
     return toResponse(refreshedEntity)
+  }
+
+  /**
+   * Decides whether `userId` may access the workbench identified by `forwardedHost`,
+   * the `X-Forwarded-Host` value a Traefik `forwardAuth` middleware sets to the
+   * original request's Host header (e.g. `wb-<instanceId>-<namespace>.<domain>`).
+   */
+  fun authorizeAccess(userId: String, forwardedHost: String): Boolean {
+    val instanceId = extractInstanceId(forwardedHost) ?: run {
+      logger.debug("Authorize denied: could not extract instance id from host '{}'", forwardedHost)
+      return false
+    }
+
+    val entity = repository.findById(instanceId).orElse(null) ?: run {
+      logger.debug("Authorize denied: no workbench found for instance id '{}'", instanceId)
+      return false
+    }
+
+    if (entity.userId != userId) {
+      logger.debug("Authorize denied: user '{}' is not the owner of workbench '{}'", userId, instanceId)
+      return false
+    }
+
+    if (entity.status != WorkbenchStatus.RUNNING.name) {
+      logger.debug("Authorize denied: workbench '{}' is not running (status: {})", instanceId, entity.status)
+      return false
+    }
+
+    return true
+  }
+
+  private fun extractInstanceId(forwardedHost: String): UUID? {
+    val match = INSTANCE_ID_HOST_PATTERN.find(forwardedHost) ?: return null
+    return try {
+      UUID.fromString(match.groupValues[1])
+    } catch (_: IllegalArgumentException) {
+      null
+    }
   }
 
   fun deleteWorkbench(userId: String, instanceName: String) {

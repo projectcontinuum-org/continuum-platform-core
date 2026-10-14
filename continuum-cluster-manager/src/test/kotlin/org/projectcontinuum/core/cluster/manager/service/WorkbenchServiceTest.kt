@@ -337,6 +337,70 @@ class WorkbenchServiceTest {
     assertEquals(versionAfterSave, dbEntity.entityVersion)
   }
 
+  // ── authorizeAccess ─────────────────────────────────────────────────
+
+  @Test
+  fun `authorizeAccess returns true for owner of running workbench`() {
+    val instanceId = UUID.randomUUID()
+    val entity = createSampleEntity(
+      instanceName = "auth-wb",
+      namespace = "wb-ns",
+      instanceId = instanceId,
+      status = WorkbenchStatus.RUNNING.name
+    )
+    repository.save(entity)
+
+    val authorized = service.authorizeAccess("user-1", "wb-$instanceId-wb-ns.example.com")
+
+    assertTrue(authorized)
+  }
+
+  @Test
+  fun `authorizeAccess returns false for non-owner`() {
+    val instanceId = UUID.randomUUID()
+    val entity = createSampleEntity(
+      instanceName = "auth-wb",
+      namespace = "wb-ns",
+      instanceId = instanceId,
+      status = WorkbenchStatus.RUNNING.name
+    )
+    repository.save(entity)
+
+    val authorized = service.authorizeAccess("other-user", "wb-$instanceId-wb-ns.example.com")
+
+    assertFalse(authorized)
+  }
+
+  @Test
+  fun `authorizeAccess returns false when workbench not found`() {
+    val authorized = service.authorizeAccess("user-1", "wb-${UUID.randomUUID()}-wb-ns.example.com")
+
+    assertFalse(authorized)
+  }
+
+  @Test
+  fun `authorizeAccess returns false when workbench is not running`() {
+    val instanceId = UUID.randomUUID()
+    val entity = createSampleEntity(
+      instanceName = "auth-wb",
+      namespace = "wb-ns",
+      instanceId = instanceId,
+      status = WorkbenchStatus.SUSPENDED.name
+    )
+    repository.save(entity)
+
+    val authorized = service.authorizeAccess("user-1", "wb-$instanceId-wb-ns.example.com")
+
+    assertFalse(authorized)
+  }
+
+  @Test
+  fun `authorizeAccess returns false for host that does not match workbench naming convention`() {
+    val authorized = service.authorizeAccess("user-1", "not-a-workbench-host.example.com")
+
+    assertFalse(authorized)
+  }
+
   // ── getWorkbenchLiveness ────────────────────────────────────────────
 
   @Test

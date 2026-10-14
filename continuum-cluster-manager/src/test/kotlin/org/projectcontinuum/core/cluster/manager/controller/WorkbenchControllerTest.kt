@@ -253,7 +253,52 @@ class WorkbenchControllerTest {
       .andExpect(jsonPath("$.serviceEndpoint").exists())
   }
 
+  // ── GET /api/v1/workbench/authorize ─────────────────────────────────
+
+  @Test
+  fun `GET authorize returns 200 when authorized`() {
+    whenever(workbenchService.authorizeAccess("user-1", "wb-abc-ns.example.com")).thenReturn(true)
+
+    mockMvc.perform(
+      get("/api/v1/workbench/authorize")
+        .header("x-continuum-user-id", "user-1")
+        .header("X-Forwarded-Host", "wb-abc-ns.example.com")
+    )
+      .andExpect(status().isOk)
+  }
+
+  @Test
+  fun `GET authorize returns 403 when not authorized`() {
+    whenever(workbenchService.authorizeAccess("user-1", "wb-abc-ns.example.com")).thenReturn(false)
+
+    mockMvc.perform(
+      get("/api/v1/workbench/authorize")
+        .header("x-continuum-user-id", "user-1")
+        .header("X-Forwarded-Host", "wb-abc-ns.example.com")
+    )
+      .andExpect(status().isForbidden)
+  }
+
+  @Test
+  fun `GET authorize returns 400 when user-id header is missing`() {
+    mockMvc.perform(
+      get("/api/v1/workbench/authorize")
+        .header("X-Forwarded-Host", "wb-abc-ns.example.com")
+    )
+      .andExpect(status().isBadRequest)
+  }
+
+  @Test
+  fun `GET authorize returns 400 when X-Forwarded-Host header is missing`() {
+    mockMvc.perform(
+      get("/api/v1/workbench/authorize")
+        .header("x-continuum-user-id", "user-1")
+    )
+      .andExpect(status().isBadRequest)
+  }
+
   // ── DELETE /api/v1/workbench/{instanceName} ─────────────────────────
+
 
   @Test
   fun `DELETE returns 204`() {
