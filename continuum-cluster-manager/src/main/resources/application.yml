@@ -1,6 +1,7 @@
 spring.application.name: continuum-cluster-manager
 server:
   port: 8080
+  max-http-header-size: 80KB
   error:
     include-message: always
     include-stacktrace: on_param
