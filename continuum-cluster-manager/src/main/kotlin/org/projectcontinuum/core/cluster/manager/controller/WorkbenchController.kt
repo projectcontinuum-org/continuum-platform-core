@@ -32,6 +32,15 @@ class WorkbenchController(
     return ResponseEntity.ok(variants)
   }
 
+  @GetMapping("/authorize")
+  fun authorize(
+    @RequestHeader("x-continuum-user-id") userId: String,
+    @RequestHeader("X-Forwarded-Host") forwardedHost: String
+  ): ResponseEntity<Void> {
+    val authorized = workbenchService.authorizeAccess(userId, forwardedHost)
+    return if (authorized) ResponseEntity.ok().build() else ResponseEntity.status(HttpStatus.FORBIDDEN).build()
+  }
+
   @PostMapping
   fun createWorkbench(
     @RequestHeader("x-continuum-user-id", required = false, defaultValue = "anonymous") userId: String,

@@ -19,6 +19,7 @@ import org.projectcontinuum.core.cluster.manager.model.*
 import org.projectcontinuum.core.cluster.manager.repository.WorkbenchInstanceRepository
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
+import org.springframework.cache.CacheManager
 import org.springframework.test.context.ActiveProfiles
 import org.springframework.transaction.support.TransactionTemplate
 import java.time.Instant
@@ -35,6 +36,9 @@ class WorkbenchServiceTest {
   @Autowired
   private lateinit var transactionTemplate: TransactionTemplate
 
+  @Autowired
+  private lateinit var cacheManager: CacheManager
+
   lateinit var client: KubernetesClient
   lateinit var server: KubernetesMockServer
 
@@ -45,6 +49,7 @@ class WorkbenchServiceTest {
   @BeforeEach
   fun setUp() {
     repository.deleteAll()
+    cacheManager.cacheNames.forEach { cacheManager.getCache(it)?.clear() }
 
     freemarkerCfg = Configuration(Configuration.VERSION_2_3_34)
     freemarkerCfg.setClassLoaderForTemplateLoading(this::class.java.classLoader, "/templates")
@@ -65,7 +70,8 @@ class WorkbenchServiceTest {
     namespace: String = "default",
     userId: String = "user-1",
     status: String = WorkbenchStatus.RUNNING.name,
-    instanceId: UUID = UUID.randomUUID()
+    instanceId: UUID = UUID.randomUUID(),
+    ingressUrl: String? = null
   ): WorkbenchInstanceEntity {
     val now = Instant.now()
     return WorkbenchInstanceEntity(
@@ -75,6 +81,7 @@ class WorkbenchServiceTest {
       userId = userId,
       status = status,
       image = "theiaide/theia:latest",
+      ingressUrl = ingressUrl,
       createdAt = now,
       updatedAt = now
     )
@@ -335,6 +342,67 @@ class WorkbenchServiceTest {
     // Verify entity version didn't change (no unnecessary save)
     val dbEntity = repository.findById(instanceId).get()
     assertEquals(versionAfterSave, dbEntity.entityVersion)
+  }
+
+  // ── authorizeAccess ─────────────────────────────────────────────────
+
+  @Test
+  fun `authorizeAccess returns true for owner of running workbench`() {
+    val entity = createSampleEntity(
+      instanceName = "auth-wb",
+      namespace = "wb-ns",
+      status = WorkbenchStatus.RUNNING.name,
+      ingressUrl = "https://wb-auth.example.com"
+    )
+    repository.save(entity)
+
+    val authorized = service.authorizeAccess("user-1", "wb-auth.example.com")
+
+    assertTrue(authorized)
+  }
+
+  @Test
+  fun `authorizeAccess returns false for non-owner`() {
+    val entity = createSampleEntity(
+      instanceName = "auth-wb",
+      namespace = "wb-ns",
+      status = WorkbenchStatus.RUNNING.name,
+      ingressUrl = "https://wb-auth.example.com"
+    )
+    repository.save(entity)
+
+    val authorized = service.authorizeAccess("other-user", "wb-auth.example.com")
+
+    assertFalse(authorized)
+  }
+
+  @Test
+  fun `authorizeAccess returns false when workbench not found`() {
+    val authorized = service.authorizeAccess("user-1", "wb-unknown.example.com")
+
+    assertFalse(authorized)
+  }
+
+  @Test
+  fun `authorizeAccess returns false when workbench is not running`() {
+    val entity = createSampleEntity(
+      instanceName = "auth-wb",
+      namespace = "wb-ns",
+      status = WorkbenchStatus.SUSPENDED.name,
+      ingressUrl = "https://wb-auth.example.com"
+    )
+    repository.save(entity)
+
+    val authorized = service.authorizeAccess("user-1", "wb-auth.example.com")
+
+    assertFalse(authorized)
+  }
+
+  @Test
+  fun `authorizeAccess returns false for host with no matching workbench`() {
+    val authorized = service.authorizeAccess("user-1", "not-a-workbench-host.example.com")
+
+    assertFalse(authorized)
   }
 
   // ── getWorkbenchLiveness ────────────────────────────────────────────
