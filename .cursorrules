@@ -56,7 +56,7 @@ Every workflow node extends `ProcessNodeModel` with: input/output ports, JSON Sc
 ## Conventions
 
 - GitHub Packages for Maven artifacts (requires `GITHUB_USERNAME` + `GITHUB_TOKEN`)
-- Jib for containerization (no Docker daemon), publishes to GHCR
+- Jib for containerization (no Docker daemon), publishes to Docker Hub
 - GitHub Actions CI/CD — build on push/PR, publish + containerize on tags
 - Each node has a `.doc.md` file in resources, auto-loaded by `ProcessNodeModel`
 - Spring auto-config via `META-INF/spring/org.springframework.boot.autoconfigure.AutoConfiguration.imports`

@@ -12,7 +12,7 @@ export function Footer() {
 
           <div className="flex items-center gap-6 text-sm text-fg-muted">
             <a
-              href="https://github.com/projectcontinuum/continuum-platform-core"
+              href="https://github.com/projectcontinuum-org/continuum-platform-core"
               target="_blank"
               rel="noopener noreferrer"
               className="transition-colors hover:text-fg"
@@ -20,7 +20,7 @@ export function Footer() {
               GitHub
             </a>
             <a
-              href="https://github.com/projectcontinuum/continuum-platform-core/issues"
+              href="https://github.com/projectcontinuum-org/continuum-platform-core/issues"
               target="_blank"
               rel="noopener noreferrer"
               className="transition-colors hover:text-fg"
