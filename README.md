@@ -40,10 +40,10 @@ Project Continuum is split across several focused repositories:
 | Repository | Description |
 |-----------|-------------|
 | **Continuum** (this repo) | Core backend — API server, worker framework, shared libraries |
-| [continuum-workbench](https://github.com/projectcontinuum/continuum-workbench) | Browser IDE — Eclipse Theia + React Flow workflow editor |
-| [continuum-feature-base](https://github.com/projectcontinuum/continuum-feature-base) | Base analytics nodes — data transforms, REST, scripting, anomaly detection |
-| [continuum-feature-ai](https://github.com/projectcontinuum/continuum-feature-ai) | AI/ML nodes — LLM fine-tuning with Unsloth + LoRA |
-| [continuum-feature-template](https://github.com/projectcontinuum/continuum-feature-template) | Template — scaffold your own custom worker with nodes |
+| [continuum-workbench](https://github.com/projectcontinuum-org/continuum-workbench) | Browser IDE — Eclipse Theia + React Flow workflow editor |
+| [continuum-feature-base](https://github.com/projectcontinuum-org/continuum-feature-base) | Base analytics nodes — data transforms, REST, scripting, anomaly detection |
+| [continuum-feature-ai](https://github.com/projectcontinuum-org/continuum-feature-ai) | AI/ML nodes — LLM fine-tuning with Unsloth + LoRA |
+| [continuum-feature-template](https://github.com/projectcontinuum-org/continuum-feature-template) | Template — scaffold your own custom worker with nodes |
 
 ---
 
@@ -60,9 +60,9 @@ This monorepo contains the **core backend infrastructure** for Project Continuum
 | `continuum-avro-schemas` | Shared Avro schemas for Kafka messages |
 | `continuum-knime-base` | KNIME compatibility layer (experimental) |
 
-> **Looking for workflow nodes?** See [continuum-feature-base](https://github.com/projectcontinuum/continuum-feature-base) and [continuum-feature-ai](https://github.com/projectcontinuum/continuum-feature-ai).
+> **Looking for workflow nodes?** See [continuum-feature-base](https://github.com/projectcontinuum-org/continuum-feature-base) and [continuum-feature-ai](https://github.com/projectcontinuum-org/continuum-feature-ai).
 >
-> **Looking for the UI?** See [continuum-workbench](https://github.com/projectcontinuum/continuum-workbench).
+> **Looking for the UI?** See [continuum-workbench](https://github.com/projectcontinuum-org/continuum-workbench).
 
 ---
 
@@ -183,15 +183,15 @@ A click turned outcome.
    cd docker && docker compose up -d
    ```
 3. Select a run configuration from the toolbar and hit ▶️ — start **ApiServer** and **MessageBridge**
-4. Start a feature worker from one of the feature repos (e.g., [continuum-feature-base](https://github.com/projectcontinuum/continuum-feature-base))
-5. Start the browser UI from [continuum-workbench](https://github.com/projectcontinuum/continuum-workbench)
+4. Start a feature worker from one of the feature repos (e.g., [continuum-feature-base](https://github.com/projectcontinuum-org/continuum-feature-base))
+5. Start the browser UI from [continuum-workbench](https://github.com/projectcontinuum-org/continuum-workbench)
 6. Open [http://localhost:3002](http://localhost:3002) and start building workflows!
 
 ### Option B: Command Line
 
 ```bash
 # Clone the repo
-git clone https://github.com/projectcontinuum/Continuum.git
+git clone https://github.com/projectcontinuum-org/continuum-platform-core.git
 cd Continuum
 
 # Spin up infrastructure (Temporal, Kafka, MinIO, Mosquitto)
@@ -205,10 +205,10 @@ docker compose up -d
 ./gradlew :continuum-message-bridge:bootRun --args='--server.port=8082'
 
 # Start a feature worker from a feature repo (e.g., continuum-feature-base)
-# See: https://github.com/projectcontinuum/continuum-feature-base
+# See: https://github.com/projectcontinuum-org/continuum-feature-base
 
 # Start the browser UI from the workbench repo
-# See: https://github.com/projectcontinuum/continuum-workbench
+# See: https://github.com/projectcontinuum-org/continuum-workbench
 ```
 
 > 💡 **Tip:** Pass any `spring.*` property via `--args`:
@@ -311,10 +311,10 @@ If you see the gap — fill it. Check out the [Issues](../../issues) page, pick 
 | Repository | Description |
 |-----------|-------------|
 | **Continuum** (this repo) | Core backend — API server, worker framework, shared libraries |
-| [continuum-workbench](https://github.com/projectcontinuum/continuum-workbench) | Browser IDE — Eclipse Theia + React Flow workflow editor |
-| [continuum-feature-base](https://github.com/projectcontinuum/continuum-feature-base) | Base analytics nodes — data transforms, REST, scripting, anomaly detection |
-| [continuum-feature-ai](https://github.com/projectcontinuum/continuum-feature-ai) | AI/ML nodes — LLM fine-tuning with Unsloth + LoRA |
-| [continuum-feature-template](https://github.com/projectcontinuum/continuum-feature-template) | Template — scaffold your own custom worker with nodes |
+| [continuum-workbench](https://github.com/projectcontinuum-org/continuum-workbench) | Browser IDE — Eclipse Theia + React Flow workflow editor |
+| [continuum-feature-base](https://github.com/projectcontinuum-org/continuum-feature-base) | Base analytics nodes — data transforms, REST, scripting, anomaly detection |
+| [continuum-feature-ai](https://github.com/projectcontinuum-org/continuum-feature-ai) | AI/ML nodes — LLM fine-tuning with Unsloth + LoRA |
+| [continuum-feature-template](https://github.com/projectcontinuum-org/continuum-feature-template) | Template — scaffold your own custom worker with nodes |
 
 ---
 

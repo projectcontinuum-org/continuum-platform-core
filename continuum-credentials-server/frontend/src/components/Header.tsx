@@ -4,7 +4,7 @@ import { assetPath } from '../basePath';
 
 const NAV_LINKS: Array<{ label: string; href: string; external?: boolean }> = [
   { label: 'Credentials', href: '/' },
-  { label: 'Documentation', href: 'https://github.com/projectcontinuum/continuum-platform-core', external: true },
+  { label: 'Documentation', href: 'https://github.com/projectcontinuum-org/continuum-platform-core', external: true },
 ];
 
 export function Header() {
