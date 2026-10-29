@@ -29,7 +29,7 @@ cd continuum-platform-core
 ./gradlew :continuum-credentials-server:test --tests "org.projectcontinuum.core.credentials.service.CredentialServiceTest"
 ```
 
-To run the full stack locally, use [continuum-local-setup](https://github.com/projectcontinuum-org/continuum-local-setup). See `CLAUDE.md` for module-level notes.
+To run the full stack locally, use [continuum-local-setup](https://github.com/projectcontinuum-org/continuum-local-setup). See `AGENTS.md` for module-level notes.
 
 ## Pull request process
 
