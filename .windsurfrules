@@ -32,7 +32,7 @@ Core backend monorepo for **Project Continuum** — a distributed, crash-proof w
 ## Dependency Chain
 
 ```
-continuum-commons (base) ← continuum-worker-springboot-starter ← feature repos (via GitHub Packages)
+continuum-commons (base) ← continuum-worker-springboot-starter ← feature repos (via Maven Central)
 continuum-commons ← continuum-api-server
 continuum-commons ← continuum-message-bridge
 ```
@@ -55,7 +55,7 @@ Every workflow node extends `ProcessNodeModel` with: input/output ports, JSON Sc
 
 ## Conventions
 
-- GitHub Packages for Maven artifacts (requires `GITHUB_USERNAME` + `GITHUB_TOKEN`)
+- Maven Central for Maven artifacts (no credentials needed to resolve)
 - Jib for containerization (no Docker daemon), publishes to Docker Hub
 - GitHub Actions CI/CD — build on push/PR, publish + containerize on tags
 - Each node has a `.doc.md` file in resources, auto-loaded by `ProcessNodeModel`

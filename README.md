@@ -294,7 +294,7 @@ We're launching a dedicated YouTube channel with deep dives, demos, and architec
 
 We don't want perfect. We want **working**.
 
-If you see the gap — fill it. Check out the [Issues](../../issues) page, pick something, and send a PR.
+If you see the gap — fill it. Check out the [Issues](https://github.com/projectcontinuum-org/continuum-platform-core/issues) page, pick something, and send a PR.
 
 **First time?** Look for issues labeled `good first issue`. We're friendly.
 
