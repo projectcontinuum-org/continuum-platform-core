@@ -57,3 +57,6 @@ continuum-frontend/continuum-workbench/gen-webpack.node.config.js
 continuum-frontend/continuum-workbench-thin/gen-webpack.config.js
 unsloth-trainer/venv/
 unsloth-trainer/.venv/
+
+### npm ###
+package-lock.json
