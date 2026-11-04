@@ -16,6 +16,7 @@ Core platform team. No Spring Boot app — library only. Published to Maven Cent
 - `ExecutionContext` — holds `ownerId` and pre-resolved credentials (label → data map). Populated by `ContinuumNodeActivity` before `execute()` is called.
 - `TaskQueues` — object (not enum) of const strings so they can appear in annotations: `WORKFLOW_TASK_QUEUE`, `ACTIVITY_TASK_QUEUE`, `ACTIVITY_TASK_QUEUE_INITIALIZE`.
 - `NodeProgressCallback` — rate-limited in the worker starter; nodes call `report(percentage)` or `report(NodeProgress(...))`.
+- `ValidationHelper` — JSON Schema (draft 4 default) checks of node properties. `validateJsonWithSchema` asserts (used by `ProcessNodeModel.run` and the api-server at workflow start); `findSchemaViolations` returns `SchemaViolation(keyword, path, property, message)` per problem for callers that report errors instead of failing.
 - Spring `context` and `beans` are `compileOnly` — this library does not pull in a Spring runtime.
 
 ## Work Guidance

@@ -54,10 +54,28 @@ class ContinuumNodeMcpTools(
         )
         nodeId: String
     ): ContinuumWorkflowModel.NodeData {
-        return nodeExplorerService.getNodeMetadata(nodeId)
-            ?: throw IllegalArgumentException(
-                "No registered node with id '$nodeId'. Use the full node id exactly as returned by " +
-                    "searchContinuumNodes or listContinuumNodeCategories (e.g. 'org.projectcontinuum.feature.rdkit.node.RDKit2SVGNodeModel')."
-            )
+        return nodeExplorerService.getNodeMetadata(nodeId) ?: throw unknownNode(nodeId)
     }
+
+    @McpTool(
+        name = "getContinuumNodeDocumentation",
+        description = "Fetch the markdown documentation of one registered Continuum node: what it does, what each property means, " +
+            "its ports, how templates behave, and examples. Read it before configuring the node."
+    )
+    fun getContinuumNodeDocumentation(
+        @McpToolParam(
+            description = "The full registered node id, exactly as returned by listContinuumNodeCategories or searchContinuumNodes",
+            required = true
+        )
+        nodeId: String
+    ): String {
+        return nodeExplorerService.getDocumentation(nodeId)
+            ?: if (nodeExplorerService.getNodeMetadata(nodeId) == null) throw unknownNode(nodeId)
+            else "Node '$nodeId' has no documentation. Rely on the property descriptions from getContinuumNodeMetadata."
+    }
+
+    private fun unknownNode(nodeId: String) = IllegalArgumentException(
+        "No registered node with id '$nodeId'. Use the full node id exactly as returned by " +
+            "searchContinuumNodes or listContinuumNodeCategories (e.g. 'org.projectcontinuum.feature.rdkit.node.RDKit2SVGNodeModel')."
+    )
 }

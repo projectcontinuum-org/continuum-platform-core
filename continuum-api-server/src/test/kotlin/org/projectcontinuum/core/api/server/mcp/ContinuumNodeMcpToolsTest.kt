@@ -108,4 +108,29 @@ class ContinuumNodeMcpToolsTest {
     assertTrue(error.message!!.contains("No registered node with id 'SvgNode'"))
     assertTrue(error.message!!.contains("full node id"))
   }
+
+  @Test
+  fun `getContinuumNodeDocumentation returns the markdown`() {
+    whenever(nodeExplorerService.getDocumentation("org.test.SvgNode")).thenReturn("# RDKit to SVG")
+
+    assertEquals("# RDKit to SVG", tools.getContinuumNodeDocumentation("org.test.SvgNode"))
+  }
+
+  @Test
+  fun `getContinuumNodeDocumentation says so when a registered node has no docs`() {
+    whenever(nodeExplorerService.getDocumentation("org.test.SvgNode")).thenReturn(null)
+    whenever(nodeExplorerService.getNodeMetadata("org.test.SvgNode")).thenReturn(nodeData)
+
+    assertTrue(tools.getContinuumNodeDocumentation("org.test.SvgNode").contains("has no documentation"))
+  }
+
+  @Test
+  fun `getContinuumNodeDocumentation throws for an unknown node`() {
+    whenever(nodeExplorerService.getDocumentation("SvgNode")).thenReturn(null)
+    whenever(nodeExplorerService.getNodeMetadata("SvgNode")).thenReturn(null)
+
+    val error = assertThrows<IllegalArgumentException> { tools.getContinuumNodeDocumentation("SvgNode") }
+
+    assertTrue(error.message!!.contains("No registered node with id 'SvgNode'"))
+  }
 }
