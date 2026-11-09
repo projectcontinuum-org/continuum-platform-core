@@ -41,7 +41,8 @@ class WorkflowSpecBuilder(
             return McpWorkflowBuildResult(valid = false, errors = validation.errors, warnings = validation.warnings)
         }
         // A valid spec has a name, non-blank unique keys, registered node ids and edges with all four fields set.
-        val specNodes = nodes!!
+        // It may have no nodes: that builds an empty workflow.
+        val specNodes = nodes.orEmpty()
         val specEdges = edges.orEmpty()
         val metadata = specNodes.map { it.nodeId!! }.distinct().associateWith { nodeExplorerService.getNodeMetadata(it)!! }
         val depths = depths(specNodes.map { it.key!! }, specEdges)

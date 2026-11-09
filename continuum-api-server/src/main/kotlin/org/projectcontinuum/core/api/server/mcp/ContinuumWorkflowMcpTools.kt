@@ -35,12 +35,13 @@ class ContinuumWorkflowMcpTools(
         description = "Build the complete Continuum workflow (the content of a .cwf file) from the same compact spec that " +
             "validateContinuumWorkflow takes. The spec is validated first. If it has errors, returns valid=false with the errors and no workflow. " +
             "Otherwise returns valid=true, a suggested fileName and workflow: the full workflow JSON with every node's registry metadata, " +
-            "the given properties merged over the defaults, edges and a layout. Save workflow unchanged as the file content; do not edit it."
+            "the given properties merged over the defaults, edges and a layout. Save workflow unchanged as the file content; do not edit it. " +
+            "An empty nodes list builds an empty workflow (with a warning), so a file can be saved first and rebuilt as nodes are added."
     )
     fun buildContinuumWorkflow(
         @McpToolParam(description = "Workflow name", required = true)
         name: String?,
-        @McpToolParam(description = "The nodes of the workflow: [{key, nodeId, properties}]", required = true)
+        @McpToolParam(description = "The nodes of the workflow: [{key, nodeId, properties}]. Empty for an empty workflow.", required = true)
         nodes: List<McpWorkflowSpecNode>?,
         @McpToolParam(description = "The connections: [{from, fromPort, to, toPort}]. Empty or omitted for a single node.", required = false)
         edges: List<McpWorkflowSpecEdge>?

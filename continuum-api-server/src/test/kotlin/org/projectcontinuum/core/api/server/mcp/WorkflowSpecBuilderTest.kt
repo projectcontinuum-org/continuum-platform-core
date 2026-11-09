@@ -122,6 +122,17 @@ class WorkflowSpecBuilderTest {
   }
 
   @Test
+  fun `an empty spec builds an empty workflow`() {
+    val result = builder.build("Live Build", emptyList(), null)
+
+    assertTrue(result.valid, result.errors.toString())
+    assertEquals("live-build.cwf", result.fileName)
+    assertEquals(emptyList(), result.workflow!!.nodes)
+    assertEquals(emptyList(), result.workflow!!.edges)
+    assertEquals(listOf("The workflow has no nodes yet."), result.warnings.map { it.message })
+  }
+
+  @Test
   fun `warnings are passed through and each build gets a new id`() {
     val nodes = listOf(node("r", "org.test.Reader"), node("q", "org.test.Reader"))
 

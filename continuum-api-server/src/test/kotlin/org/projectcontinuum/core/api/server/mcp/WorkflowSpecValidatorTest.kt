@@ -67,11 +67,16 @@ class WorkflowSpecValidatorTest {
   }
 
   @Test
-  fun `missing name and nodes are errors`() {
+  fun `a missing name is an error and no nodes only a warning`() {
     val result = validator.validate(" ", null, null)
 
     assertFalse(result.valid)
-    assertEquals(listOf("The workflow needs a non-empty name.", "The workflow needs at least one node."), result.errors.map { it.message })
+    assertEquals(listOf("The workflow needs a non-empty name."), result.errors.map { it.message })
+    assertEquals(listOf("The workflow has no nodes yet."), result.warnings.map { it.message })
+
+    val empty = validator.validate("w", emptyList(), null)
+    assertTrue(empty.valid, messages(empty))
+    assertEquals(0, empty.nodeCount)
   }
 
   @Test

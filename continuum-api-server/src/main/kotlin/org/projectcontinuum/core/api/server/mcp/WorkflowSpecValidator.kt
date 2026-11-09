@@ -24,7 +24,8 @@ class WorkflowSpecValidator(
         val specEdges = edges.orEmpty()
 
         if (name.isNullOrBlank()) errors += McpWorkflowIssue("The workflow needs a non-empty name.")
-        if (specNodes.isEmpty()) errors += McpWorkflowIssue("The workflow needs at least one node.")
+        // Allowed so a client can save an empty workflow first and fill it in node by node
+        if (specNodes.isEmpty()) warnings += McpWorkflowIssue("The workflow has no nodes yet.")
 
         val byKey = validateNodes(specNodes, errors)
         val validEdges = validateEdges(specEdges, byKey, errors)
