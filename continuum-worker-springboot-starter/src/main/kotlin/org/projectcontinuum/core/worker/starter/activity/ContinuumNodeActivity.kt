@@ -22,6 +22,7 @@ import org.projectcontinuum.core.commons.context.CredentialFetcher
 import org.projectcontinuum.core.worker.starter.credential.CredentialFetcherService
 import io.temporal.activity.Activity
 import io.temporal.activity.ActivityExecutionContext
+import io.temporal.client.ActivityCompletionException
 import io.temporal.spring.boot.ActivityImpl
 import jakarta.annotation.PostConstruct
 import org.slf4j.LoggerFactory
@@ -197,25 +198,68 @@ class ContinuumNodeActivity(
     Files.createDirectories(nodeCachePath)
 
     val executionStartTime = AtomicLong(0)
-    val progressCallback = createProgressCallback(node.id, executionStartTime)
+    val cancellation = ActivityCancellation(Thread.currentThread())
+    val progressCallback = createProgressCallback(node.id, executionStartTime, cancellation)
 
     // Start a background heartbeat scheduler to keep the activity alive even when
     // the node doesn't call report() for extended periods (e.g., during long model
     // downloads or training steps). Without this, Temporal would consider the activity
     // dead after the heartbeat timeout and retry it unnecessarily.
     val activityContext = Activity.getExecutionContext()
-    val heartbeatScheduler = startHeartbeatScheduler(node.id, activityContext)
+    val heartbeatScheduler = startHeartbeatScheduler(node.id, activityContext, cancellation)
 
     return try {
       when {
         processNodeClassNames.contains(nodeModel) -> executeProcessNode(node, inputs, progressCallback, executionStartTime)
         triggerNodeClassNames.contains(nodeModel) -> executeTriggerNode(node, progressCallback, executionStartTime)
         else -> createErrorOutput(node.id, "Node model '$nodeModel' not found")
-      }
+      }.also { cancellation.rethrowIfCancelled() }
     } catch (e: NodeRuntimeException) {
+      cancellation.rethrowIfCancelled()
       handleNodeException(node, e)
+    } catch (e: Throwable) {
+      // Report the cancellation to Temporal, not whatever the interrupted node threw on its way out
+      cancellation.rethrowIfCancelled()
+      throw e
     } finally {
       heartbeatScheduler.shutdownNow()
+      cancellation.close()
+    }
+  }
+
+  /**
+   * Carries a Temporal cancellation (or timeout / worker shutdown) seen by a heartbeat to the activity thread.
+   *
+   * Heartbeats are how Temporal delivers cancellation: [ActivityExecutionContext.heartbeat] throws an
+   * [ActivityCompletionException]. The background scheduler runs on its own thread, so on its first such
+   * exception it interrupts the activity thread — a node blocked in I/O, `Process.waitFor` or `Thread.sleep`
+   * stops — and [run] rethrows the exception so Temporal records the cancellation, even when the node
+   * swallowed the interrupt or the exception from [NodeProgressCallback.report].
+   */
+  private class ActivityCancellation(private val activityThread: Thread) {
+    private val lock = Any()
+    private var exception: ActivityCompletionException? = null
+    private var closed = false
+    private var interrupted = false
+
+    /** Records [e]; with [interrupt], interrupts the activity thread unless the activity already finished. */
+    fun cancel(e: ActivityCompletionException, interrupt: Boolean) = synchronized(lock) {
+      if (closed || exception != null) return
+      exception = e
+      if (interrupt) {
+        interrupted = true
+        activityThread.interrupt()
+      }
+    }
+
+    fun rethrowIfCancelled() {
+      synchronized(lock) { exception }?.let { throw it }
+    }
+
+    /** Ends the activity: no later interrupts; clears the one sent so it does not leak into the next task on this thread. */
+    fun close() = synchronized(lock) {
+      closed = true
+      if (interrupted) Thread.interrupted()
     }
   }
 
@@ -314,13 +358,19 @@ class ContinuumNodeActivity(
    * The caller is responsible for calling [ScheduledExecutorService.shutdownNow]
    * when the activity completes.
    *
+   * A heartbeat failing with [ActivityCompletionException] (activity cancelled, timed out or the worker
+   * shutting down) is handed to [cancellation], which stops the node; other failures are logged and retried
+   * on the next tick.
+   *
    * @param nodeId The ID of the node being executed (for logging)
    * @param activityContext The activity execution context captured on the activity thread
+   * @param cancellation Receives a cancellation seen by a heartbeat
    * @return The scheduler, which must be shut down when execution completes
    */
   private fun startHeartbeatScheduler(
     nodeId: String,
-    activityContext: ActivityExecutionContext
+    activityContext: ActivityExecutionContext,
+    cancellation: ActivityCancellation
   ): ScheduledExecutorService {
     val scheduler = Executors.newSingleThreadScheduledExecutor { runnable ->
       Thread(runnable, "heartbeat-$nodeId").apply { isDaemon = true }
@@ -330,6 +380,10 @@ class ContinuumNodeActivity(
       try {
         activityContext.heartbeat("heartbeat for node $nodeId")
         LOGGER.debug("Background heartbeat sent for node: $nodeId")
+      } catch (e: ActivityCompletionException) {
+        LOGGER.warn("Stopping node $nodeId: ${e.javaClass.simpleName} from heartbeat")
+        cancellation.cancel(e, interrupt = true)
+        scheduler.shutdown()
       } catch (e: Exception) {
         LOGGER.warn("Failed to send background heartbeat for node $nodeId: ${e.message}")
       }
@@ -351,10 +405,17 @@ class ContinuumNodeActivity(
    * - Stage status changes
    * - Intermediate updates only if [progressReportRateLimitMs] has elapsed
    *
+   * The heartbeat runs on the node's own thread, so a cancellation it reports is thrown straight into the
+   * node and also recorded in [cancellation], in case the node catches it.
+   *
    * @param nodeId The ID of the node being executed
    * @return A [NodeProgressCallback] instance
    */
-  private fun createProgressCallback(nodeId: String, executionStartTime: AtomicLong): NodeProgressCallback {
+  private fun createProgressCallback(
+    nodeId: String,
+    executionStartTime: AtomicLong,
+    cancellation: ActivityCancellation
+  ): NodeProgressCallback {
     val lastReportTime = AtomicLong(0)
     val lastReportedStages = AtomicReference<Map<String, StageStatus>?>(null)
 
@@ -378,7 +439,12 @@ class ContinuumNodeActivity(
         // Always send a heartbeat to Temporal to keep the activity alive.
         // This is independent of rate limiting - heartbeats are cheap and
         // prevent Temporal from thinking the activity is dead.
-        Activity.getExecutionContext().heartbeat(progressWithDuration)
+        try {
+          Activity.getExecutionContext().heartbeat(progressWithDuration)
+        } catch (e: ActivityCompletionException) {
+          cancellation.cancel(e, interrupt = false)
+          throw e
+        }
 
         val lastTime = lastReportTime.get()
         val currentStages = progressWithDuration.stageStatus
