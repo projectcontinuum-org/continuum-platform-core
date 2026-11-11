@@ -110,14 +110,106 @@ jobs:
           JRELEASER_GPG_SECRET_KEY: ${{ secrets.GPG_SECRET_KEY }}
           JRELEASER_GPG_PUBLIC_KEY: ${{ secrets.GPG_PUBLIC_KEY }}
 
+  # One single-platform image per architecture, each built on a runner of that architecture.
+  # Every leg pushes the module's normal tags; the manifest job then repoints each tag to a multi-arch
+  # manifest list built from the per-leg digests, so the leg that pushes last does not matter.
+  containerize:
+    needs: build
+    if: inputs.publish_to_docker_hub
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: true
+      matrix:
+        include:
+          - arch: amd64
+            runner: ubuntu-latest
+          - arch: arm64
+            runner: ubuntu-24.04-arm
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          lfs: true
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '21'
+
+      - name: Cache Gradle dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: gradle-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
+          restore-keys: |
+            gradle-${{ runner.os }}-${{ runner.arch }}-
+
+      - name: Grant execute permission for gradlew
+        run: chmod +x ./gradlew
+
+      # Jib modules build for the given platform; landing-page's docker-based jib task builds for the runner's.
       - name: Containerize
-        if: inputs.publish_to_docker_hub
         run: |
           if [ "${{ inputs.module-name }}" = "all" ]; then
-            ./gradlew jib --no-daemon
+            ./gradlew jib -Djib.from.platforms=linux/${{ matrix.arch }} --no-daemon
           else
-            ./gradlew :${{ inputs.module-name }}:jib --no-daemon
+            ./gradlew :${{ inputs.module-name }}:jib -Djib.from.platforms=linux/${{ matrix.arch }} --no-daemon
           fi
         env:
           DOCKER_REPO_USERNAME: ${{ secrets.DOCKER_HUB_USERNAME }}
           DOCKER_REPO_PASSWORD: ${{ secrets.DOCKER_HUB_PASSWORD }}
+
+      # "<image>:<tag> <digest>" per pushed tag, from the jib-image.json each module writes into its build dir
+      - name: Record pushed image digests
+        run: |
+          mkdir -p jib-images
+          find . -path '*/build/jib-image.json' -not -path '*/node_modules/*' -exec jq -r \
+            '.imageDigest as $digest | (.image | sub(":[^:/]+$"; "")) as $repo | .tags[] | "\($repo):\(.) \($digest)"' {} \; \
+            > jib-images/${{ matrix.arch }}.txt
+          cat jib-images/${{ matrix.arch }}.txt
+
+      # Named per module, so several modules can be containerized in the same workflow run
+      - name: Upload image digests
+        uses: actions/upload-artifact@v4
+        with:
+          name: jib-images-${{ inputs.module-name }}-${{ matrix.arch }}
+          path: jib-images/${{ matrix.arch }}.txt
+          if-no-files-found: error
+
+  manifest:
+    needs: containerize
+    permissions:
+      contents: read
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download image digests
+        uses: actions/download-artifact@v4
+        with:
+          pattern: jib-images-${{ inputs.module-name }}-*
+          path: jib-images
+          merge-multiple: true
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKER_HUB_USERNAME }}
+          password: ${{ secrets.DOCKER_HUB_PASSWORD }}
+
+      - name: Create multi-arch manifests
+        run: |
+          for image in $(cut -d' ' -f1 jib-images/*.txt | sort -u); do
+            sources=()
+            for digest in $(awk -v img="${image}" '$1 == img { print $2 }' jib-images/*.txt); do
+              sources+=("${image%:*}@${digest}")
+            done
+            docker buildx imagetools create --tag "${image}" "${sources[@]}"
+            docker buildx imagetools inspect "${image}"
+          done

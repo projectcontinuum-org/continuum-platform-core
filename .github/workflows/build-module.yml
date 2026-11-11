@@ -1,25 +1,58 @@
 name: Build Module
 
+# workflow_dispatch has no multi-select input, so every module is its own checkbox.
+# Input ids are the Gradle module names; the select job turns the ticked ones into the build matrix.
 on:
   workflow_dispatch:
     inputs:
-      module:
-        description: 'Select a Gradle module to build.'
-        required: true
-        type: choice
-        options:
-          - all
-          - continuum-api-server
-          - continuum-avro-schemas
-          - continuum-cloud-gateway
-          - continuum-commons
-          - continuum-message-bridge
-          - continuum-worker-springboot-starter
-          - continuum-gradle-plugin
-          - continuum-orchestration-service
-          - continuum-cluster-manager
-          - continuum-credentials-server
-          - landing-page
+      all:
+        description: 'All modules (one build of the whole project; ignores the module checkboxes below)'
+        type: boolean
+        default: false
+      continuum-api-server:
+        description: 'continuum-api-server'
+        type: boolean
+        default: false
+      continuum-avro-schemas:
+        description: 'continuum-avro-schemas'
+        type: boolean
+        default: false
+      continuum-cloud-gateway:
+        description: 'continuum-cloud-gateway'
+        type: boolean
+        default: false
+      continuum-commons:
+        description: 'continuum-commons'
+        type: boolean
+        default: false
+      continuum-message-bridge:
+        description: 'continuum-message-bridge'
+        type: boolean
+        default: false
+      continuum-worker-springboot-starter:
+        description: 'continuum-worker-springboot-starter'
+        type: boolean
+        default: false
+      continuum-gradle-plugin:
+        description: 'continuum-gradle-plugin'
+        type: boolean
+        default: false
+      continuum-orchestration-service:
+        description: 'continuum-orchestration-service'
+        type: boolean
+        default: false
+      continuum-cluster-manager:
+        description: 'continuum-cluster-manager'
+        type: boolean
+        default: false
+      continuum-credentials-server:
+        description: 'continuum-credentials-server'
+        type: boolean
+        default: false
+      landing-page:
+        description: 'landing-page'
+        type: boolean
+        default: false
       publish_to_maven:
         description: 'Publish artifacts to Maven Central'
         required: true
@@ -32,10 +65,39 @@ on:
         default: false
 
 jobs:
+  select:
+    runs-on: ubuntu-latest
+    outputs:
+      modules: ${{ steps.modules.outputs.modules }}
+    steps:
+      - name: Collect selected modules
+        id: modules
+        env:
+          INPUTS: ${{ toJSON(inputs) }}
+        run: |
+          if [ "$(jq -r '.all' <<< "${INPUTS}")" = "true" ]; then
+            modules='["all"]'
+          else
+            modules=$(jq -c '[to_entries[]
+              | select((.value == true or .value == "true") and .key != "publish_to_maven" and .key != "publish_to_docker_hub")
+              | .key]' <<< "${INPUTS}")
+          fi
+          if [ "${modules}" = "[]" ]; then
+            echo "::error::Select at least one module (or 'All modules')"
+            exit 1
+          fi
+          echo "Building: ${modules}"
+          echo "modules=${modules}" >> "$GITHUB_OUTPUT"
+
   build-module:
+    needs: select
+    strategy:
+      fail-fast: false
+      matrix:
+        module: ${{ fromJSON(needs.select.outputs.modules) }}
     uses: ./.github/workflows/generic-module-builder.yml
     with:
-      module-name: ${{ github.event.inputs.module }}
-      publish_to_maven: ${{ github.event.inputs.publish_to_maven == 'true' }}
-      publish_to_docker_hub: ${{ github.event.inputs.publish_to_docker_hub == 'true' }}
+      module-name: ${{ matrix.module }}
+      publish_to_maven: ${{ inputs.publish_to_maven }}
+      publish_to_docker_hub: ${{ inputs.publish_to_docker_hub }}
     secrets: inherit
