@@ -173,10 +173,11 @@ jobs:
             > jib-images/${{ matrix.arch }}.txt
           cat jib-images/${{ matrix.arch }}.txt
 
+      # Named per module, so several modules can be containerized in the same workflow run
       - name: Upload image digests
         uses: actions/upload-artifact@v4
         with:
-          name: jib-images-${{ matrix.arch }}
+          name: jib-images-${{ inputs.module-name }}-${{ matrix.arch }}
           path: jib-images/${{ matrix.arch }}.txt
           if-no-files-found: error
 
@@ -189,7 +190,7 @@ jobs:
       - name: Download image digests
         uses: actions/download-artifact@v4
         with:
-          pattern: jib-images-*
+          pattern: jib-images-${{ inputs.module-name }}-*
           path: jib-images
           merge-multiple: true
 
