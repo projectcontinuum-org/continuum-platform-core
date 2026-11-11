@@ -45,11 +45,17 @@ tasks.register<Exec>("jib") {
     val dockerRepoName = "docker.io/$dockerRepoOwner/${project.name.lowercase()}"
     val imageName = "$dockerRepoName:${project.version}"
     val latestImageName = "$dockerRepoName:latest"
+    // Same jib-image.json Jib writes, so CI can merge the per-architecture pushes into one multi-arch tag
+    val jibImageJson = layout.buildDirectory.file("jib-image.json").get().asFile
     commandLine("bash", "-c",
         "docker build -t $imageName -t $latestImageName . --progress=plain && " +
             "docker login docker.io --username ${System.getenv("DOCKER_REPO_USERNAME")} --password ${System.getenv("DOCKER_REPO_PASSWORD")} && " +
             "docker push $imageName && " +
-            "docker push $latestImageName"
+            "docker push $latestImageName && " +
+            "mkdir -p ${jibImageJson.parent} && " +
+            "digest=\$(docker image inspect --format '{{index .RepoDigests 0}}' $imageName | cut -d@ -f2) && " +
+            "printf '{\"image\":\"%s\",\"imageDigest\":\"%s\",\"tags\":[\"%s\",\"latest\"]}' " +
+            "$imageName \"\$digest\" ${project.version} > $jibImageJson"
     )
 }
 
