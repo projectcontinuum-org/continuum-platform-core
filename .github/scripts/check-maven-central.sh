@@ -85,7 +85,7 @@ done
   echo
   if [ "${existing}" -gt 0 ]; then
     echo "> [!CAUTION]"
-    echo "> ${existing} of ${#poms[@]} artifact(s) already exist on Maven Central, so the deploy was skipped."
+    echo "> ${existing} of ${#poms[@]} artifact(s) already exist on Maven Central, so publishing this version would be rejected."
     echo "> Maven Central versions cannot be overwritten. Bump \`platformVersion\` in \`gradle.properties\` and run again."
   else
     echo "All ${#poms[@]} staged artifact(s) are new to Maven Central."

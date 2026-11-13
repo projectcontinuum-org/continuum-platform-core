@@ -1,0 +1,59 @@
+name: Maven Central Version Check
+
+# Fails a PR that changes any module while platformVersion is already on Maven Central, so the version bump
+# happens in the PR instead of surfacing as a failed release. Every continuum-* module shares platformVersion
+# (gradle.properties), so a change to any of them, not only the Maven-published ones, needs a new version.
+on:
+  pull_request:
+    paths:
+      - 'continuum-*/**'
+      - 'gradle.properties'
+      - 'settings.gradle.kts'
+      - 'build.gradle.kts'
+      - 'gradle/**'
+      - '.github/scripts/check-maven-central.sh'
+      - '.github/workflows/pr-maven-central-check.yml'
+
+concurrency:
+  group: maven-central-check-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    name: Maven artifacts not yet published
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '21'
+
+      - name: Cache Gradle dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: gradle-${{ runner.os }}-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
+          restore-keys: |
+            gradle-${{ runner.os }}-
+
+      # Stages the exact POMs a release would upload, for every module that publishes (no signing, no credentials).
+      - name: Stage artifacts locally
+        run: |
+          chmod +x ./gradlew
+          ./gradlew publishAllPublicationsToLocalStagingRepository --no-daemon --stacktrace
+
+      # Secrets are absent on fork/Dependabot PRs; the script then checks repo1.maven.org only.
+      - name: Check artifacts are not already on Maven Central
+        run: bash .github/scripts/check-maven-central.sh
+        env:
+          MAVEN_REPO_USERNAME: ${{ secrets.MAVEN_CENTRAL_USERNAME }}
+          MAVEN_REPO_PASSWORD: ${{ secrets.MAVEN_CENTRAL_PASSWORD }}

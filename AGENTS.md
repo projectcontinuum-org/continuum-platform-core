@@ -267,6 +267,8 @@ Container images build with Jib (no Docker daemon) and push to **Docker Hub** at
 
 CI runs `.github/workflows/generic-module-builder.yml`, triggered manually via `.github/workflows/build-module.yml` (tick one or more modules, or "All modules", plus whether to publish to Maven and/or Docker Hub; each ticked module runs as its own matrix leg) and on every published GitHub release via `.github/workflows/on-release.yml` (all libraries and services).
 
+PRs that touch any `continuum-*` module or shared build files (`settings.gradle.kts`, root `build.gradle.kts`, `gradle.properties`, `gradle/`) run `.github/workflows/pr-maven-central-check.yml`. All modules share `platformVersion`, so the workflow stages the Maven-published modules locally and runs the same `check-maven-central.sh`. A PR that changes any module must bump `platformVersion` once the current version has been released.
+
 ## Child DOX Index
 
 - [continuum-commons/AGENTS.md](continuum-commons/AGENTS.md) — base node model, Parquet I/O, shared protocol types; library depended on by every module and every feature repo
