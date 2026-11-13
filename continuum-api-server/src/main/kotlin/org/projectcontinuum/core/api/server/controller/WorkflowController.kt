@@ -28,8 +28,10 @@ class WorkflowController(
   }
 
   @GetMapping("/active")
-  fun getActiveWorkflows(): List<String> {
-    return workflowService.getActiveWorkflows().map { it.workflowId }
+  fun getActiveWorkflows(
+    @RequestHeader("x-continuum-user-id", required = false, defaultValue = "anonymous") ownedBy: String
+  ): List<String> {
+    return workflowService.getActiveWorkflows(ownedBy).map { it.workflowId }
   }
 
   @GetMapping("/{workflowId}/status")
@@ -47,11 +49,12 @@ class WorkflowController(
 
   @PostMapping("/{workflowId}/cancel")
   fun cancelWorkflow(
+    @RequestHeader("x-continuum-user-id", required = false, defaultValue = "anonymous") ownedBy: String,
     @PathVariable workflowId: String,
     @RequestParam(required = false) reason: String?
   ): ResponseEntity<Void> {
     return try {
-      workflowService.cancelWorkflow(workflowId, reason)
+      workflowService.cancelWorkflow(ownedBy, workflowId, reason)
       ResponseEntity.noContent().build()
     } catch (e: WorkflowNotFoundException) {
       ResponseEntity.notFound().build()
@@ -60,11 +63,12 @@ class WorkflowController(
 
   @PostMapping("/{workflowId}/terminate")
   fun terminateWorkflow(
+    @RequestHeader("x-continuum-user-id", required = false, defaultValue = "anonymous") ownedBy: String,
     @PathVariable workflowId: String,
     @RequestParam(required = false) reason: String?
   ): ResponseEntity<Void> {
     return try {
-      workflowService.terminateWorkflow(workflowId, reason)
+      workflowService.terminateWorkflow(ownedBy, workflowId, reason)
       ResponseEntity.noContent().build()
     } catch (e: WorkflowNotFoundException) {
       ResponseEntity.notFound().build()

@@ -11,4 +11,8 @@ class ApiExceptionHandler {
   @ExceptionHandler(InvalidRequestException::class)
   fun handleInvalidRequest(e: InvalidRequestException): ProblemDetail =
     ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, e.message ?: "Invalid request")
+
+  @ExceptionHandler(ResourceNotFoundException::class)
+  fun handleNotFound(e: ResourceNotFoundException): ProblemDetail =
+    ProblemDetail.forStatusAndDetail(HttpStatus.NOT_FOUND, e.message ?: "Not found")
 }

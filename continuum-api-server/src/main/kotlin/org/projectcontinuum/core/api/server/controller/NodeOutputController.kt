@@ -12,6 +12,7 @@ class NodeOutputController(
 ) {
   @GetMapping("{workflowId}/nodes/{nodeId}/outputs/{outputId}")
   fun getData(
+    @RequestHeader("x-continuum-user-id", required = false, defaultValue = "anonymous") ownedBy: String,
     @PathVariable
     workflowId: String,
     @PathVariable
@@ -24,6 +25,7 @@ class NodeOutputController(
     pageSize: Int
   ): Page<List<CellDto>> {
     return nodeOutputService.getOutput(
+      ownedBy = ownedBy,
       workflowId = workflowId,
       nodeId = nodeId,
       outputId = outputId,

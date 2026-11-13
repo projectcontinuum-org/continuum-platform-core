@@ -17,6 +17,7 @@ import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.ValueSource
 import org.mockito.kotlin.any
 import org.mockito.kotlin.argumentCaptor
+import org.mockito.kotlin.eq
 import org.mockito.kotlin.mock
 import org.mockito.kotlin.never
 import org.mockito.kotlin.times
@@ -24,6 +25,7 @@ import org.mockito.kotlin.verify
 import org.mockito.kotlin.whenever
 import org.projectcontinuum.core.api.server.exception.InvalidRequestException
 import org.projectcontinuum.core.api.server.repository.jpa.WorkflowRunRepository
+import org.projectcontinuum.core.commons.workflow.IContinuumWorkflow
 import com.google.protobuf.ByteString
 import tools.jackson.databind.json.JsonMapper
 import kotlin.test.assertEquals
@@ -164,6 +166,77 @@ class WorkflowServiceTest {
     whenever(workflowRunRepository.existsByWorkflowIdAndOwnedBy("run-1", "mallory")).thenReturn(false)
 
     assertThrows<WorkflowNotFoundException> { service.getWorkflowStatusById("mallory", "run-1") }
+    verify(blockingStub, never()).listWorkflowExecutions(any())
+  }
+
+  @Test
+  fun `cancel of another owner's workflow is not found and the workflow is never signalled`() {
+    whenever(workflowRunRepository.existsByWorkflowIdAndOwnedBy("run-1", "mallory")).thenReturn(false)
+
+    assertThrows<WorkflowNotFoundException> { service.cancelWorkflow("mallory", "run-1", "because") }
+
+    verify(workflowClient, never()).newWorkflowStub(eq(IContinuumWorkflow::class.java), any<String>())
+  }
+
+  @Test
+  fun `terminate of another owner's workflow is not found and the workflow is never signalled`() {
+    whenever(workflowRunRepository.existsByWorkflowIdAndOwnedBy("run-1", "mallory")).thenReturn(false)
+
+    assertThrows<WorkflowNotFoundException> { service.terminateWorkflow("mallory", "run-1", "because") }
+
+    verify(workflowClient, never()).newWorkflowStub(eq(IContinuumWorkflow::class.java), any<String>())
+  }
+
+  @Test
+  fun `cancel and terminate of an unknown workflow id are not found, not silently accepted`() {
+    whenever(workflowRunRepository.existsByWorkflowIdAndOwnedBy("no-such-run", "alice")).thenReturn(false)
+
+    assertThrows<WorkflowNotFoundException> { service.cancelWorkflow("alice", "no-such-run", null) }
+    assertThrows<WorkflowNotFoundException> { service.terminateWorkflow("alice", "no-such-run", null) }
+  }
+
+  @Test
+  fun `owner can cancel their own workflow and the cancelling signal is sent`() {
+    val stub: IContinuumWorkflow = mock()
+    whenever(workflowRunRepository.existsByWorkflowIdAndOwnedBy("run-1", "alice")).thenReturn(true)
+    whenever(workflowClient.newWorkflowStub(eq(IContinuumWorkflow::class.java), eq("run-1"))).thenReturn(stub)
+
+    service.cancelWorkflow("alice", "run-1", "no longer needed")
+
+    verify(stub).notifyCancelling("no longer needed")
+  }
+
+  @Test
+  fun `owner can terminate their own workflow and the terminating signal is sent`() {
+    val stub: IContinuumWorkflow = mock()
+    whenever(workflowRunRepository.existsByWorkflowIdAndOwnedBy("run-1", "alice")).thenReturn(true)
+    whenever(workflowClient.newWorkflowStub(eq(IContinuumWorkflow::class.java), eq("run-1"))).thenReturn(stub)
+
+    service.terminateWorkflow("alice", "run-1", "stuck")
+
+    verify(stub).notifyTerminating("stuck")
+  }
+
+  @Test
+  fun `active workflows are scoped to the caller's owner filter`() {
+    whenever(workflowRunRepository.findWorkflowIdsByOwnedBy("alice")).thenReturn(listOf("run-1", "run-2"))
+
+    service.getActiveWorkflows("alice")
+
+    assertEquals(
+      listOf(
+        "(WorkflowId IN ('run-1', 'run-2')) AND " +
+          "(WorkflowType='IContinuumWorkflow' && ExecutionStatus='WORKFLOW_EXECUTION_STATUS_RUNNING')"
+      ),
+      sentListQueries()
+    )
+  }
+
+  @Test
+  fun `caller with no runs sees no active workflows and Temporal is not queried`() {
+    whenever(workflowRunRepository.findWorkflowIdsByOwnedBy("mallory")).thenReturn(emptyList())
+
+    assertTrue(service.getActiveWorkflows("mallory").isEmpty())
     verify(blockingStub, never()).listWorkflowExecutions(any())
   }
 }

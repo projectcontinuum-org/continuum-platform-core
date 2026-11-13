@@ -112,7 +112,18 @@ class WorkflowService(
     }
   }
 
-  fun cancelWorkflow(workflowId: String, reason: String?) {
+  /**
+   * Throws [WorkflowNotFoundException] unless [ownedBy] owns the run. Unowned and nonexistent ids are treated
+   * identically so a tenant cannot probe for other tenants' workflow ids. This must run before any signal is sent.
+   */
+  private fun requireOwned(ownedBy: String, workflowId: String) {
+    if (!workflowRunRepository.existsByWorkflowIdAndOwnedBy(workflowId, ownedBy)) {
+      throw WorkflowNotFoundException(WorkflowExecution.newBuilder().setWorkflowId(workflowId).build(), null, null)
+    }
+  }
+
+  fun cancelWorkflow(ownedBy: String, workflowId: String, reason: String?) {
+    requireOwned(ownedBy, workflowId)
     val stub = workflowClient.newWorkflowStub(IContinuumWorkflow::class.java, workflowId)
     try {
       stub.notifyCancelling(reason)
@@ -133,7 +144,8 @@ class WorkflowService(
     }, STOP_SIGNAL_GRACE_PERIOD_MS)
   }
 
-  fun terminateWorkflow(workflowId: String, reason: String?) {
+  fun terminateWorkflow(ownedBy: String, workflowId: String, reason: String?) {
+    requireOwned(ownedBy, workflowId)
     val stub = workflowClient.newWorkflowStub(IContinuumWorkflow::class.java, workflowId)
     try {
       stub.notifyTerminating(reason)
@@ -156,23 +168,12 @@ class WorkflowService(
     }, STOP_SIGNAL_GRACE_PERIOD_MS)
   }
 
-  fun getActiveWorkflows(): List<WorkflowStatus> {
-    return workflowClient.workflowServiceStubs.blockingStub()
-      .listWorkflowExecutions(
-        ListWorkflowExecutionsRequest.newBuilder()
-          .setNamespace(workflowClient.options.namespace)
-          .setQuery("WorkflowType='${IContinuumWorkflow::class.java.simpleName}' && ExecutionStatus='WORKFLOW_EXECUTION_STATUS_RUNNING'")
-          .build()
-      ).executionsList.map { execution ->
-        WorkflowStatus(
-          execution.execution.workflowId,
-          execution.type.name,
-          execution.status,
-          execution.searchAttributes.indexedFieldsMap
-            .filterKeys { !it.equals("BuildIds") }
-            .mapValues { it.value.data.toStringUtf8() }
-        )
-      }
+  /** Running workflow executions owned by [ownedBy]; scoped with the same owner filter as [listAllWorkflow]. */
+  fun getActiveWorkflows(ownedBy: String): List<WorkflowStatus> {
+    val running = "WorkflowType='${IContinuumWorkflow::class.java.simpleName}' && ExecutionStatus='WORKFLOW_EXECUTION_STATUS_RUNNING'"
+    return ownerFilters(ownedBy).flatMap { ownerFilter ->
+      listExecutions(TemporalVisibilityQuery.scope(ownerFilter, running))
+    }
   }
 
   /**

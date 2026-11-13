@@ -20,11 +20,13 @@ Core platform team. Container image: `projectcontinuum/continuum-api-server`. Ru
 - Temporal visibility queries: build them with `utils.TemporalVisibilityQuery`. Never use raw string interpolation.
   - `quote()` escapes values.
   - `scope()` AND-combines a client query as `(<server filter>) AND (<client query>)`, after `validateClientQuery` rejects unbalanced parens, unterminated quotes, `;`, comments, backslashes and control characters (400).
-- `WorkflowController` `/list`, `/count`, `/tree` and `/{workflowId}/status` are scoped to the `x-continuum-user-id` owner (default `anonymous`) via `workflow_runs.owned_by`:
-  - The server filter is `WorkflowId IN (...)`, in chunks of 500. A caller with no runs gets an empty result, and Temporal is not queried.
-  - `/status` returns 404 for a workflow the caller does not own.
+- `WorkflowController` is owner-scoped end to end by the `x-continuum-user-id` header (default `anonymous`, so local docker-compose needs no auth layer). Ownership comes from `workflow_runs.owned_by`:
+  - `/list`, `/count`, `/tree` and `/active` use the server filter `WorkflowId IN (...)`, in chunks of 500. A caller with no runs gets an empty result, and Temporal is not queried.
+  - `/{workflowId}/status`, `/{workflowId}/cancel` and `/{workflowId}/terminate` return 404 for a workflow the caller does not own, and for an unknown id. The check (`existsByWorkflowIdAndOwnedBy`) runs before any Temporal signal is sent. Never signal a workflow before checking ownership.
   - The optional `query` parameter is still accepted, but only narrows the caller's own runs.
-  - `/active`, `/cancel` and `/terminate` are not owner-scoped.
+  - Any new endpoint that takes a workflow id must check ownership the same way.
+- `NodeOutputService.getOutput` checks that the caller owns the run before locating or reading any output. An unowned run and a nonexistent run both throw `ResourceNotFoundException`, which `ApiExceptionHandler` maps to a 404 `ProblemDetail` with the same message, so a tenant cannot probe for other tenants' ids.
+- Runs with no `workflow_runs` row (created before that table existed, or a scheduled run whose first snapshot has not reached the message bridge yet) are not visible to any caller, so they cannot be cancelled, terminated or read through the API until a row exists.
 - `NodeExplorerController` — serves the node palette tree used by the frontend, backed by `RegisteredNodeRepository`.
 - Two persistence layers: JPA (`WorkflowRunEntity`, `WorkflowRunSummaryEntity`) for workflow runs; JDBC (`RegisteredNodeRepository`) for node registry.
 - RSQL filter support on workflow run queries via `io.github.perplexhub:rsql-jpa-spring-boot-starter`.
