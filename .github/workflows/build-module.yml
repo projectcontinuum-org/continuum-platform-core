@@ -49,10 +49,6 @@ on:
         description: 'continuum-credentials-server'
         type: boolean
         default: false
-      landing-page:
-        description: 'landing-page'
-        type: boolean
-        default: false
       publish_to_maven:
         description: 'Publish artifacts to Maven Central'
         required: true

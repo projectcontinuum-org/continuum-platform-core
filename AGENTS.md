@@ -153,7 +153,6 @@ cd docker && docker compose up -d
 | `continuum-cloud-gateway` | HTTP/WebSocket reverse proxy routing to per-user workbench pods | — |
 | `continuum-knime-base` | KNIME compatibility layer (experimental) | — |
 | `continuum-knime-scheduler` | Object-store CRUD proxy for KNIME `.knwf` workflow files + Postgres bookkeeping | 8085 |
-| `landing-page` | Static marketing landing page | — |
 
 #### Execution flow
 
@@ -262,11 +261,13 @@ PostgreSQL uses a single `continuum` database with multiple schemas. All service
 
 #### Publishing
 
-Libraries (`continuum-commons`, `continuum-avro-schemas`, `continuum-worker-springboot-starter`, `continuum-gradle-plugin`) publish to **Maven Central** via JReleaser and Sonatype. Group: `org.projectcontinuum.core`. Requires `MAVEN_REPO_USERNAME`, `MAVEN_REPO_PASSWORD`, GPG secrets.
+Libraries (`continuum-commons`, `continuum-avro-schemas`, `continuum-worker-springboot-starter`, `continuum-gradle-plugin`) publish to **Maven Central** via JReleaser and Sonatype. Group: `org.projectcontinuum.core`. Requires `MAVEN_REPO_USERNAME`, `MAVEN_REPO_PASSWORD`, GPG secrets. Before `jreleaserDeploy`, CI runs `.github/scripts/check-maven-central.sh`, which fails the job (with a step-summary table) if any staged artifact version already exists on Maven Central; bump `platformVersion` to republish. On a failed deploy CI prints `<module>/build/jreleaser/trace.log` (the console only says "Unexpected error") and uploads it as the `build-diagnostics-<module>` artifact.
 
-Container images build with Jib (no Docker daemon) and push to **Docker Hub** at `docker.io/projectcontinuum/{module-name}:{version}`. Requires `DOCKER_REPO_USERNAME`, `DOCKER_REPO_PASSWORD`. CI builds each image natively on amd64 and arm64 runners (`-Djib.from.platforms=linux/<arch>`) and merges the per-arch digests from each module's `build/jib-image.json` into one multi-arch tag (`.github/workflows/generic-module-builder.yml`). `landing-page`'s `jib` task is a `docker build` that writes the same `jib-image.json`. Bundled native binaries (e.g. `continuum-api-server` DuckDB extensions) need a `linux_arm64` build as well.
+Container images build with Jib (no Docker daemon) and push to **Docker Hub** at `docker.io/projectcontinuum/{module-name}:{version}`. Requires `DOCKER_REPO_USERNAME`, `DOCKER_REPO_PASSWORD`. CI builds each image natively on amd64 and arm64 runners (`-Djib.from.platforms=linux/<arch>`) and merges the per-arch digests from each module's `build/jib-image.json` into one multi-arch tag (`.github/workflows/generic-module-builder.yml`). Bundled native binaries (e.g. `continuum-api-server` DuckDB extensions) need a `linux_arm64` build as well.
 
 CI runs `.github/workflows/generic-module-builder.yml`, triggered manually via `.github/workflows/build-module.yml` (tick one or more modules, or "All modules", plus whether to publish to Maven and/or Docker Hub; each ticked module runs as its own matrix leg) and on every published GitHub release via `.github/workflows/on-release.yml` (all libraries and services).
+
+PRs that touch any `continuum-*` module or shared build files (`settings.gradle.kts`, root `build.gradle.kts`, `gradle.properties`, `gradle/`) run `.github/workflows/pr-maven-central-check.yml`. All modules share `platformVersion`, so the workflow stages the Maven-published modules locally and runs the same `check-maven-central.sh`. A PR that changes any module must bump `platformVersion` once the current version has been released.
 
 ## Child DOX Index
 
@@ -284,4 +285,3 @@ Modules without child AGENTS.md (minimal, self-contained):
 - `continuum-avro-schemas` — Avro schema definitions only; no logic
 - `continuum-message-bridge` — Kafka consumer → MQTT bridge; 10 files, all config/handler/entity
 - `continuum-knime-base` — experimental KNIME compatibility layer; 2 files
-- `landing-page` — static marketing page
