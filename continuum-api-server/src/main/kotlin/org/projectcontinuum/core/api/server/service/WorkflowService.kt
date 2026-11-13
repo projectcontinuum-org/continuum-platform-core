@@ -83,7 +83,9 @@ class WorkflowService(
         .build()
     )
 
-    // Save workflow run to database before starting Temporal execution
+    // Save workflow run to database before starting Temporal execution, so the owner row exists before the first
+    // event reaches the message-bridge. It is inserted here and not after the start: once the workflow is running
+    // the bridge may already have upserted newer status/outputs, and a later save() would overwrite them.
     workflowRunRepository.save(
       WorkflowRunEntity(
         workflowId = workflowId,
@@ -101,14 +103,38 @@ class WorkflowService(
 
     // Set the owner context so ContinuumContextPropagator carries it into Temporal headers
     ContinuumOwnerContext.set(ownedBy)
-    try {
-      val workflowExecution: WorkflowExecution = WorkflowClient.start(
+    val workflowExecution: WorkflowExecution = try {
+      WorkflowClient.start(
         continuumWorkflow::start,
         continuumWorkflowModel
       )
-      return workflowExecution.workflowId
+    } catch (e: Exception) {
+      // The workflow never started, so the PENDING row would be an orphan that no event will ever update.
+      runCatching { workflowRunRepository.deleteById(workflowId) }
+        .onFailure { LOGGER.warn("Could not remove the run row of workflow $workflowId after a failed start", it) }
+      throw e
     } finally {
       ContinuumOwnerContext.clear()
+    }
+
+    recordRunId(workflowId, workflowExecution.runId)
+    return workflowExecution.workflowId
+  }
+
+  /**
+   * Stores the Temporal run id, which node outputs are stored under, as soon as the workflow has started. Only
+   * `run_id` is updated. A failure here must not fail the start (the workflow is already running): the
+   * message-bridge also writes the run id from the first workflow event, so this only closes the gap before it.
+   */
+  private fun recordRunId(workflowId: String, runId: String?) {
+    if (runId.isNullOrBlank()) {
+      LOGGER.warn("Temporal returned no run id for workflow $workflowId; the message-bridge will record it")
+      return
+    }
+    try {
+      workflowRunRepository.updateRunId(workflowId, runId)
+    } catch (e: Exception) {
+      LOGGER.warn("Could not record run id $runId for workflow $workflowId; the message-bridge will record it", e)
     }
   }
 

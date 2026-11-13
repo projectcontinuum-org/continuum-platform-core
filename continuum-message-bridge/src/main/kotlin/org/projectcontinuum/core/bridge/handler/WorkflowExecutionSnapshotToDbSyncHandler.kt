@@ -47,6 +47,7 @@ class WorkflowExecutionSnapshotToDbSyncHandler(
       ownedBy = message.payload.data.ownedBy,
       workflowUri = message.payload.data.workflowUri,
       scheduleId = message.payload.data.scheduleId,
+      runId = message.payload.data.runId,
       progressPercentage = message.payload.data.progressPercentage,
       status = message.payload.data.status,
       data = objectMapper.writeValueAsString(

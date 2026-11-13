@@ -30,3 +30,7 @@ CREATE UNIQUE INDEX IF NOT EXISTS ux_node_tree_node_placement
 CREATE INDEX IF NOT EXISTS ix_node_tree_parent_id ON node_tree_entries (parent_id);
 
 CREATE INDEX IF NOT EXISTS ix_node_tree_node_id ON node_tree_entries (node_id) WHERE type = 'CONTINUUM_NODE';
+
+-- Temporal run id of the execution (node outputs are stored under it). The api-server schema owns workflow_runs and
+-- the backfill; this only guarantees the column exists if the bridge starts first. A no-op if the table is not there yet.
+ALTER TABLE IF EXISTS workflow_runs ADD COLUMN IF NOT EXISTS run_id VARCHAR(64);

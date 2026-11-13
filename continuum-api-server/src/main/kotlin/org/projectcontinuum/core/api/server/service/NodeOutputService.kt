@@ -14,23 +14,25 @@ class NodeOutputService(
 ) {
 
   /**
-   * Returns one page of a node output, but only if [ownedBy] owns the workflow run. The check runs before the
-   * output is located, downloaded or read, so nothing about another tenant's run (not even whether it exists)
-   * is revealed: an unowned and a nonexistent run are both a [ResourceNotFoundException].
+   * Returns one page of a node output, but only if [ownedBy] owns the run. Outputs are stored under the Temporal
+   * **run id** (`{remote}<runId>/<nodeId>/output.<port>.parquet`), which is not the workflow id the API returns, so
+   * ownership is looked up by `workflow_runs.run_id`. The check runs before the output is located, downloaded or
+   * read, so nothing about another tenant's run (not even whether it exists) is revealed: an unowned and a
+   * nonexistent run are both a [ResourceNotFoundException].
    */
   fun getOutput(
     ownedBy: String,
-    workflowId: String,
+    runId: String,
     nodeId: String,
     outputId: String,
     page: Int,
     pageSize: Int
   ): Page<List<CellDto>> {
-    if (!workflowRunRepository.existsByWorkflowIdAndOwnedBy(workflowId, ownedBy)) {
+    if (!workflowRunRepository.existsByRunIdAndOwnedBy(runId, ownedBy)) {
       throw ResourceNotFoundException("Workflow run not found")
     }
     return nodeOutputRepository.getOutput(
-      workflowId = workflowId,
+      runId = runId,
       nodeId = nodeId,
       outputId = outputId,
       page = page,

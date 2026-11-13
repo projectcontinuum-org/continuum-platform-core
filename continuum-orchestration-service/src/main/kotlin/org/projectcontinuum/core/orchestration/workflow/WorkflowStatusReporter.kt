@@ -79,7 +79,8 @@ class WorkflowStatusReporter(
           ownedBy = ContinuumOwnerContext.get() ?: "anonymous",
           workflowType = Workflow.getInfo().workflowType,
           workflowUri = currentRunningWorkflow()!!.name,
-          scheduleId = ContinuumScheduleContext.get()
+          scheduleId = ContinuumScheduleContext.get(),
+          runId = Workflow.getInfo().runId
         )
       )
 

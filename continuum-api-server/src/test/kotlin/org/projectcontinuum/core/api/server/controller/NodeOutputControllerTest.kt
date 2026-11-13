@@ -30,12 +30,12 @@ class NodeOutputControllerTest {
     // Spring strips ";..." matrix content from path segments, so match any id here; the repository tests cover
     // the validation of each hostile value.
     whenever(nodeOutputService.getOutput(any(), any(), any(), any(), any(), any()))
-      .thenThrow(InvalidRequestException("Invalid workflowId"))
+      .thenThrow(InvalidRequestException("Invalid runId"))
 
-    mockMvc.perform(get("/api/v1/data/{workflowId}/nodes/{nodeId}/outputs/{outputId}", "x'); SELECT 1; --", "1", "output"))
+    mockMvc.perform(get("/api/v1/data/{runId}/nodes/{nodeId}/outputs/{outputId}", "x'); SELECT 1; --", "1", "output"))
       .andExpect(status().isBadRequest)
       .andExpect(jsonPath("$.status").value(400))
-      .andExpect(jsonPath("$.detail").value("Invalid workflowId"))
+      .andExpect(jsonPath("$.detail").value("Invalid runId"))
   }
 
   @Test

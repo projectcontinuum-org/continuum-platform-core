@@ -62,7 +62,7 @@ class NodeOutputRepository(
   }
 
   fun getOutput(
-    workflowId: String,
+    runId: String,
     nodeId: String,
     outputId: String,
     page: Int = 0,
@@ -70,7 +70,7 @@ class NodeOutputRepository(
   ): Page<List<CellDto>> {
     validatePaging(page, pageSize)
     val localFile = getCachedOutputFile(
-      workflowId = workflowId,
+      runId = runId,
       nodeId = nodeId,
       outputId = outputId
     )
@@ -140,18 +140,18 @@ class NodeOutputRepository(
    * outside [cacheDirectoryBasePath].
    */
   fun getCachedOutputFile(
-    workflowId: String,
+    runId: String,
     nodeId: String,
     outputId: String
   ): File {
-    validateId("workflowId", workflowId)
+    validateId("runId", runId)
     validateId("nodeId", nodeId)
     validateId("outputId", outputId)
 
     val fileName = "output.$outputId.$dataFileExtension"
-    val bucketKey = "$s3BucketBasePath/$workflowId/$nodeId/$fileName"
+    val bucketKey = "$s3BucketBasePath/$runId/$nodeId/$fileName"
     val cacheBaseDir = File(cacheDirectoryBasePath).canonicalFile
-    val localCacheFile = File(cacheBaseDir, listOf(workflowId, nodeId, fileName).joinToString(File.separator))
+    val localCacheFile = File(cacheBaseDir, listOf(runId, nodeId, fileName).joinToString(File.separator))
       .canonicalFile
     // Defence in depth on top of the allow-list: the resolved file must stay under the cache base dir.
     if (!localCacheFile.toPath().startsWith(cacheBaseDir.toPath())) {

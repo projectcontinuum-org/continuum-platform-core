@@ -28,6 +28,10 @@ class WorkflowRunEntity(
   @Column(name = "schedule_id")
     val scheduleId: UUID? = null,
 
+  /** Temporal run id; node outputs are stored under it. Written by the message-bridge, so null until its first event. */
+  @Column(name = "run_id")
+    val runId: String? = null,
+
   @Column(name = "progress_percentage", nullable = false)
     val progressPercentage: Int = 0,
 

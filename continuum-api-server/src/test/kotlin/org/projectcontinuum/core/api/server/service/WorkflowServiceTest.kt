@@ -1,6 +1,7 @@
 package org.projectcontinuum.core.api.server.service
 
 import io.temporal.api.common.v1.Payload
+import io.temporal.api.common.v1.WorkflowExecution
 import io.temporal.api.workflowservice.v1.CountWorkflowExecutionsRequest
 import io.temporal.api.workflowservice.v1.CountWorkflowExecutionsResponse
 import io.temporal.api.workflowservice.v1.ListWorkflowExecutionsRequest
@@ -9,12 +10,15 @@ import io.temporal.api.workflowservice.v1.WorkflowServiceGrpc
 import io.temporal.client.WorkflowClient
 import io.temporal.client.WorkflowClientOptions
 import io.temporal.client.WorkflowNotFoundException
+import io.temporal.client.WorkflowOptions
 import io.temporal.serviceclient.WorkflowServiceStubs
+import io.temporal.workflow.Functions
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertThrows
 import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.ValueSource
+import org.mockito.Mockito
 import org.mockito.kotlin.any
 import org.mockito.kotlin.argumentCaptor
 import org.mockito.kotlin.eq
@@ -23,12 +27,16 @@ import org.mockito.kotlin.never
 import org.mockito.kotlin.times
 import org.mockito.kotlin.verify
 import org.mockito.kotlin.whenever
+import org.projectcontinuum.core.api.server.entity.jpa.WorkflowRunEntity
 import org.projectcontinuum.core.api.server.exception.InvalidRequestException
 import org.projectcontinuum.core.api.server.repository.jpa.WorkflowRunRepository
+import org.projectcontinuum.core.commons.model.ContinuumWorkflowModel
+import org.projectcontinuum.core.commons.model.PortData
 import org.projectcontinuum.core.commons.workflow.IContinuumWorkflow
 import com.google.protobuf.ByteString
 import tools.jackson.databind.json.JsonMapper
 import kotlin.test.assertEquals
+import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 class WorkflowServiceTest {
@@ -238,5 +246,81 @@ class WorkflowServiceTest {
 
     assertTrue(service.getActiveWorkflows("mallory").isEmpty())
     verify(blockingStub, never()).listWorkflowExecutions(any())
+  }
+
+  // --- startWorkflow: the Temporal run id is recorded right after the start ---
+
+  private val emptyWorkflow = ContinuumWorkflowModel(id = "id", name = "/systest/wf.cwf")
+
+  private fun execution(workflowId: String, runId: String?): WorkflowExecution =
+    WorkflowExecution.newBuilder().setWorkflowId(workflowId).apply { runId?.let { setRunId(it) } }.build()
+
+  /** Runs [block] with the static `WorkflowClient.start(...)` replaced by [onStart]. */
+  private fun <T> withTemporalStart(onStart: () -> WorkflowExecution, block: () -> T): T {
+    whenever(workflowClient.newWorkflowStub(eq(IContinuumWorkflow::class.java), any<WorkflowOptions>()))
+      .thenReturn(mock<IContinuumWorkflow>())
+    Mockito.mockStatic(WorkflowClient::class.java).use { static ->
+      static.`when`<WorkflowExecution> {
+        WorkflowClient.start(any<Functions.Func1<ContinuumWorkflowModel, Map<String, Map<String, PortData>>>>(), any())
+      }.thenAnswer { onStart() }
+      return block()
+    }
+  }
+
+  @Test
+  fun `start records the Temporal run id on the run row`() {
+    val workflowId = withTemporalStart({ execution("ignored", "run-123") }) {
+      service.startWorkflow(emptyWorkflow, "alice")
+    }
+
+    val saved = argumentCaptor<WorkflowRunEntity>()
+    verify(workflowRunRepository).save(saved.capture())
+    assertEquals("alice", saved.firstValue.ownedBy)
+    assertEquals("PENDING", saved.firstValue.status)
+    // The run id is written with a targeted update, never with a second save() that would overwrite newer data.
+    verify(workflowRunRepository).updateRunId(eq(saved.firstValue.workflowId), eq("run-123"))
+    verify(workflowRunRepository, times(1)).save(any<WorkflowRunEntity>())
+    assertEquals("ignored", workflowId)
+  }
+
+  @Test
+  fun `the run row exists before the workflow is started`() {
+    val order = mutableListOf<String>()
+    whenever(workflowRunRepository.save(any<WorkflowRunEntity>())).thenAnswer { order += "save"; it.arguments[0] }
+
+    withTemporalStart({ order += "start"; execution("wf", "run-1") }) { service.startWorkflow(emptyWorkflow, "alice") }
+
+    assertEquals(listOf("save", "start"), order)
+  }
+
+  @Test
+  fun `a failed start removes the orphaned run row and rethrows`() {
+    val failure = RuntimeException("temporal is down")
+
+    val thrown = assertThrows<RuntimeException> {
+      withTemporalStart({ throw failure }) { service.startWorkflow(emptyWorkflow, "alice") }
+    }
+
+    assertSame(failure, thrown)
+    val saved = argumentCaptor<WorkflowRunEntity>()
+    verify(workflowRunRepository).save(saved.capture())
+    verify(workflowRunRepository).deleteById(saved.firstValue.workflowId)
+    verify(workflowRunRepository, never()).updateRunId(any(), any())
+  }
+
+  @Test
+  fun `failing to record the run id does not fail a workflow that is already running`() {
+    whenever(workflowRunRepository.updateRunId(any(), any())).thenThrow(RuntimeException("db down"))
+
+    val workflowId = withTemporalStart({ execution("wf-1", "run-1") }) { service.startWorkflow(emptyWorkflow, "alice") }
+
+    assertEquals("wf-1", workflowId)
+  }
+
+  @Test
+  fun `a start with no run id leaves it for the message bridge`() {
+    withTemporalStart({ execution("wf-1", null) }) { service.startWorkflow(emptyWorkflow, "alice") }
+
+    verify(workflowRunRepository, never()).updateRunId(any(), any())
   }
 }

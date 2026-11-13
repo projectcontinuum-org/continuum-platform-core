@@ -25,3 +25,16 @@ CREATE TABLE IF NOT EXISTS workflow_schedules (
 
 ALTER TABLE workflow_runs ADD COLUMN IF NOT EXISTS schedule_id UUID REFERENCES workflow_schedules(schedule_id) ON DELETE SET NULL;
 CREATE INDEX IF NOT EXISTS ix_workflow_runs_schedule_id ON workflow_runs (schedule_id) WHERE schedule_id IS NOT NULL;
+
+-- Temporal run id of the execution. Node outputs are stored under <run_id>/<node_id>/..., so this is the key that ties
+-- a stored output back to its owner. Written by the message-bridge from the workflow update events; it differs from
+-- workflow_id (the id the API returns).
+ALTER TABLE workflow_runs ADD COLUMN IF NOT EXISTS run_id VARCHAR(64);
+CREATE INDEX IF NOT EXISTS ix_workflow_runs_run_id ON workflow_runs (run_id) WHERE run_id IS NOT NULL;
+
+-- Backfill runs that finished before run_id existed: their stored output paths look like
+-- {remote}<run id>/<node id>/output.<port>.parquet. Only rows that still have no run_id are touched, so this is a
+-- no-op on every start after the first.
+UPDATE workflow_runs
+SET run_id = (regexp_match(data::text, '\{remote\}([0-9a-fA-F-]{36})/'))[1]
+WHERE run_id IS NULL AND data::text LIKE '%{remote}%';

@@ -5,8 +5,10 @@ import org.springframework.data.domain.Page
 import org.springframework.data.domain.Pageable
 import org.springframework.data.jpa.repository.JpaRepository
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor
+import org.springframework.data.jpa.repository.Modifying
 import org.springframework.data.jpa.repository.Query
 import org.springframework.data.repository.query.Param
+import org.springframework.transaction.annotation.Transactional
 
 interface WorkflowRunRepository : JpaRepository<WorkflowRunEntity, String>, JpaSpecificationExecutor<WorkflowRunEntity> {
     fun findByOwnedBy(ownedBy: String): List<WorkflowRunEntity>
@@ -25,4 +27,16 @@ interface WorkflowRunRepository : JpaRepository<WorkflowRunEntity, String>, JpaS
     fun findWorkflowIdsByOwnedBy(@Param("ownedBy") ownedBy: String): List<String>
 
     fun existsByWorkflowIdAndOwnedBy(workflowId: String, ownedBy: String): Boolean
+
+    /** True when [ownedBy] owns the run whose Temporal run id is [runId] (the id node outputs are stored under). */
+    fun existsByRunIdAndOwnedBy(runId: String, ownedBy: String): Boolean
+
+    /**
+     * Sets only the run id, so it can never overwrite the status or outputs the message-bridge may already have
+     * written for this row (a full `save()` would, since JPA merges every column).
+     */
+    @Modifying
+    @Transactional
+    @Query("UPDATE WorkflowRunEntity w SET w.runId = :runId WHERE w.workflowId = :workflowId")
+    fun updateRunId(@Param("workflowId") workflowId: String, @Param("runId") runId: String): Int
 }
