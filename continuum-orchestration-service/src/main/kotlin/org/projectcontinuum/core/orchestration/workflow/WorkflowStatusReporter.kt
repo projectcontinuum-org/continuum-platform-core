@@ -60,6 +60,16 @@ class WorkflowStatusReporter(
     val effectiveStatus = terminalStatus ?: status
     // Check if the Workflow is being replayed - skip publishing during replay
     if (!WorkflowUnsafe.isReplaying()) {
+      // A signal can arrive before start() has stored the workflow model (the API server sends notifyCancelling /
+      // notifyTerminating right after the start, while task queues are still being resolved). There is nothing to
+      // report yet, and throwing here would fail the workflow TASK, which Temporal retries forever, wedging the
+      // run in RUNNING. The pinned terminal status is already stored, so the first real update carries it.
+      val workflow = currentRunningWorkflow()
+      if (workflow == null) {
+        LOGGER.debug("Skipping status update '{}': the workflow model is not stored yet", effectiveStatus)
+        return
+      }
+
       // Combine successful outputs and error outputs for the event
       val nodeToOutputsMapWithErr = mutableMapOf<String, Map<String, PortData>>()
       nodeToOutputsMapWithErr.putAll(nodeToOutputsMap)
@@ -75,10 +85,10 @@ class WorkflowStatusReporter(
           nodeToOutputsMap = nodeToOutputsMapWithErr,
           createdAtTimestampUtc = Workflow.getInfo().runStartedTimestampMillis,
           updatesAtTimestampUtc = Instant.now().toEpochMilli(),
-          workflow = currentRunningWorkflow()!!,
+          workflow = workflow,
           ownedBy = ContinuumOwnerContext.get() ?: "anonymous",
           workflowType = Workflow.getInfo().workflowType,
-          workflowUri = currentRunningWorkflow()!!.name,
+          workflowUri = workflow.name,
           scheduleId = ContinuumScheduleContext.get(),
           runId = Workflow.getInfo().runId
         )
