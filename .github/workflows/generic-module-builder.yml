@@ -152,7 +152,7 @@ jobs:
       - name: Grant execute permission for gradlew
         run: chmod +x ./gradlew
 
-      # Jib modules build for the given platform; landing-page's docker-based jib task builds for the runner's.
+      # Jib builds the image for the given platform.
       - name: Containerize
         run: |
           if [ "${{ inputs.module-name }}" = "all" ]; then
