@@ -261,7 +261,7 @@ PostgreSQL uses a single `continuum` database with multiple schemas. All service
 
 #### Publishing
 
-Libraries (`continuum-commons`, `continuum-avro-schemas`, `continuum-worker-springboot-starter`, `continuum-gradle-plugin`) publish to **Maven Central** via JReleaser and Sonatype. Group: `org.projectcontinuum.core`. Requires `MAVEN_REPO_USERNAME`, `MAVEN_REPO_PASSWORD`, GPG secrets.
+Libraries (`continuum-commons`, `continuum-avro-schemas`, `continuum-worker-springboot-starter`, `continuum-gradle-plugin`) publish to **Maven Central** via JReleaser and Sonatype. Group: `org.projectcontinuum.core`. Requires `MAVEN_REPO_USERNAME`, `MAVEN_REPO_PASSWORD`, GPG secrets. Before `jreleaserDeploy`, CI runs `.github/scripts/check-maven-central.sh`, which fails the job (with a step-summary table) if any staged artifact version already exists on Maven Central; bump `platformVersion` to republish. On a failed deploy CI prints `<module>/build/jreleaser/trace.log` (the console only says "Unexpected error") and uploads it as the `build-diagnostics-<module>` artifact.
 
 Container images build with Jib (no Docker daemon) and push to **Docker Hub** at `docker.io/projectcontinuum/{module-name}:{version}`. Requires `DOCKER_REPO_USERNAME`, `DOCKER_REPO_PASSWORD`. CI builds each image natively on amd64 and arm64 runners (`-Djib.from.platforms=linux/<arch>`) and merges the per-arch digests from each module's `build/jib-image.json` into one multi-arch tag (`.github/workflows/generic-module-builder.yml`). Bundled native binaries (e.g. `continuum-api-server` DuckDB extensions) need a `linux_arm64` build as well.
 

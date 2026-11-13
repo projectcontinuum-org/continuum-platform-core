@@ -95,6 +95,14 @@ jobs:
           MAVEN_REPO_USERNAME: ${{ secrets.MAVEN_REPO_USERNAME }}
           MAVEN_REPO_PASSWORD: ${{ secrets.MAVEN_REPO_PASSWORD }}
 
+      # Maven Central versions are immutable: stop before JReleaser if any staged artifact is already there.
+      - name: Check artifacts are not already on Maven Central
+        if: inputs.publish_to_maven
+        run: bash .github/scripts/check-maven-central.sh
+        env:
+          MAVEN_REPO_USERNAME: ${{ secrets.MAVEN_REPO_USERNAME }}
+          MAVEN_REPO_PASSWORD: ${{ secrets.MAVEN_REPO_PASSWORD }}
+
       - name: Deploy to Maven Central via JReleaser
         if: inputs.publish_to_maven
         run: |
