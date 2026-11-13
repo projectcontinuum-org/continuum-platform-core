@@ -42,7 +42,7 @@ spec:
               memory: "${memoryLimit}"
           volumeMounts:
             - name: workspace-storage
-              mountPath: /workspace
+              mountPath: /home/continuum
           startupProbe:
             httpGet:
               path: /

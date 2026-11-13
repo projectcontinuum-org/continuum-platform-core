@@ -78,10 +78,10 @@ export function WorkbenchListPage() {
 
   const handleOpen = (workbench: WorkbenchResponse) => {
     if (workbench.ingressUrl) {
-      window.open(`${workbench.ingressUrl}/#/workspace`, '_blank');
+      window.open(workbench.ingressUrl, '_blank');
     } else if (workbench.serviceEndpoint) {
       // Fallback: open via the cluster-manager reverse proxy
-      const externalUrl = `/workbench/${workbench.instanceName}/open/#/workspace`;
+      const externalUrl = `/workbench/${workbench.instanceName}/open/`;
       window.open(externalUrl, '_blank');
     }
   };
