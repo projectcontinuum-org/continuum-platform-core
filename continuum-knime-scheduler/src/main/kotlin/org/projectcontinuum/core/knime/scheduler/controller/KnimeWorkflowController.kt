@@ -6,6 +6,7 @@ import org.projectcontinuum.core.knime.scheduler.service.KnimeWorkflowService
 import org.springframework.core.io.InputStreamResource
 import org.springframework.data.domain.Page
 import org.springframework.data.domain.Pageable
+import org.springframework.http.ContentDisposition
 import org.springframework.http.HttpHeaders
 import org.springframework.http.MediaType
 import org.springframework.http.ResponseEntity
@@ -19,9 +20,26 @@ import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.RequestParam
 import org.springframework.web.bind.annotation.RestController
 import org.springframework.web.multipart.MultipartFile
+import java.nio.charset.StandardCharsets
 import java.util.UUID
 
 private const val USER_ID_HEADER = "x-continuum-user-id"
+
+/**
+ * `fileName` is the uploader-supplied multipart filename, so it is never concatenated into the
+ * header. [ContentDisposition] quotes/escapes `"` and `\` and adds an RFC 5987 `filename*`, but
+ * (Spring 7.0) leaves CR/LF and other control characters raw in the quoted `filename=` — so those
+ * are replaced with `_` first. Path components are stripped in case a client sent a full path.
+ */
+internal fun attachmentDisposition(fileName: String): String {
+  val safeName = fileName
+    .substringAfterLast('/')
+    .substringAfterLast('\\')
+    .map { if (Character.isISOControl(it) || it == '\u2028' || it == '\u2029') '_' else it }
+    .joinToString("")
+    .ifBlank { "workflow.knwf" }
+  return ContentDisposition.attachment().filename(safeName, StandardCharsets.UTF_8).build().toString()
+}
 
 @RestController
 @RequestMapping("/api/v1/knime-workflows")
@@ -57,7 +75,7 @@ class KnimeWorkflowController(
   ): ResponseEntity<InputStreamResource> {
     val (entity, objectStream) = knimeWorkflowService.download(workflowId, userId)
     return ResponseEntity.ok()
-      .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"${entity.fileName}\"")
+      .header(HttpHeaders.CONTENT_DISPOSITION, attachmentDisposition(entity.fileName))
       .contentType(MediaType.APPLICATION_OCTET_STREAM)
       .contentLength(entity.sizeBytes)
       .body(InputStreamResource(objectStream))
@@ -118,7 +136,7 @@ class KnimeWorkflowController(
   ): ResponseEntity<InputStreamResource> {
     val (entity, objectStream) = knimeWorkflowService.downloadExecution(workflowId, executionId, userId)
     return ResponseEntity.ok()
-      .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"${entity.fileName}\"")
+      .header(HttpHeaders.CONTENT_DISPOSITION, attachmentDisposition(entity.fileName))
       .contentType(MediaType.APPLICATION_OCTET_STREAM)
       .contentLength(entity.sizeBytes)
       .body(InputStreamResource(objectStream))

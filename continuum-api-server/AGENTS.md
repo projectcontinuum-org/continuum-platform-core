@@ -11,7 +11,20 @@ Core platform team. Container image: `projectcontinuum/continuum-api-server`. Ru
 - Node registry: workers register their nodes via Kafka (handled by `continuum-message-bridge`). The API server exposes `GET/POST /api/v1/node-explorer/nodes/task-queues` so the orchestration service can resolve which worker owns which node.
 - `WorkflowController` — CRUD for workflow definitions (stored as JSONB in PostgreSQL).
 - `WorkflowRunController` / `WorkflowRunService` — execution lifecycle. Starting a run creates a Temporal workflow via the SDK client.
-- `NodeOutputController` / `NodeOutputService` — DuckDB reads Parquet from MinIO/S3 for in-browser data preview. DuckDB 1.2.2 is included as a JDBC driver.
+- `NodeOutputController` / `NodeOutputService` — DuckDB reads Parquet from MinIO/S3 for in-browser data preview. DuckDB 1.2.2 is included as a JDBC driver. `NodeOutputRepository` contract:
+  - `workflowId`, `nodeId` and `outputId` must match `^[A-Za-z0-9._-]{1,255}$`, and must not be `.` or contain `..`.
+  - `page` must be `>= 0`. `pageSize` must be in `1..NodeOutputRepository.MAX_PAGE_SIZE` (1000).
+  - The resolved cache file must canonically stay under `cacheDirectoryBasePath`.
+  - Any violation throws `InvalidRequestException`. `ApiExceptionHandler` maps it to HTTP 400 `ProblemDetail`.
+  - The parquet path and LIMIT/OFFSET are always bound parameters (`read_parquet(?) ... LIMIT ? OFFSET ?`). Never interpolate them into SQL; httpfs is loaded, so an injected path could reach the network.
+- Temporal visibility queries: build them with `utils.TemporalVisibilityQuery`. Never use raw string interpolation.
+  - `quote()` escapes values.
+  - `scope()` AND-combines a client query as `(<server filter>) AND (<client query>)`, after `validateClientQuery` rejects unbalanced parens, unterminated quotes, `;`, comments, backslashes and control characters (400).
+- `WorkflowController` `/list`, `/count`, `/tree` and `/{workflowId}/status` are scoped to the `x-continuum-user-id` owner (default `anonymous`) via `workflow_runs.owned_by`:
+  - The server filter is `WorkflowId IN (...)`, in chunks of 500. A caller with no runs gets an empty result, and Temporal is not queried.
+  - `/status` returns 404 for a workflow the caller does not own.
+  - The optional `query` parameter is still accepted, but only narrows the caller's own runs.
+  - `/active`, `/cancel` and `/terminate` are not owner-scoped.
 - `NodeExplorerController` — serves the node palette tree used by the frontend, backed by `RegisteredNodeRepository`.
 - Two persistence layers: JPA (`WorkflowRunEntity`, `WorkflowRunSummaryEntity`) for workflow runs; JDBC (`RegisteredNodeRepository`) for node registry.
 - RSQL filter support on workflow run queries via `io.github.perplexhub:rsql-jpa-spring-boot-starter`.

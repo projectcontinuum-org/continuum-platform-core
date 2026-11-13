@@ -4,6 +4,8 @@ import freemarker.template.Configuration
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
+import org.junit.jupiter.api.assertDoesNotThrow
+import org.junit.jupiter.api.assertThrows
 import org.junit.jupiter.api.io.TempDir
 import org.projectcontinuum.core.cluster.manager.config.OverlayProperties
 import java.nio.file.Files
@@ -713,5 +715,54 @@ class OverlayServiceTest {
     val variants = service.listVariants()
 
     assertEquals(listOf("gpu"), variants)
+  }
+
+  // ── variant validation (path traversal) ────────────────────────────────
+
+  @Test
+  fun `requireKnownVariant accepts null and listed variants`() {
+    Files.writeString(overlayDir.resolve("gpu--deployment.yaml"), "spec: {}")
+    assertDoesNotThrow { service.requireKnownVariant(null) }
+    assertDoesNotThrow { service.requireKnownVariant("gpu") }
+  }
+
+  @Test
+  fun `requireKnownVariant rejects variants not in listVariants`() {
+    Files.writeString(overlayDir.resolve("gpu--deployment.yaml"), "spec: {}")
+    val ex = assertThrows<IllegalArgumentException> { service.requireKnownVariant("cpu") }
+    assertTrue(ex.message!!.contains("Unknown variant"))
+  }
+
+  @Test
+  fun `requireKnownVariant rejects path traversal and malformed names`() {
+    for (variant in listOf("../../etc/passwd", "..", "../gpu", "a/b", "a\\b", "gpu--x", "", "gpu\n---", "-gpu")) {
+      assertThrows<IllegalArgumentException>("'$variant' must be rejected") { service.requireKnownVariant(variant) }
+    }
+  }
+
+  @Test
+  fun `requireKnownVariant only checks the name when overlays are disabled`() {
+    val disabledService = OverlayService(OverlayProperties(enabled = false), freemarkerCfg)
+    assertDoesNotThrow { disabledService.requireKnownVariant("gpu-enabled") }
+    assertThrows<IllegalArgumentException> { disabledService.requireKnownVariant("../../etc") }
+  }
+
+  @Test
+  fun `applyOverlay refuses a variant that escapes the overlay directory`() {
+    // The configured overlay dir is `nested`; a traversal variant would otherwise reach this sibling file
+    Files.writeString(overlayDir.resolve("outside--deployment.yaml"), "metadata:\n  annotations:\n    leaked: \"true\"")
+    val nested = overlayDir.resolve("nested").also { Files.createDirectories(it) }
+    val nestedService = OverlayService(OverlayProperties(enabled = true, path = nested.toString()), freemarkerCfg)
+
+    assertThrows<IllegalArgumentException> {
+      nestedService.applyOverlay(baseDeploymentYaml, ResourceType.DEPLOYMENT, defaultModel, "../outside")
+    }
+  }
+
+  @Test
+  fun `listVariants ignores files whose variant part is not a valid name`() {
+    Files.writeString(overlayDir.resolve("gpu--deployment.yaml"), "spec: {}")
+    Files.writeString(overlayDir.resolve(" bad--deployment.yaml"), "spec: {}")
+    assertEquals(listOf("gpu"), service.listVariants())
   }
 }

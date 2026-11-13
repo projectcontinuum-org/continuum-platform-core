@@ -3,6 +3,8 @@ package org.projectcontinuum.core.worker.starter.credential
 import com.fasterxml.jackson.databind.ObjectMapper
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertNull
+import org.junit.jupiter.api.Assertions.assertTrue
+import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.mockito.kotlin.any
@@ -14,6 +16,13 @@ import org.springframework.http.HttpMethod
 import org.springframework.http.ResponseEntity
 import org.springframework.web.client.ResourceAccessException
 import org.springframework.web.client.RestTemplate
+import org.junit.jupiter.params.ParameterizedTest
+import org.junit.jupiter.params.provider.ValueSource
+import org.mockito.kotlin.argumentCaptor
+import org.mockito.kotlin.never
+import org.mockito.kotlin.verify
+import java.net.URI
+import java.net.URLDecoder
 
 class CredentialFetcherServiceTest {
 
@@ -28,10 +37,10 @@ class CredentialFetcherServiceTest {
     service = CredentialFetcherService(restTemplate, "http://localhost:8083")
 
     whenever(
-      restTemplate.exchange(any<String>(), eq(HttpMethod.GET), any<HttpEntity<Void>>(), eq(String::class.java))
+      restTemplate.exchange(any<URI>(), eq(HttpMethod.GET), any<HttpEntity<Void>>(), eq(String::class.java))
     ).thenAnswer { invocation ->
-      val url = invocation.getArgument<String>(0)
-      val name = url.substringAfterLast("/")
+      val url = invocation.getArgument<URI>(0)
+      val name = URLDecoder.decode(url.rawPath.substringAfterLast("/"), Charsets.UTF_8)
       val data = credentialStore[name] ?: throw ResourceAccessException("not found: $name")
       ResponseEntity.ok(objectMapper.writeValueAsString(mapOf("data" to data)))
     }
@@ -56,7 +65,7 @@ class CredentialFetcherServiceTest {
   @Test
   fun `returns null when the server returns an empty body`() {
     whenever(
-      restTemplate.exchange(any<String>(), eq(HttpMethod.GET), any<HttpEntity<Void>>(), eq(String::class.java))
+      restTemplate.exchange(any<URI>(), eq(HttpMethod.GET), any<HttpEntity<Void>>(), eq(String::class.java))
     ).thenAnswer { ResponseEntity.ok<String>(null) }
 
     val result = service.fetch("anything", "owner-1")
@@ -67,11 +76,57 @@ class CredentialFetcherServiceTest {
   @Test
   fun `returns null when the response body is malformed`() {
     whenever(
-      restTemplate.exchange(any<String>(), eq(HttpMethod.GET), any<HttpEntity<Void>>(), eq(String::class.java))
+      restTemplate.exchange(any<URI>(), eq(HttpMethod.GET), any<HttpEntity<Void>>(), eq(String::class.java))
     ).thenAnswer { ResponseEntity.ok("not-json") }
 
     val result = service.fetch("anything", "owner-1")
 
     assertNull(result)
+  }
+
+  @ParameterizedTest
+  @ValueSource(
+    strings = [
+      "../admin",
+      "../../api/v1/users",
+      "a/b",
+      "a?owner=other#f",
+      "a b",
+      "a\nb",
+      "100%",
+      "\$(id)",
+      "x'); SELECT 1; --",
+      "{name}",
+    ]
+  )
+  fun `hostile names stay inside a single encoded path segment`(hostile: String) {
+    credentialStore[hostile] = mapOf("k" to "v")
+
+    val result = service.fetch(hostile, "owner-1")
+
+    val captor = argumentCaptor<URI>()
+    verify(restTemplate).exchange(captor.capture(), eq(HttpMethod.GET), any<HttpEntity<Void>>(), eq(String::class.java))
+    val uri = captor.firstValue
+    assertEquals("localhost", uri.host)
+    assertEquals(8083, uri.port)
+    assertNull(uri.rawQuery)
+    assertNull(uri.rawFragment)
+    assertTrue(uri.rawPath.startsWith("/api/v1/credentials/"))
+    val segment = uri.rawPath.removePrefix("/api/v1/credentials/")
+    assertFalse(segment.contains("/"), "name must be a single segment: ${uri.rawPath}")
+    assertEquals(hostile, URLDecoder.decode(segment.replace("+", "%2B"), Charsets.UTF_8))
+    assertEquals(mapOf("k" to "v"), result)
+  }
+
+  @Test
+  fun `traversal name is percent-encoded`() {
+    assertEquals("/api/v1/credentials/..%2Fadmin", service.credentialUri("../admin").rawPath)
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = ["", " ", ".", ".."])
+  fun `dot-segment and blank names are refused without a request`(name: String) {
+    assertNull(service.fetch(name, "owner-1"))
+    verify(restTemplate, never()).exchange(any<URI>(), any<HttpMethod>(), any<HttpEntity<Void>>(), eq(String::class.java))
   }
 }

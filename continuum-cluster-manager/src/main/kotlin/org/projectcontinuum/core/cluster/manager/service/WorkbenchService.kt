@@ -30,6 +30,13 @@ class WorkbenchService(
 
   private val logger = LoggerFactory.getLogger(WorkbenchService::class.java)
   private val objectMapper = jacksonObjectMapper()
+  private val inputValidator = WorkbenchInputValidator(workbenchProperties)
+
+  init {
+    // Server-side config that is interpolated into the templates: fail fast on a bad value.
+    inputValidator.validateImagePullPolicy(workbenchProperties.imagePullPolicy)
+    inputValidator.validateNamespace(workbenchProperties.namespace)
+  }
 
   /**
    * Audit operation types for workbench lifecycle events
@@ -64,6 +71,19 @@ class WorkbenchService(
 
   fun createWorkbench(userId: String, request: WorkbenchCreateRequest): WorkbenchResponse {
     logger.info("AUDIT | operation=CREATE | userId={} | instanceName={} | status=INITIATED", userId, request.instanceName)
+
+    try {
+      validateCreateRequest(userId, request)
+    } catch (ex: IllegalArgumentException) {
+      logAudit(
+        operation = AuditOperation.CREATE,
+        userId = userId,
+        instanceName = request.instanceName,
+        status = "FAILED",
+        details = mapOf("reason" to "Invalid request: ${ex.message}")
+      )
+      throw ex
+    }
 
     val existing = repository.findByUserIdAndInstanceName(userId, request.instanceName)
     val activeStatuses = setOf(WorkbenchStatus.RUNNING.name, WorkbenchStatus.SUSPENDED.name)
@@ -438,6 +458,20 @@ class WorkbenchService(
         throw WorkbenchNotFoundException("Workbench '$instanceName' not found for user '$userId'")
       }
 
+    try {
+      request.image?.let { inputValidator.validateRequestedImage(it) }
+    } catch (ex: IllegalArgumentException) {
+      logAudit(
+        operation = AuditOperation.UPDATE,
+        userId = userId,
+        instanceId = entity.instanceId,
+        instanceName = instanceName,
+        status = "FAILED",
+        details = mapOf("reason" to "Invalid request: ${ex.message}")
+      )
+      throw ex
+    }
+
     val updatedEntity = entity.copy(
       image = request.image ?: entity.image,
       cpuRequest = request.resources?.cpuRequest ?: entity.cpuRequest,
@@ -448,6 +482,20 @@ class WorkbenchService(
       storageClassName = request.resources?.storageClassName ?: entity.storageClassName,
       updatedAt = Instant.now()
     )
+
+    try {
+      validateEntityTemplateValues(updatedEntity)
+    } catch (ex: IllegalArgumentException) {
+      logAudit(
+        operation = AuditOperation.UPDATE,
+        userId = userId,
+        instanceId = entity.instanceId,
+        instanceName = instanceName,
+        status = "FAILED",
+        details = mapOf("reason" to "Invalid request: ${ex.message}")
+      )
+      throw ex
+    }
 
     // Build change details for audit
     val changes = buildMap<String, Any> {
@@ -628,13 +676,58 @@ class WorkbenchService(
     return writer.toString()
   }
 
+  /**
+   * Parses the final (template + overlay) YAML and applies it — but only after
+   * [verifyRenderedResources] has confirmed it is exactly the one resource this template
+   * is meant to produce. Anything else (an injected extra document, a changed kind/name/
+   * namespace) is refused and nothing from this YAML is sent to Kubernetes.
+   */
   @Suppress("DEPRECATION")
-  private fun applyYaml(yaml: String, namespace: String) {
+  private fun applyYaml(yaml: String, resourceType: ResourceType, instanceId: String, namespace: String) {
     val resources: List<HasMetadata> = kubernetesClient.load(yaml.byteInputStream()).items()
+    verifyRenderedResources(resources, resourceType, instanceId, namespace)
     for (resource in resources) {
       kubernetesClient.resource(resource)
         .inNamespace(namespace)
         .createOrReplace()
+    }
+  }
+
+  private fun verifyRenderedResources(
+    resources: List<HasMetadata>,
+    resourceType: ResourceType,
+    instanceId: String,
+    namespace: String
+  ) {
+    val expectedName = resourceType.expectedName(instanceId)
+    fun reject(reason: String): Nothing {
+      logger.error(
+        "Refusing to apply rendered {} manifest for workbench {}: {}",
+        resourceType.name, instanceId, reason
+      )
+      throw IllegalStateException("Rendered ${resourceType.kind} manifest for workbench $instanceId failed verification: $reason")
+    }
+
+    if (resources.size != 1) {
+      reject("expected exactly 1 resource, got ${resources.size} (${resources.joinToString { "${it.kind}/${it.metadata?.name}" }})")
+    }
+    val resource = resources.single()
+    if (resource.apiVersion != resourceType.apiVersion || resource.kind != resourceType.kind) {
+      reject("expected ${resourceType.apiVersion}/${resourceType.kind}, got ${resource.apiVersion}/${resource.kind}")
+    }
+    val metadata = resource.metadata ?: reject("missing metadata")
+    if (metadata.name != expectedName) {
+      reject("expected name '$expectedName', got '${metadata.name}'")
+    }
+    if (metadata.namespace != namespace) {
+      reject("expected namespace '$namespace', got '${metadata.namespace}'")
+    }
+    val labels = metadata.labels.orEmpty()
+    if (labels["instance-id"] != instanceId ||
+      labels["app"] != "continuum-workbench" ||
+      labels["managed-by"] != "continuum-cluster-manager"
+    ) {
+      reject("lifecycle labels (instance-id/app/managed-by) do not match")
     }
   }
 
@@ -652,11 +745,53 @@ class WorkbenchService(
   ): String {
     val yaml = renderTemplate(templateName, model)
     val mergedYaml = overlayService.applyOverlay(yaml, resourceType, model, variant)
-    applyYaml(mergedYaml, namespace)
+    applyYaml(mergedYaml, resourceType, model["instanceId"] as String, namespace)
     return mergedYaml
   }
 
+  /**
+   * Boundary validation for a create request. Every value that reaches a template is
+   * checked here, before any K8s or DB side effect. `instanceId` (server-generated UUID),
+   * `namespace` and `imagePullPolicy` (server config, checked in `init`) are not caller-controlled.
+   */
+  private fun validateCreateRequest(userId: String, request: WorkbenchCreateRequest) {
+    inputValidator.validateUserId(userId)
+    request.image?.let { inputValidator.validateRequestedImage(it) }
+    inputValidator.validateImageSyntax(request.resolvedImage())
+    val resources = request.resolvedResources()
+    inputValidator.validateResources(
+      cpuRequest = resources.cpuRequest,
+      cpuLimit = resources.cpuLimit,
+      memoryRequest = resources.memoryRequest,
+      memoryLimit = resources.memoryLimit,
+      storageSize = resources.storageSize,
+      storageClassName = resources.storageClassName
+    )
+    overlayService.requireKnownVariant(request.variant)
+  }
+
+  /**
+   * Syntax checks for every entity value interpolated into a template. Runs on every render
+   * (create/resume/update/rollback) so a value stored before validation existed can't inject
+   * either. The image allow-list is only enforced on caller-supplied images (create/update)
+   * so existing workbenches keep resuming if the allow-list is tightened later.
+   */
+  private fun validateEntityTemplateValues(entity: WorkbenchInstanceEntity) {
+    inputValidator.validateUserId(entity.userId)
+    inputValidator.validateNamespace(entity.namespace)
+    inputValidator.validateImageSyntax(entity.image)
+    inputValidator.validateResources(
+      cpuRequest = entity.cpuRequest,
+      cpuLimit = entity.cpuLimit,
+      memoryRequest = entity.memoryRequest,
+      memoryLimit = entity.memoryLimit,
+      storageSize = entity.storageSize,
+      storageClassName = entity.storageClassName
+    )
+  }
+
   private fun buildTemplateModel(entity: WorkbenchInstanceEntity): Map<String, Any?> {
+    validateEntityTemplateValues(entity)
     return mapOf(
       "instanceId" to entity.instanceId.toString(),
       "namespace" to entity.namespace,

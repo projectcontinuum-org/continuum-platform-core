@@ -26,8 +26,8 @@ spec:
         fsGroup: 1000
       containers:
         - name: theia
-          image: ${image}
-          imagePullPolicy: ${imagePullPolicy}
+          image: "${image?json_string}"
+          imagePullPolicy: "${imagePullPolicy?json_string}"
           env:
             - name: NODE_ENV
               value: "production"
@@ -35,11 +35,11 @@ spec:
             - containerPort: 8080
           resources:
             requests:
-              cpu: "${cpuRequest}"
-              memory: "${memoryRequest}"
+              cpu: "${cpuRequest?json_string}"
+              memory: "${memoryRequest?json_string}"
             limits:
-              cpu: "${cpuLimit}"
-              memory: "${memoryLimit}"
+              cpu: "${cpuLimit?json_string}"
+              memory: "${memoryLimit?json_string}"
           volumeMounts:
             - name: workspace-storage
               mountPath: /home/continuum

@@ -19,13 +19,22 @@ import java.nio.file.Paths
 
 /**
  * Resource types that can be customized via overlays.
- * Each maps to an expected filename suffix in the overlay directory.
+ * Each maps to an expected filename suffix in the overlay directory, plus the exact
+ * `apiVersion`/`kind` and `wb-{instanceId}-{nameSuffix}` name the rendered (and overlaid)
+ * manifest must have before `WorkbenchService` applies it.
  */
-enum class ResourceType(val filename: String) {
-  DEPLOYMENT("deployment.yaml"),
-  SERVICE("service.yaml"),
-  PVC("pvc.yaml"),
-  INGRESS("ingress.yaml")
+enum class ResourceType(
+  val filename: String,
+  val apiVersion: String,
+  val kind: String,
+  val nameSuffix: String
+) {
+  DEPLOYMENT("deployment.yaml", "apps/v1", "Deployment", "deployment"),
+  SERVICE("service.yaml", "v1", "Service", "svc"),
+  PVC("pvc.yaml", "v1", "PersistentVolumeClaim", "pvc"),
+  INGRESS("ingress.yaml", "networking.k8s.io/v1", "Ingress", "ingress");
+
+  fun expectedName(instanceId: String): String = "wb-$instanceId-$nameSuffix"
 }
 
 /**
@@ -113,6 +122,7 @@ class OverlayService(
         .map { it.fileName.toString() }
         .filter { it.contains("--") && it.endsWith(".yaml") }
         .map { it.substringBefore("--") }
+        .filter { isValidVariantName(it) }
         .distinct()
         .sorted()
         .toList()
@@ -120,6 +130,22 @@ class OverlayService(
       logger.warn("Failed to list overlay variants from {}: {}", overlayProperties.path, ex.message)
       emptyList()
     }
+  }
+
+  /**
+   * Rejects a caller-supplied [variant] before anything is created: it must match
+   * [VARIANT_NAME_REGEX] and, when overlays are enabled, be one of [listVariants].
+   * `null` (no variant) is always accepted. When overlays are disabled the variant is
+   * stored but never applied, so only the name check runs.
+   *
+   * @throws IllegalArgumentException (mapped to 400) for an invalid or unknown variant
+   */
+  fun requireKnownVariant(variant: String?) {
+    if (variant == null) return
+    require(isValidVariantName(variant)) { "Invalid variant: must match ${VARIANT_NAME_REGEX.pattern}" }
+    if (!overlayProperties.enabled) return
+    val known = listVariants()
+    require(variant in known) { "Unknown variant '$variant': available variants are $known" }
   }
 
   /**
@@ -143,7 +169,7 @@ class OverlayService(
       return baseYaml
     }
 
-    val overlayFile = Paths.get(overlayProperties.path, "${variant}--${resourceType.filename}")
+    val overlayFile = resolveOverlayFile(variant, resourceType)
     if (!Files.exists(overlayFile)) {
       return baseYaml
     }
@@ -180,6 +206,22 @@ class OverlayService(
       baseYaml
     }
   }
+
+  /**
+   * Builds the overlay file path for [variant]. Not fail-open: a variant that fails
+   * [VARIANT_NAME_REGEX] or resolves outside the overlay directory (path traversal)
+   * throws instead of silently falling back to the base YAML.
+   */
+  private fun resolveOverlayFile(variant: String, resourceType: ResourceType): Path {
+    require(isValidVariantName(variant)) { "Invalid variant: must match ${VARIANT_NAME_REGEX.pattern}" }
+    val overlayDir = Paths.get(overlayProperties.path).toAbsolutePath().normalize()
+    val overlayFile = overlayDir.resolve("${variant}--${resourceType.filename}").normalize()
+    require(overlayFile.parent == overlayDir) { "Invalid variant: resolves outside the overlay directory" }
+    return overlayFile
+  }
+
+  private fun isValidVariantName(variant: String): Boolean =
+    VARIANT_NAME_REGEX.matches(variant) && !variant.contains("--")
 
   /**
    * Renders the overlay content as a FreeMarker template with the given model.
@@ -302,6 +344,11 @@ class OverlayService(
     labels.forEach { (key, value) ->
       node.set<JsonNode>(key, value)
     }
+  }
+
+  companion object {
+    /** Allowed variant names: ConfigMap-key-safe, no path separators, no `..`, no `--`. */
+    val VARIANT_NAME_REGEX = Regex("^[A-Za-z0-9][A-Za-z0-9._-]{0,62}$")
   }
 
   private data class ProtectedFieldSnapshot(
