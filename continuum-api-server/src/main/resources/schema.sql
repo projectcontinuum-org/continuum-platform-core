@@ -26,6 +26,12 @@ CREATE TABLE IF NOT EXISTS workflow_schedules (
 ALTER TABLE workflow_runs ADD COLUMN IF NOT EXISTS schedule_id UUID REFERENCES workflow_schedules(schedule_id) ON DELETE SET NULL;
 CREATE INDEX IF NOT EXISTS ix_workflow_runs_schedule_id ON workflow_runs (schedule_id) WHERE schedule_id IS NOT NULL;
 
+-- Every endpoint is scoped by owner (list, count, tree, active, cancel, terminate, status, runs and node output), so
+-- every one of them filters on owned_by. The list endpoints sort newest first, hence created_at DESC in the same
+-- index: the common query (a caller's most recent runs, paged) is then one index scan with no sort. Without it each of
+-- these queries scans the whole table, which grows with every run and cannot be pruned through the API.
+CREATE INDEX IF NOT EXISTS ix_workflow_runs_owned_by_created_at ON workflow_runs (owned_by, created_at DESC);
+
 -- Temporal run id of the execution. Node outputs are stored under <run_id>/<node_id>/..., so this is the key that ties
 -- a stored output back to its owner. Written by the message-bridge from the workflow update events; it differs from
 -- workflow_id (the id the API returns).
