@@ -111,11 +111,10 @@ When the user requests a durable behavior change, record it here or in the relev
 ./gradlew :continuum-message-bridge:bootRun
 ./gradlew :continuum-credentials-server:bootRun
 ./gradlew :continuum-cluster-manager:bootRun
-./gradlew :continuum-cloud-gateway:bootRun
 ./gradlew :continuum-knime-scheduler:bootRun
 ```
 
-IntelliJ run configs in `.run/` cover: ApiServer, MessageBridge, OrchestrationService, CredentialServer, Gateway.
+IntelliJ run configs in `.run/` cover: ApiServer, MessageBridge, OrchestrationService, CredentialServer.
 
 **Start infrastructure (required before running any service):**
 ```bash
@@ -150,7 +149,6 @@ cd docker && docker compose up -d
 | `continuum-message-bridge` | Kafka consumer → MQTT publisher bridge for browser real-time updates | 8081 |
 | `continuum-credentials-server` | AES-GCM encrypted credential storage (REST + embedded React UI) | 8083 |
 | `continuum-cluster-manager` | Kubernetes lifecycle manager for per-user workbench instances | — |
-| `continuum-cloud-gateway` | HTTP/WebSocket reverse proxy routing to per-user workbench pods | — |
 | `continuum-knime-base` | KNIME compatibility layer (experimental) | — |
 | `continuum-knime-scheduler` | Object-store CRUD proxy for KNIME `.knwf` workflow files + Postgres bookkeeping | 8085 |
 
@@ -220,11 +218,9 @@ The orchestration service resolves each node's task queue dynamically via `Initi
 
 The `continuum` DSL extension in each feature `build.gradle.kts` controls versions: `continuumVersion`, `springBootVersion`, `temporalVersion`, `awsSdkVersion`.
 
-#### Cluster manager and cloud gateway
+#### Cluster manager
 
-`continuum-cluster-manager` manages per-user `continuum-workbench` Kubernetes deployments (PVC + Deployment + Service) via Fabric8 client and FreeMarker templates (`pvc.ftl`, `deployment.ftl`, `service.ftl`). Service names follow `wb-{instanceId}-svc.{namespace}.svc.cluster.local:8080`.
-
-`continuum-cloud-gateway` is an HTTP + WebSocket reverse proxy that resolves the workbench service endpoint from PostgreSQL and forwards requests, stripping the `/workbench/{instanceName}/open` prefix. It proxies to the cluster-local service URL.
+`continuum-cluster-manager` manages per-user `continuum-workbench` Kubernetes deployments (PVC + Deployment + Service + Ingress) via Fabric8 client and FreeMarker templates (`pvc.ftl`, `deployment.ftl`, `service.ftl`, `ingress.ftl`). Service names follow `wb-{instanceId}-svc.{namespace}.svc.cluster.local:8080`. Access to a workbench is gated by `GET /api/v1/workbench/authorize`, which the ingress layer calls with the caller's `x-continuum-user-id` and the forwarded host.
 
 #### Data format
 
@@ -255,7 +251,6 @@ All inter-node data is Apache Parquet (Snappy compressed, Avro schema `DataRow`)
 | MinIO API / Console | 39000 / 39001 |
 | Mosquitto TCP / WS | 31883 / 31884 |
 | Credentials Server (container) | 38083 |
-| Cloud Gateway (container) | 38084 |
 
 PostgreSQL uses a single `continuum` database with multiple schemas. All services default to `continuum_owner` / `continuum-test-password`.
 
@@ -277,7 +272,6 @@ PRs that touch any `continuum-*` module or shared build files (`settings.gradle.
 - [continuum-api-server/AGENTS.md](continuum-api-server/AGENTS.md) — REST API: workflow CRUD, node registry, execution trigger, DuckDB node output preview
 - [continuum-credentials-server/AGENTS.md](continuum-credentials-server/AGENTS.md) — AES-GCM encrypted credential store with embedded React UI
 - [continuum-cluster-manager/AGENTS.md](continuum-cluster-manager/AGENTS.md) — Kubernetes lifecycle manager for per-user workbench pods
-- [continuum-cloud-gateway/AGENTS.md](continuum-cloud-gateway/AGENTS.md) — HTTP + WebSocket reverse proxy routing to per-user workbench pods
 - [continuum-gradle-plugin/AGENTS.md](continuum-gradle-plugin/AGENTS.md) — convention plugins for feature modules and workers; @ContinuumNode annotation validator
 - [continuum-knime-scheduler/AGENTS.md](continuum-knime-scheduler/AGENTS.md) — object-store CRUD proxy for KNIME `.knwf` workflow files, with per-user Postgres bookkeeping
 

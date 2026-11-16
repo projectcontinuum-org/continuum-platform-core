@@ -27,7 +27,7 @@ Core platform team. Container image: `projectcontinuum/continuum-cluster-manager
 - Suspend = delete Deployment + Service, keep PVC. Resume = recreate Deployment + Service from stored entity.
 - K8s mutation always happens before DB write. If K8s fails, the DB is not updated (DB is the final record of confirmed state). Rollback is attempted on failure.
 - `refreshStatusFromK8s()` queries the live deployment on `GET /status` calls — DB status may lag K8s.
-- Service endpoint exposed as `wb-{instanceId}-svc.{namespace}.svc.cluster.local:8080` — used by `continuum-cloud-gateway` to proxy requests.
+- Service endpoint exposed as `wb-{instanceId}-svc.{namespace}.svc.cluster.local:8080`. Each workbench also gets its own Ingress (`ingress.ftl`); external traffic reaches a workbench through that Ingress, gated by `GET /api/v1/workbench/authorize`. There is no reverse-proxy service in front of the workbenches (the former `continuum-cloud-gateway` was removed).
 - All operations emit structured `AUDIT |` log lines.
 - Config: `continuum.core.cluster-manager.kubernetes.master-url`, `continuum.core.cluster-manager.workbench.*`.
 - Requires PostgreSQL for workbench instance registry.
