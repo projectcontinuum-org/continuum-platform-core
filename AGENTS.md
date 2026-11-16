@@ -111,7 +111,6 @@ When the user requests a durable behavior change, record it here or in the relev
 ./gradlew :continuum-message-bridge:bootRun
 ./gradlew :continuum-credentials-server:bootRun
 ./gradlew :continuum-cluster-manager:bootRun
-./gradlew :continuum-knime-scheduler:bootRun
 ```
 
 IntelliJ run configs in `.run/` cover: ApiServer, MessageBridge, OrchestrationService, CredentialServer.
@@ -150,7 +149,6 @@ cd docker && docker compose up -d
 | `continuum-credentials-server` | AES-GCM encrypted credential storage (REST + embedded React UI) | 8083 |
 | `continuum-cluster-manager` | Kubernetes lifecycle manager for per-user workbench instances | — |
 | `continuum-knime-base` | KNIME compatibility layer (experimental) | — |
-| `continuum-knime-scheduler` | Object-store CRUD proxy for KNIME `.knwf` workflow files + Postgres bookkeeping | 8085 |
 
 #### Execution flow
 
@@ -273,7 +271,6 @@ PRs that touch any `continuum-*` module or shared build files (`settings.gradle.
 - [continuum-credentials-server/AGENTS.md](continuum-credentials-server/AGENTS.md) — AES-GCM encrypted credential store with embedded React UI
 - [continuum-cluster-manager/AGENTS.md](continuum-cluster-manager/AGENTS.md) — Kubernetes lifecycle manager for per-user workbench pods
 - [continuum-gradle-plugin/AGENTS.md](continuum-gradle-plugin/AGENTS.md) — convention plugins for feature modules and workers; @ContinuumNode annotation validator
-- [continuum-knime-scheduler/AGENTS.md](continuum-knime-scheduler/AGENTS.md) — object-store CRUD proxy for KNIME `.knwf` workflow files, with per-user Postgres bookkeeping
 
 Modules without child AGENTS.md (minimal, self-contained):
 - `continuum-avro-schemas` — Avro schema definitions only; no logic

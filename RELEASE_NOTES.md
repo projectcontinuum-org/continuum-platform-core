@@ -1,84 +1,105 @@
-# continuum-platform-core 0.0.21-beta (proposed)
+# continuum-platform-core 0.0.23 (proposed)
 
-Changes on `origin/main` since [0.0.20-beta](https://github.com/projectcontinuum-org/continuum-platform-core/releases/tag/release%2F0.0.20) (`release/0.0.20`).
+Changes on `CONTNM-161` since [0.0.22](https://github.com/projectcontinuum-org/continuum-platform-core/releases/tag/release%2F0.0.22) (`release/0.0.22`).
 
-This release makes the api-server MCP server a complete workflow-building toolset, fixes activity cancellation in the worker starter, and adds licensing, contributor docs and repository cleanup. `platformVersion` is bumped to `0.0.21`. `continuum-orchestration-service` has no changes.
+This release is a security and multi-tenancy hardening release. Every workflow, run, schedule and node-output endpoint now checks that the caller owns what it touches, and the places that build shell commands, SQL, Kubernetes manifests, URLs and HTTP headers from user input were fixed so a value can no longer change the meaning of the command. It also removes the `continuum-cloud-gateway` and `continuum-knime-scheduler` modules. `platformVersion` is bumped to `0.0.23`.
 
 ## Highlights
 
-- **Workflow validation and build tools in the MCP server.** Two new tools, `validateContinuumWorkflow` and `buildContinuumWorkflow`, check a compact workflow spec against the live node registry and produce the complete `.cwf` content. Client AI agents (the workbench WorkflowBuilder, Claude Code) now need only a prompt plus these tools.
-- **Node cancellation actually stops the node.** A cancelled, timed-out or shut-down activity now interrupts the node's thread and is reported to Temporal as cancelled, even if the node swallows the interrupt.
-- **Smaller MCP responses.** The list and search tools return a compact node form without icons or schemas.
-- **Apache 2.0 license, `CONTRIBUTING.md`, and a single `AGENTS.md`.**
+- **Tenant isolation on every workflow endpoint.** `/status`, `/cancel`, `/terminate`, `/active`, `/list`, `/count`, `/tree` and node output are scoped to the `x-continuum-user-id` caller. Another tenant's workflow or an unknown id is a 404 in both cases, so ids cannot be probed.
+- **Injection fixes** in the node-output preview (SQL), the Temporal visibility queries, the workbench Kubernetes manifests, the credential URL, and the KNIME node launcher (shell).
+- **A workflow can no longer stick in `RUNNING` when it is cancelled right after it starts.**
+- **`continuum-cloud-gateway` and `continuum-knime-scheduler` are removed** from this repository.
 
 ## What's Changed
 
-- CONTNM-147: Add more tools into the MCP server to make client AI agents as thin as possible (#149)
-- CONTNM-131: Add LICENSE and fix links (#132)
-- CONTNM-132: Add LICENSE to the README (#134). In practice this adds the consolidated project reference to `AGENTS.md`.
-- CONTNM-135: Keep a single `AGENTS.md` (#136)
-- CONTNM-140: Stops tracking `package-lock.json` files and edits `.gitignore`.
+- CONTNM-161: Security fixes (injection hardening in the api-server, cluster-manager, worker starter and commons)
+- CONTNM-161: Scope more APIs to ownership (`/cancel`, `/terminate`, `/active`, node output)
+- CONTNM-161: Bump the platform version to 0.0.23
+- CONTNM-161: Store the Temporal run id in `workflow_runs`
+- CONTNM-161: Check the workflow model before sending a status update (cancel-right-after-start fix)
+- CONTNM-161: Create an index on `workflow_runs` by owner
+- CONTNM-161: Remove `continuum-cloud-gateway` from the repository
+- CONTNM-161: Remove `continuum-knime-scheduler` (it lives in `continuum-feature-knime`)
 
 ## Details
 
-### continuum-api-server: MCP server
+### continuum-api-server: ownership
 
-New tools (`ContinuumWorkflowMcpTools`). Both take the compact spec `(name, nodes[{key, nodeId, properties}], edges[{from, fromPort, to, toPort}])`:
+- Every endpoint of `WorkflowController` reads the owner from the `x-continuum-user-id` header (default `anonymous`, so a local docker-compose setup needs no auth layer). Ownership comes from `workflow_runs.owned_by`.
+- `/{id}/cancel`, `/{id}/terminate` and `/{id}/status` return **404** for a workflow the caller does not own, and for an unknown id. The check runs **before** any Temporal signal is sent. Cancel and terminate of an unknown id used to be a silent 204.
+- `/list`, `/count`, `/tree` and `/active` are scoped to the caller's own runs. A caller with no runs gets an empty result and Temporal is not queried.
+- Cancelling or terminating a workflow that has already finished is also a 404: Temporal has no running execution to signal, and the service passes that not-found on instead of answering 204.
+- New `ResourceNotFoundException`, mapped to a 404 `ProblemDetail` by `ApiExceptionHandler`.
+- A run with no `workflow_runs` row is not visible to any caller. That covers runs created before that table existed, and a scheduled run whose first update has not reached the message bridge yet.
 
-- **`validateContinuumWorkflow`** (`WorkflowSpecValidator`) checks:
-  - every `nodeId` is registered and node keys are unique;
-  - every edge goes from an existing output port to an existing input port;
-  - each input port has at most one edge, and there are no cycles;
-  - each node's properties, merged over the registry defaults, match its JSON Schema, with no unknown keys and every required value set.
+### continuum-api-server: node output
 
-  It collects every problem in one pass. The result is `{valid, nodeCount, edgeCount, errors[], warnings[]}`, returned as a normal result (never `isError`). Each issue names its `node`, `edge` or `property`. Warnings, such as an unconnected input port, do not make the workflow invalid.
-- **`buildContinuumWorkflow`** (`WorkflowSpecBuilder`) validates first. When valid, it returns `{valid, fileName, errors, warnings, workflow}`:
-  - `workflow` is the complete `.cwf` content as a `ContinuumWorkflowModel`, with full registry node metadata, properties merged over the defaults, edges, and an automatic layout (longest-path depth).
-  - `fileName` is the workflow name as a slug plus `.cwf`.
-  - When invalid, `workflow` and `fileName` are omitted.
-- An empty `nodes` list is valid (warning "The workflow has no nodes yet.") and builds an empty workflow. A client can save the file first and rebuild it after each added node.
+- `GET /api/v1/data/{runId}/nodes/{nodeId}/outputs/{outputId}`: the first path segment is the Temporal **run id**, the first segment of a stored output path (`{remote}<runId>/<nodeId>/output.<port>.parquet`), not the workflow id that `POST /api/v1/workflow` returns. The URL shape is unchanged; the parameter is renamed.
+- The caller must own the run (looked up by `workflow_runs.run_id`) before the output is located or read. An unowned and a nonexistent run give the same 404 body.
+- `runId`, `nodeId` and `outputId` must match `^[A-Za-z0-9._-]{1,255}$`, and must not be `.` or contain `..`. `page` must be at least 0 and `pageSize` must be in `1..1000`. A violation is a **400** `application/problem+json` (`InvalidRequestException`).
+- The Parquet path, `LIMIT` and `OFFSET` are bound parameters (`read_parquet(?)`), never interpolated into SQL. The DuckDB connection has `httpfs` loaded, so an injected path could previously reach the network. The resolved cache file must also stay under the cache directory, and statements and result sets are closed.
 
-New tool in `ContinuumNodeMcpTools`:
+### continuum-api-server: Temporal visibility queries
 
-- **`getContinuumNodeDocumentation`** returns a node's markdown documentation. A node with no documentation returns a hint to use the property descriptions instead.
+- New `TemporalVisibilityQuery`. Values are escaped, and a client `query` on `/list`, `/count` and `/tree` is AND-combined with the server's own owner filter as `(<owner filter>) AND (<client query>)`, so it can only narrow the caller's own runs.
+- A client query is rejected (400) when it has unbalanced parentheses, an unterminated quote, `;`, `--`, `/*`, `#`, a backslash or a control character. `/count` allows a trailing `GROUP BY ExecutionStatus`.
+- The owner filter is `WorkflowId IN (...)` in chunks of 500, with counts and groups merged across chunks.
 
-Changed tool behavior (clients may depend on these):
+### continuum-api-server: run id and database
 
-- `listContinuumNodeCategories` and `searchContinuumNodes` now return compact `McpNodeTreeItem` results (type, id, name, description, input and output port names, children). Icons, schemas and defaults are left out. Use `getContinuumNodeMetadata` for the full node.
-- `searchContinuumNodes` matches the query case-insensitively as one literal substring of each node's name, description, documentation and id. The tool description now tells models to use a single distinctive word.
-- `getContinuumNodeMetadata` and `getContinuumNodeDocumentation` now throw a descriptive error for an unknown node id. Clients receive it as `isError`. Previously the metadata tool returned `null`.
+- New column `workflow_runs.run_id`, written when the workflow starts and by the message bridge on every event (kept if a later event has none). `schema.sql` adds the column and an index on it, and **backfills existing rows** from the `{remote}<runId>/` prefix of their stored output paths.
+- New index `ix_workflow_runs_owned_by_created_at (owned_by, created_at DESC)`. Every endpoint now filters by owner and the list endpoints sort newest first.
+- `WorkflowService.startWorkflow` inserts the `PENDING` row first, starts the workflow, then records the run id with a targeted `updateRunId` query (never a second `save()`, which could overwrite newer status written by the bridge). If the start fails, the orphan `PENDING` row is deleted. If recording the run id fails, the start still succeeds.
 
 ### continuum-commons
 
-- `ValidationHelper.findSchemaViolations(properties, schema)` is new. It returns a `SchemaViolation(keyword, path, property, message)` per JSON Schema problem instead of asserting.
-- `validateJsonWithSchema` keeps its behavior (assert on any violation) and now calls the new function.
+- `WorkflowUpdate` has a new nullable field `runId` (default `null`, so events from an older orchestration service still deserialize).
+- `KnimeNodeModel` starts KNIME with `ProcessBuilder(buildKnimeCommand(...))`, an argument list with no `bash -c`, so a node id or path can no longer be run as a command. `resolveWorkflowDir` rejects a node id that resolves to the KNIME workflow root or outside it. The string-joined `prepareWorkflowInputs` is `@Deprecated` and kept for binary compatibility; use `prepareWorkflowInputOptions`.
 
-### continuum-worker-springboot-starter: cancellation
+### continuum-orchestration-service
 
-- **Before:** Temporal delivers cancellation through heartbeat exceptions, and a node could swallow the exception or ignore the interrupt, so the activity kept running or finished as if nothing happened.
-- **Now:** `ContinuumNodeActivity` handles an `ActivityCompletionException` (cancelled, timed out, or worker shutting down) from a heartbeat. The background heartbeat scheduler interrupts the activity thread, so a node blocked in I/O, `Process.waitFor` or `Thread.sleep` stops. The activity rethrows the cancellation so Temporal records it, even if `execute()` swallowed it or returned normally.
-- The interrupt is cleared before the worker thread is reused.
-- Covered by the new `ContinuumNodeActivityCancellationTest`.
+- `WorkflowStatusReporter` publishes the Temporal run id (`Workflow.getInfo().runId`) on every event.
+- **Cancel-right-after-start fix.** The api-server signals `notifyCancelling` straight after starting a workflow, sometimes while it is still resolving task queues. `publishUpdate` then threw a `NullPointerException` (`currentRunningWorkflow()!!`), which fails the workflow *task*. Temporal retries that task forever, so the run stayed `RUNNING` with no status. It now skips the update when the workflow model is not stored yet; the pinned terminal status is carried by the next update.
 
-### Licensing and documentation
+### continuum-message-bridge
 
-- Added Apache License 2.0 (`LICENSE`).
-- Added `CONTRIBUTING.md`: reporting issues, JDK 21 setup, per-module build and test, and the pull request process.
-- Removed the duplicated `CLAUDE.md`, `.clinerules`, `.cursorrules`, `.windsurfrules` and `.github/copilot-instructions.md`. `AGENTS.md` is now the single source of AI-assistant guidance and holds the project reference.
-- README links to sibling repositories (workbench, feature-base, feature-ai, feature-template), the clone URL and the Issues link now point to the `projectcontinuum-org` GitHub organization (previously `projectcontinuum`).
-- The cluster-manager, credentials-server and knime-scheduler frontends have updated GitHub/Documentation links in their header and footer.
-- Module `AGENTS.md` files for api-server, commons and worker-springboot-starter now describe the changes above.
+- The `workflow_runs` upsert writes `run_id`, keeps an existing value if a later event has none (`COALESCE`), and the bridge's `schema.sql` adds the column if it starts before the api-server.
 
-### Build and repository
+### continuum-cluster-manager
 
-- `gradle.properties`: `platformVersion` is `0.0.21` (was `0.0.20`), and `repoName` is `projectcontinuum-org/continuum-platform-core` (was `projectcontinuum/Continuum`).
-- `package-lock.json` files are no longer tracked (removed from the cluster-manager, credentials-server and knime-scheduler frontends and from `landing-page`) and are listed in `.gitignore`.
+- New `WorkbenchInputValidator`. Every value interpolated into a template is checked before rendering and a bad value is a **400** with `{"error": ...}`:
+  - the five resource quantities must parse as Kubernetes quantities (at most 32 characters);
+  - `storageClassName` and the namespace must be DNS-1123 names;
+  - the image must be a valid reference (at most 512 characters);
+  - the `x-continuum-user-id` header must be 1 to 256 characters with no control characters, quotes or backslashes.
+- **Image allow-list.** A create or update request may only name an image under `WORKBENCH_ALLOWED_IMAGE_PREFIXES` (property `continuum.core.cluster-manager.workbench.allowed-image-prefixes`), which **defaults to the workbench image repository** (`WORKBENCH_IMAGE_REPOSITORY`, `projectcontinuum/continuum-workbench`). An explicitly empty value allows any valid image. The allow-list is not applied to images already stored for existing workbenches, so those keep resuming.
+- The templates quote `image`, `imagePullPolicy`, the quantities and the storage class with `?json_string`. After rendering and applying overlays, `applyYaml` verifies the result is exactly the one expected resource (kind, name `wb-{id}-{suffix}`, namespace and labels) and refuses to apply anything else, so a value containing a newline and `---` can no longer inject a second resource.
+- Overlay variants must match `^[A-Za-z0-9][A-Za-z0-9._-]{0,62}$` (no `--`), and when overlays are enabled must be in the known list. A path or an unknown name is a 400, not a silent fallback to the base manifest. An overlay file must resolve inside the overlay directory.
+- Resume, update and rollback re-validate the stored values, so a tampered row is refused.
+
+### continuum-worker-springboot-starter
+
+- `CredentialFetcherService` builds the credential URL with `UriComponentsBuilder.pathSegment(...)`, so a name containing `/`, `?`, `#`, `%` or whitespace stays one path segment. A blank, `.` or `..` name is refused and no request is sent.
+
+### Removed modules
+
+- **`continuum-cloud-gateway`** is removed (module, IntelliJ run config, release matrix entry, manual build checkbox and docs). It only read `workbench_instances`, which the cluster-manager owns, so there is nothing to migrate. Workbenches are reached through their own Ingress, gated by `GET /api/v1/workbench/authorize`.
+- **`continuum-knime-scheduler`** is removed. It now lives in `continuum-feature-knime` (`scheduler/`). The `Content-Disposition` fix made here (the download filename is stripped of path components and control characters before it goes in the header) was ported there.
+
+### Tests
+
+- About 110 new tests (api-server 53, cluster-manager 43, commons 5, message bridge 3, worker starter 3, orchestration 2): ownership and 404s for every endpoint, hostile-input cases for node output, visibility queries, workbench templates, credentials and the KNIME launcher, a Temporal test-environment test for the cancel-right-after-start race, and the first tests of the message bridge.
 
 ## Upgrade notes
 
-- **MCP clients:** Anything parsing `listContinuumNodeCategories` or `searchContinuumNodes` output must handle the compact shape. Anything relying on `getContinuumNodeMetadata` returning `null` for an unknown id must handle an error instead.
-- **Node authors:** A node that runs subprocesses must stop them on `InterruptedException` or on an exception from `NodeProgressCallback.report()`. Cancellation is now enforced by interrupting the node thread.
-- **Publishing coordinates:** `repoName` feeds the GitHub Packages and container-registry paths used when publishing. Update anything that pulls artifacts or images from the old `projectcontinuum/Continuum` path.
-- **Frontend builds:** Without committed lockfiles, `npm install` in the frontend modules resolves dependency versions at build time, so builds are not reproducible from the repo alone.
+- **Node output URL.** Clients must address `/api/v1/data/...` by the Temporal run id taken from the stored output path. The workbench already does. Anything that passed the workflow id there now gets a 404.
+- **Ownership is enforced.** A client that cancels, terminates or lists workflows must send the same `x-continuum-user-id` it started them with. Unknown ids and other users' ids are now 404 where they were 204 or readable before. Behind a proxy that does not inject the header, every caller is `anonymous`.
+- **Workbench image allow-list.** Create and update requests naming an image outside `projectcontinuum/continuum-workbench` are now rejected with 400. Set `WORKBENCH_ALLOWED_IMAGE_PREFIXES` to allow other repositories (an empty value allows any valid image). With the Helm chart, set `continuum.clusterManager.workbench.allowedImagePrefixes` (needs the matching `continuum-charts` change).
+- **Database.** The api-server and message bridge add `workflow_runs.run_id` and two indexes on start, and backfill `run_id` for existing runs. No manual step. Rows that cannot be backfilled have no `run_id`, so their node output is not readable until a new event records one.
+- **Events.** Anything that deserializes `WorkflowUpdate` strictly must accept the new optional `runId`.
+- **`KnimeNodeModel` subclasses.** Prefer `prepareWorkflowInputOptions`; the string version is deprecated.
+- **`continuum-cloud-gateway` image.** No new version is published. The `/workbench/<name>/open` proxy path no longer exists in this repository.
+- **Not part of this release.** Schema validation of node properties (`validateJsonWithSchema`) still uses Kotlin `assert`, which does nothing at runtime unless the JVM runs with `-ea`. The Jackson dependency advisories are deferred to the Spring Boot upgrade.
 
-**Full Changelog**: https://github.com/projectcontinuum-org/continuum-platform-core/compare/release/0.0.20...main
+**Full Changelog**: https://github.com/projectcontinuum-org/continuum-platform-core/compare/release/0.0.22...CONTNM-161
