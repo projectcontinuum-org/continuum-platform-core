@@ -25,6 +25,9 @@ continuum.core:
       namespace: ${WORKBENCH_NAMESPACE:default}
       image-repository: ${WORKBENCH_IMAGE_REPOSITORY:projectcontinuum/continuum-workbench}
       image-pull-policy: ${WORKBENCH_IMAGE_PULL_POLICY:IfNotPresent}
+      # Comma-separated image repository prefixes create/update requests may use (defaults to image-repository).
+      # Set to an empty value to allow any syntactically valid image reference.
+      allowed-image-prefixes: ${WORKBENCH_ALLOWED_IMAGE_PREFIXES:${WORKBENCH_IMAGE_REPOSITORY:projectcontinuum/continuum-workbench}}
       overlays:
         enabled: ${OVERLAY_ENABLED:false}
         path: ${OVERLAY_PATH:./.data/overlays/workbench}

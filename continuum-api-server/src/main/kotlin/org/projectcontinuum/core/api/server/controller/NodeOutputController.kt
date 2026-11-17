@@ -10,10 +10,15 @@ import org.springframework.web.bind.annotation.*
 class NodeOutputController(
   val nodeOutputService: NodeOutputService
 ) {
-  @GetMapping("{workflowId}/nodes/{nodeId}/outputs/{outputId}")
+  /**
+   * `runId` is the Temporal run id: the first segment of a stored output path (`{remote}<runId>/<nodeId>/...`),
+   * which is what the workbench sends. It is not the workflow id returned by `POST /api/v1/workflow`.
+   */
+  @GetMapping("{runId}/nodes/{nodeId}/outputs/{outputId}")
   fun getData(
+    @RequestHeader("x-continuum-user-id", required = false, defaultValue = "anonymous") ownedBy: String,
     @PathVariable
-    workflowId: String,
+    runId: String,
     @PathVariable
     nodeId: String,
     @PathVariable
@@ -24,7 +29,8 @@ class NodeOutputController(
     pageSize: Int
   ): Page<List<CellDto>> {
     return nodeOutputService.getOutput(
-      workflowId = workflowId,
+      ownedBy = ownedBy,
+      runId = runId,
       nodeId = nodeId,
       outputId = outputId,
       page = page,

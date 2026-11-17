@@ -17,10 +17,6 @@ on:
         description: 'continuum-avro-schemas'
         type: boolean
         default: false
-      continuum-cloud-gateway:
-        description: 'continuum-cloud-gateway'
-        type: boolean
-        default: false
       continuum-commons:
         description: 'continuum-commons'
         type: boolean

@@ -17,6 +17,7 @@ Core platform team. No Spring Boot app — library only. Published to Maven Cent
 - `TaskQueues` — object (not enum) of const strings so they can appear in annotations: `WORKFLOW_TASK_QUEUE`, `ACTIVITY_TASK_QUEUE`, `ACTIVITY_TASK_QUEUE_INITIALIZE`.
 - `NodeProgressCallback` — rate-limited in the worker starter; nodes call `report(percentage)` or `report(NodeProgress(...))`.
 - `ValidationHelper` — JSON Schema (draft 4 default) checks of node properties. `validateJsonWithSchema` asserts (used by `ProcessNodeModel.run` and the api-server at workflow start); `findSchemaViolations` returns `SchemaViolation(keyword, path, property, message)` per problem for callers that report errors instead of failing.
+- `KnimeNodeModel` — published base for nodes that run a single KNIME node in batch mode. It starts KNIME with `ProcessBuilder(buildKnimeCommand(...))`: an argv list with no shell, so paths, node ids and port ids reach KNIME verbatim. Never reintroduce `bash -c` or string-joined commands. `resolveWorkflowDir(runId, nodeId)` canonicalizes `{knimeWorkflowRootDir}/{runId}/{nodeId}` and throws a non-retriable `NodeRuntimeException` if it is the root itself or outside it. Use `prepareWorkflowInputOptions` (one `-option=...` per element). The space-joined `prepareWorkflowInputs` String API is `@Deprecated`, and only kept for binary compatibility.
 - Spring `context` and `beans` are `compileOnly` — this library does not pull in a Spring runtime.
 
 ## Work Guidance

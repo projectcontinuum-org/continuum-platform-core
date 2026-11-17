@@ -1,5 +1,6 @@
 package org.projectcontinuum.core.commons.node
 
+import org.projectcontinuum.core.commons.exception.NodeRuntimeException
 import org.projectcontinuum.core.commons.model.ContinuumWorkflowModel
 import org.projectcontinuum.core.commons.protocol.progress.NodeProgressCallback
 import org.projectcontinuum.core.commons.utils.NodeInputReader
@@ -56,10 +57,7 @@ abstract class KnimeNodeModel : ProcessNodeModel() {
     try {
       val workflowRunId = Activity.getExecutionContext().info.runId
       // Create temporary directory for the workflow
-      val workflowDir = File(
-        knimeWorkflowRootDir,
-        "${workflowRunId}${File.separator}${node.id}"
-      )
+      val workflowDir = resolveWorkflowDir(workflowRunId, node.id)
 
       LOGGER.info("Generating workflow at ${workflowDir.absolutePath}")
 
@@ -97,41 +95,26 @@ abstract class KnimeNodeModel : ProcessNodeModel() {
     inputs: Map<String, NodeInputReader>,
     nodeOutputWriter: NodeOutputWriter
   ): Future<Int> {
-    val inputs = prepareWorkflowInputs(
+    val inputOptions = prepareWorkflowInputOptions(
       workflowPath,
       inputs
     )
-    val outputs = outputPorts.keys.mapIndexed { index, portId ->
+    val outputOptions = outputPorts.keys.mapIndexed { index, portId ->
       val nodeId = inputPorts.size + index + 1
       "-option=${nodeId},outputPathOrUrl,${workflowPath.resolve("$portId.json").toFile().absolutePath},String"
-    }.joinToString(" \\\\n")
+    }
 
     val workspaceDir = File(knimeWorkspacesRoot, "knime-workspace-${Thread.currentThread().threadId()}")
     // read all the stdio of the process in a single thread
     return executor.submit<Int> {
-      val command = """
-                "$knimeExecutablePath" \
-                -nosplash \
-                -debug \
-                --launcher.suppressErrors \
-                -application org.knime.product.KNIME_BATCH_APPLICATION \
-                -data "${workspaceDir.absolutePath}" \
-                -reset \
-                -consoleLog \
-                -workflowDir="${workflowPath.absolutePathString()}" \
-                $inputs \
-                $outputs
-            """.trimIndent()
+      val command = buildKnimeCommand(workflowPath, workspaceDir, inputOptions, outputOptions)
 
-      val processBuilder = ProcessBuilder(
-        "/bin/bash",
-        "-c",
-        command
-      )
+      // argv list, no shell: paths, node ids and port ids reach KNIME verbatim and are never shell-parsed.
+      val processBuilder = ProcessBuilder(command)
 
       processBuilder.redirectErrorStream(true)
       val process = processBuilder.start()
-      LOGGER.info("Starting KNIME process with command: $command")
+      LOGGER.info("Starting KNIME process with command: {}", command)
       process.inputStream.bufferedReader().use { reader ->
         reader.lines().forEach { line ->
           LOGGER.debug("KNIME: $line")
@@ -165,10 +148,64 @@ abstract class KnimeNodeModel : ProcessNodeModel() {
     }
   }
 
+  /**
+   * Builds the KNIME batch command as an argv list (no shell). Each element is passed to the process verbatim,
+   * so no quoting or escaping is needed or applied.
+   */
+  fun buildKnimeCommand(
+    workflowPath: Path,
+    workspaceDir: File,
+    inputOptions: List<String>,
+    outputOptions: List<String>
+  ): List<String> = buildList {
+    add(knimeExecutablePath)
+    add("-nosplash")
+    add("-debug")
+    add("--launcher.suppressErrors")
+    add("-application")
+    add("org.knime.product.KNIME_BATCH_APPLICATION")
+    add("-data")
+    add(workspaceDir.absolutePath)
+    add("-reset")
+    add("-consoleLog")
+    add("-workflowDir=${workflowPath.absolutePathString()}")
+    addAll(inputOptions)
+    addAll(outputOptions)
+  }
+
+  /**
+   * Resolves `{knimeWorkflowRootDir}/{workflowRunId}/{nodeId}` and rejects (non-retriable) ids that would
+   * resolve outside [knimeWorkflowRootDir], e.g. a node id containing `../`.
+   */
+  fun resolveWorkflowDir(workflowRunId: String, nodeId: String): File {
+    val root = File(knimeWorkflowRootDir).canonicalFile
+    val workflowDir = File(File(root, workflowRunId), nodeId).canonicalFile
+    if (workflowDir == root || !workflowDir.toPath().startsWith(root.toPath())) {
+      throw NodeRuntimeException(
+        isRetriable = false,
+        workflowId = workflowRunId,
+        nodeId = nodeId,
+        message = "Node id '$nodeId' resolves outside the KNIME workflow root directory"
+      )
+    }
+    return workflowDir
+  }
+
+  @Deprecated(
+    "Returns the options as one space-joined string, which is not safe to pass to a shell. " +
+      "Use prepareWorkflowInputOptions and pass each element as a separate process argument.",
+    ReplaceWith("prepareWorkflowInputOptions(workflowPath, inputs)")
+  )
   fun prepareWorkflowInputs(
     workflowPath: Path,
     inputs: Map<String, NodeInputReader>
-  ): String {
+  ): String = prepareWorkflowInputOptions(workflowPath, inputs).joinToString(" ")
+
+  /** Writes each input port's table to `{portId}.json` and returns one KNIME `-option=...` argument per port. */
+  fun prepareWorkflowInputOptions(
+    workflowPath: Path,
+    inputs: Map<String, NodeInputReader>
+  ): List<String> {
     // Prepare the inputs for the workflow
 
     return inputPorts.keys.mapIndexed { index, portId ->
@@ -181,7 +218,7 @@ abstract class KnimeNodeModel : ProcessNodeModel() {
       inputFile.toFile().writeText(knimeInputsTableJson)
 
       "-option=${index},inputPathOrUrl,${inputFile.toFile().absolutePath},String"
-    }.joinToString(" \\\\n")
+    }
   }
 
   fun renderKnimeWorkflow(

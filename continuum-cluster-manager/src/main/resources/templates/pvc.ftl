@@ -12,7 +12,7 @@ spec:
     - ReadWriteOnce
   resources:
     requests:
-      storage: ${storageSize}
+      storage: "${storageSize?json_string}"
 <#if storageClassName?has_content>
-  storageClassName: ${storageClassName}
+  storageClassName: "${storageClassName?json_string}"
 </#if>

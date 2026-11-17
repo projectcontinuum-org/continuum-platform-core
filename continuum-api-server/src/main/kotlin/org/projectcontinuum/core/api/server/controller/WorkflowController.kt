@@ -28,25 +28,33 @@ class WorkflowController(
   }
 
   @GetMapping("/active")
-  fun getActiveWorkflows(): List<String> {
-    return workflowService.getActiveWorkflows().map { it.workflowId }
+  fun getActiveWorkflows(
+    @RequestHeader("x-continuum-user-id", required = false, defaultValue = "anonymous") ownedBy: String
+  ): List<String> {
+    return workflowService.getActiveWorkflows(ownedBy).map { it.workflowId }
   }
 
   @GetMapping("/{workflowId}/status")
   fun getWorkflowStatusById(
+    @RequestHeader("x-continuum-user-id", required = false, defaultValue = "anonymous") ownedBy: String,
     @PathVariable
     workflowId: String
-  ): WorkflowStatus {
-    return workflowService.getWorkflowStatusById(workflowId)
+  ): ResponseEntity<WorkflowStatus> {
+    return try {
+      ResponseEntity.ok(workflowService.getWorkflowStatusById(ownedBy, workflowId))
+    } catch (e: WorkflowNotFoundException) {
+      ResponseEntity.notFound().build()
+    }
   }
 
   @PostMapping("/{workflowId}/cancel")
   fun cancelWorkflow(
+    @RequestHeader("x-continuum-user-id", required = false, defaultValue = "anonymous") ownedBy: String,
     @PathVariable workflowId: String,
     @RequestParam(required = false) reason: String?
   ): ResponseEntity<Void> {
     return try {
-      workflowService.cancelWorkflow(workflowId, reason)
+      workflowService.cancelWorkflow(ownedBy, workflowId, reason)
       ResponseEntity.noContent().build()
     } catch (e: WorkflowNotFoundException) {
       ResponseEntity.notFound().build()
@@ -55,37 +63,44 @@ class WorkflowController(
 
   @PostMapping("/{workflowId}/terminate")
   fun terminateWorkflow(
+    @RequestHeader("x-continuum-user-id", required = false, defaultValue = "anonymous") ownedBy: String,
     @PathVariable workflowId: String,
     @RequestParam(required = false) reason: String?
   ): ResponseEntity<Void> {
     return try {
-      workflowService.terminateWorkflow(workflowId, reason)
+      workflowService.terminateWorkflow(ownedBy, workflowId, reason)
       ResponseEntity.noContent().build()
     } catch (e: WorkflowNotFoundException) {
       ResponseEntity.notFound().build()
     }
   }
 
+  /**
+   * `query` is an optional Temporal visibility filter. It is validated (400 if it could escape its
+   * parentheses) and AND-combined with the caller's owner filter, so it can only narrow the result.
+   */
   @GetMapping("/list")
   fun listWorkflow(
+    @RequestHeader("x-continuum-user-id", required = false, defaultValue = "anonymous") ownedBy: String,
     @RequestParam(
       required = false,
       defaultValue = ""
     )
     query: String
   ): List<WorkflowStatus> {
-    return workflowService.listAllWorkflow(query)
+    return workflowService.listAllWorkflow(ownedBy, query)
   }
 
   @GetMapping("/count")
   fun countWorkflow(
+    @RequestHeader("x-continuum-user-id", required = false, defaultValue = "anonymous") ownedBy: String,
     @RequestParam(
       required = false,
       defaultValue = ""
     )
     query: String
   ): CountWorkflowResponse {
-    val response = workflowService.countWorkflow(query)
+    val response = workflowService.countWorkflow(ownedBy, query)
     return CountWorkflowResponse(
       count = response.count.toInt(),
       groups = response.groupsList.map {
@@ -99,6 +114,7 @@ class WorkflowController(
 
   @GetMapping("/tree")
   fun getWorkflowTree(
+    @RequestHeader("x-continuum-user-id", required = false, defaultValue = "anonymous") ownedBy: String,
     @RequestParam
     baseDir: String,
     @RequestParam(
@@ -107,7 +123,7 @@ class WorkflowController(
     )
     query: String
   ): List<TreeHelper.TreeItem<TreeHelper.Execution>> {
-    return workflowService.getWorkflowTree(baseDir, query)
+    return workflowService.getWorkflowTree(ownedBy, baseDir, query)
   }
 
 }

@@ -56,7 +56,7 @@ class ContinuumWorkflowTest {
     override fun close() = testEnv.close()
   }
 
-  private fun newEnv(dropOneNode: Boolean = false): Env {
+  private fun newEnv(dropOneNode: Boolean = false, initializeGate: CountDownLatch? = null): Env {
     val mapper = JacksonJsonPayloadConverter.newDefaultObjectMapper()
       .apply { registerModule(KotlinModule.Builder().build()) }
     val dataConverter = DefaultDataConverter.newDefaultInstance()
@@ -77,7 +77,7 @@ class ContinuumWorkflowTest {
     testEnv.newWorker(activityTaskQueue).registerActivitiesImplementations(fakeNodeActivity)
 
     testEnv.newWorker(TaskQueues.ACTIVITY_TASK_QUEUE_INITIALIZE)
-      .registerActivitiesImplementations(FakeInitializeActivity(activityTaskQueue, dropOneNode))
+      .registerActivitiesImplementations(FakeInitializeActivity(activityTaskQueue, dropOneNode, initializeGate))
 
     testEnv.start()
     return Env(testEnv, testEnv.workflowClient, fakeNodeActivity)
@@ -304,6 +304,46 @@ class ContinuumWorkflowTest {
       val executionException = assertFailsWith<ExecutionException> { future.get(10, TimeUnit.SECONDS) }
       val workflowFailed = executionException.cause as WorkflowFailedException
       assertTrue(workflowFailed.cause is CanceledFailure)
+    }
+  }
+
+  @Test
+  fun `cancelling signal sent before the workflow model is stored does not wedge the workflow`() {
+    // The API server sends notifyCancelling right after the start. If that lands while start() is still resolving
+    // task queues, currentRunningWorkflow is still null. The signal handler used to NPE (publishUpdate used `!!`),
+    // which fails the workflow TASK, not the workflow: Temporal retries it forever and the run stays RUNNING.
+    val gate = CountDownLatch(1)
+    newEnv(initializeGate = gate).use { env ->
+      env.fakeNodeActivity.successOutputs["1"] = mapOf("output-1" to samplePortData("ok"))
+      val model = WorkflowFixtures.loadWorkflow("/test-workflows/single-node.cwf.json")
+      val (stub, future) = startWorkflow(env, model)
+
+      // Give the workflow time to reach the held initialize activity, then signal while it is parked there.
+      Thread.sleep(500)
+      stub.notifyCancelling("cancelled right after start")
+      gate.countDown()
+
+      // The cancel signal only pins the final status; it does not stop the workflow. The workflow must still
+      // run to completion instead of failing its workflow task on every retry.
+      val result = future.get(10, TimeUnit.SECONDS)
+      assertTrue(result.containsKey("1"))
+    }
+  }
+
+  @Test
+  fun `terminating signal sent before the workflow model is stored does not wedge the workflow`() {
+    val gate = CountDownLatch(1)
+    newEnv(initializeGate = gate).use { env ->
+      env.fakeNodeActivity.successOutputs["1"] = mapOf("output-1" to samplePortData("ok"))
+      val model = WorkflowFixtures.loadWorkflow("/test-workflows/single-node.cwf.json")
+      val (stub, future) = startWorkflow(env, model)
+
+      Thread.sleep(500)
+      stub.notifyTerminating("terminated right after start")
+      gate.countDown()
+
+      val result = future.get(10, TimeUnit.SECONDS)
+      assertTrue(result.containsKey("1"))
     }
   }
 

@@ -8,6 +8,8 @@ import org.springframework.http.HttpHeaders
 import org.springframework.http.HttpMethod
 import org.springframework.stereotype.Component
 import org.springframework.web.client.RestTemplate
+import org.springframework.web.util.UriComponentsBuilder
+import java.net.URI
 import tools.jackson.core.type.TypeReference
 import tools.jackson.module.kotlin.jacksonObjectMapper
 
@@ -32,6 +34,19 @@ class CredentialFetcherService(
   }
 
   /**
+   * Builds `{credentialsServerBaseUrl}/api/v1/credentials/{name}` with [name] encoded as a single path segment,
+   * so `/`, `..`, `?`, `#`, `%` and whitespace in a credential name cannot change the request path or query.
+   * Returned as a [URI] so RestTemplate's `exchange(URI, ...)` overload sends it as-is (the String overload would
+   * re-expand `{...}` templates and double-encode `%`).
+   */
+  internal fun credentialUri(name: String): URI =
+    UriComponentsBuilder.fromUriString(credentialsServerBaseUrl)
+      .pathSegment("api", "v1", "credentials", name)
+      .build()
+      .encode()
+      .toUri()
+
+  /**
    * Fetches a single credential from the Credentials Server by name.
    *
    * Note: RestTemplate throws on non-2xx responses by default, so we only
@@ -42,8 +57,14 @@ class CredentialFetcherService(
    * @return The credential's data map (key-value pairs), or null if the fetch fails
    */
   fun fetch(name: String, ownerId: String): Map<String, Any>? {
+    // "." and ".." survive path-segment encoding (dots are unreserved) and would be normalized by the server
+    // into a different path, so they can never name a credential.
+    if (name.isBlank() || name == "." || name == "..") {
+      LOGGER.warn("Refusing to fetch credential with invalid name '{}'", name)
+      return null
+    }
     return try {
-      val url = "$credentialsServerBaseUrl/api/v1/credentials/$name"
+      val url = credentialUri(name)
 
       val headers = HttpHeaders()
       headers.set("x-continuum-user-id", ownerId)

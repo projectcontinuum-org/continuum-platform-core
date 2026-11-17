@@ -10,7 +10,7 @@ class OpenApiConfig {
   @Bean
   fun relativeServerCustomizer() = OpenApiCustomizer { openApi ->
     // Use a relative server URL so Swagger UI resolves API calls correctly
-    // whether accessed directly or through the cloud-gateway reverse proxy.
+    // whether accessed directly or through a reverse proxy / ingress path prefix.
     openApi.servers = listOf(Server().apply { url = "../" })
   }
 }

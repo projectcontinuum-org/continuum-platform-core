@@ -1,5 +1,9 @@
 package org.projectcontinuum.core.cluster.manager.service
 
+import freemarker.cache.ClassTemplateLoader
+import freemarker.cache.MultiTemplateLoader
+import freemarker.cache.StringTemplateLoader
+import freemarker.cache.TemplateLoader
 import freemarker.template.Configuration
 import io.fabric8.kubernetes.api.model.apps.DeploymentBuilder
 import io.fabric8.kubernetes.api.model.apps.DeploymentStatusBuilder
@@ -57,7 +61,8 @@ class WorkbenchServiceTest {
 
     workbenchProperties = WorkbenchProperties(
       defaultImage = "projectcontinuum/continuum-workbench:latest",
-      namespace = "default"
+      namespace = "default",
+      allowedImagePrefixes = listOf("projectcontinuum/continuum-workbench", "theiaide/theia")
     )
 
     val overlayService = OverlayService(OverlayProperties(enabled = false), freemarkerCfg)
@@ -1059,5 +1064,259 @@ class WorkbenchServiceTest {
       .withLabel("instance-id", response.instanceId.toString()).list().items
     assertEquals(1, ingresses.size)
     assertEquals("user-freemarker", ingresses[0].metadata.annotations?.get("owner"))
+  }
+
+  // ── Manifest injection regression tests ───────────────────────────────
+
+  private val secretInjection = "1Gi\n---\napiVersion: v1\nkind: Secret\nmetadata:\n  name: injected\n  namespace: default\nstringData:\n  pwned: \"true\""
+
+  private fun assertNothingCreatedFor(userId: String, instanceName: String) {
+    assertNull(repository.findByUserIdAndInstanceName(userId, instanceName))
+    assertTrue(client.secrets().inNamespace("default").list().items.isEmpty(), "no Secret may be created")
+    assertTrue(client.apps().deployments().inNamespace("default").list().items.isEmpty())
+    assertTrue(client.persistentVolumeClaims().inNamespace("default").list().items.isEmpty())
+    assertTrue(client.services().inNamespace("default").list().items.isEmpty())
+    assertTrue(client.network().v1().ingresses().inNamespace("default").list().items.isEmpty())
+  }
+
+  @Test
+  fun `createWorkbench rejects memoryLimit with injected Secret document`() {
+    val ex = assertThrows<IllegalArgumentException> {
+      service.createWorkbench("user-1", WorkbenchCreateRequest(
+        instanceName = "inject-mem", resources = ResourceSpec(memoryLimit = secretInjection)
+      ))
+    }
+    assertTrue(ex.message!!.contains("memoryLimit"))
+    assertNothingCreatedFor("user-1", "inject-mem")
+  }
+
+  @Test
+  fun `createWorkbench rejects storageSize with injected Secret document`() {
+    assertThrows<IllegalArgumentException> {
+      service.createWorkbench("user-1", WorkbenchCreateRequest(
+        instanceName = "inject-storage", resources = ResourceSpec(storageSize = secretInjection)
+      ))
+    }
+    assertNothingCreatedFor("user-1", "inject-storage")
+  }
+
+  @Test
+  fun `createWorkbench rejects quantity with injected YAML field`() {
+    for (field in listOf("cpuRequest", "cpuLimit", "memoryRequest", "memoryLimit", "storageSize")) {
+      val hostile = "1Gi\n  x: y"
+      val resources = when (field) {
+        "cpuRequest" -> ResourceSpec(cpuRequest = hostile)
+        "cpuLimit" -> ResourceSpec(cpuLimit = hostile)
+        "memoryRequest" -> ResourceSpec(memoryRequest = hostile)
+        "memoryLimit" -> ResourceSpec(memoryLimit = hostile)
+        else -> ResourceSpec(storageSize = hostile)
+      }
+      val ex = assertThrows<IllegalArgumentException> {
+        service.createWorkbench("user-1", WorkbenchCreateRequest(instanceName = "inject-$field".lowercase(), resources = resources))
+      }
+      assertTrue(ex.message!!.contains(field), "message should name $field: ${ex.message}")
+    }
+    assertNothingCreatedFor("user-1", "inject-cpurequest")
+  }
+
+  @Test
+  fun `createWorkbench rejects path-like storageClassName`() {
+    assertThrows<IllegalArgumentException> {
+      service.createWorkbench("user-1", WorkbenchCreateRequest(
+        instanceName = "inject-sc", resources = ResourceSpec(storageClassName = "../../etc")
+      ))
+    }
+    assertThrows<IllegalArgumentException> {
+      service.createWorkbench("user-1", WorkbenchCreateRequest(
+        instanceName = "inject-sc", resources = ResourceSpec(storageClassName = "fast\n---\nkind: Secret")
+      ))
+    }
+    assertNothingCreatedFor("user-1", "inject-sc")
+  }
+
+  @Test
+  fun `createWorkbench rejects image with spaces or newlines`() {
+    assertThrows<IllegalArgumentException> {
+      service.createWorkbench("user-1", WorkbenchCreateRequest(instanceName = "inject-img", image = "theiaide/theia:latest evil"))
+    }
+    assertThrows<IllegalArgumentException> {
+      service.createWorkbench("user-1", WorkbenchCreateRequest(instanceName = "inject-img", image = "theiaide/theia:latest\n---\napiVersion: v1\nkind: Secret"))
+    }
+    assertNothingCreatedFor("user-1", "inject-img")
+  }
+
+  @Test
+  fun `createWorkbench rejects image outside allowed prefixes`() {
+    val ex = assertThrows<IllegalArgumentException> {
+      service.createWorkbench("user-1", WorkbenchCreateRequest(instanceName = "evil-img", image = "evil.example.com/miner:latest"))
+    }
+    assertTrue(ex.message!!.contains("not allowed"))
+    assertNothingCreatedFor("user-1", "evil-img")
+  }
+
+  @Test
+  fun `createWorkbench allows any valid image when allow-list is empty`() {
+    val permissive = WorkbenchService(
+      repository, client, freemarkerCfg, transactionTemplate,
+      workbenchProperties.copy(allowedImagePrefixes = emptyList()),
+      OverlayService(OverlayProperties(enabled = false), freemarkerCfg)
+    )
+    val response = permissive.createWorkbench("user-1", WorkbenchCreateRequest(instanceName = "any-img", image = "ghcr.io/acme/wb:1.0"))
+    assertEquals("ghcr.io/acme/wb:1.0", response.image)
+  }
+
+  @Test
+  fun `createWorkbench rejects userId with line breaks`() {
+    assertThrows<IllegalArgumentException> {
+      service.createWorkbench("user\n---\nkind: Secret", WorkbenchCreateRequest(instanceName = "inject-user"))
+    }
+    assertTrue(client.secrets().inNamespace("default").list().items.isEmpty())
+  }
+
+  @Test
+  fun `service refuses to start with an invalid imagePullPolicy`() {
+    assertThrows<IllegalArgumentException> {
+      WorkbenchService(
+        repository, client, freemarkerCfg, transactionTemplate,
+        workbenchProperties.copy(imagePullPolicy = "Sometimes"),
+        OverlayService(OverlayProperties(enabled = false), freemarkerCfg)
+      )
+    }
+  }
+
+  @Test
+  fun `updateWorkbench rejects hostile values and leaves existing resources untouched`() {
+    val created = service.createWorkbench("user-1", WorkbenchCreateRequest(instanceName = "upd-inject"))
+    val deploymentName = "wb-${created.instanceId}-deployment"
+
+    assertThrows<IllegalArgumentException> {
+      service.updateWorkbench("user-1", "upd-inject", WorkbenchUpdateRequest(resources = ResourceSpec(memoryLimit = secretInjection)))
+    }
+    assertThrows<IllegalArgumentException> {
+      service.updateWorkbench("user-1", "upd-inject", WorkbenchUpdateRequest(image = "theiaide/theia:x y"))
+    }
+    assertThrows<IllegalArgumentException> {
+      service.updateWorkbench("user-1", "upd-inject", WorkbenchUpdateRequest(image = "evil/miner:latest"))
+    }
+
+    assertTrue(client.secrets().inNamespace("default").list().items.isEmpty())
+    val deployment = client.apps().deployments().inNamespace("default").withName(deploymentName).get()
+    assertEquals("1Gi", deployment.spec.template.spec.containers[0].resources.limits["memory"]!!.toString())
+    assertEquals(created.image, deployment.spec.template.spec.containers[0].image)
+    assertEquals("1Gi", repository.findById(created.instanceId).get().memoryLimit)
+  }
+
+  @Test
+  fun `resumeWorkbench refuses a stored entity with a hostile value`() {
+    val entity = createSampleEntity(instanceName = "legacy-wb", status = WorkbenchStatus.SUSPENDED.name)
+      .copy(memoryLimit = "1Gi\n---\napiVersion: v1\nkind: Secret") // fits VARCHAR(50)
+    repository.save(entity)
+
+    assertThrows<IllegalArgumentException> { service.resumeWorkbench("user-1", "legacy-wb") }
+
+    assertTrue(client.secrets().inNamespace("default").list().items.isEmpty())
+    assertTrue(client.apps().deployments().inNamespace("default").list().items.isEmpty())
+  }
+
+  @Test
+  fun `createWorkbench with valid values renders expected manifest`() {
+    val response = service.createWorkbench("user-1", WorkbenchCreateRequest(
+      instanceName = "normal-wb",
+      image = "projectcontinuum/continuum-workbench:0.0.5",
+      resources = ResourceSpec(cpuRequest = "250m", cpuLimit = "1", memoryRequest = "256Mi", memoryLimit = "2Gi",
+        storageSize = "10Gi", storageClassName = "fast-ssd")
+    ))
+
+    val deployment = client.apps().deployments().inNamespace("default").withName("wb-${response.instanceId}-deployment").get()
+    val container = deployment.spec.template.spec.containers.single()
+    assertEquals("projectcontinuum/continuum-workbench:0.0.5", container.image)
+    assertEquals("IfNotPresent", container.imagePullPolicy)
+    assertEquals("250m", container.resources.requests["cpu"]!!.toString())
+    assertEquals("2Gi", container.resources.limits["memory"]!!.toString())
+
+    val pvc = client.persistentVolumeClaims().inNamespace("default").withName("wb-${response.instanceId}-pvc").get()
+    assertEquals("10Gi", pvc.spec.resources.requests["storage"]!!.toString())
+    assertEquals("fast-ssd", pvc.spec.storageClassName)
+    assertTrue(client.secrets().inNamespace("default").list().items.isEmpty())
+  }
+
+  // ── Defence in depth: rendered-manifest verification ──────────────────
+
+  private fun serviceWithTemplateOverride(templateName: String, content: String, overlayService: OverlayService? = null): WorkbenchService {
+    val overrides = StringTemplateLoader().apply { putTemplate(templateName, content) }
+    val cfg = Configuration(Configuration.VERSION_2_3_34)
+    cfg.templateLoader = MultiTemplateLoader(arrayOf<TemplateLoader>(overrides, ClassTemplateLoader(this::class.java.classLoader, "/templates")))
+    cfg.defaultEncoding = "UTF-8"
+    return WorkbenchService(
+      repository, client, cfg, transactionTemplate, workbenchProperties,
+      overlayService ?: OverlayService(OverlayProperties(enabled = false), cfg)
+    )
+  }
+
+  @Test
+  fun `applyYaml refuses a template that renders an extra resource`() {
+    val baseDeployment = this::class.java.classLoader.getResource("templates/deployment.ftl")!!.readText()
+    val hostile = serviceWithTemplateOverride(
+      "deployment.ftl",
+      baseDeployment + "\n---\napiVersion: v1\nkind: Secret\nmetadata:\n  name: injected\n  namespace: default\nstringData:\n  a: b\n"
+    )
+
+    val ex = assertThrows<IllegalStateException> {
+      hostile.createWorkbench("user-1", WorkbenchCreateRequest(instanceName = "multi-doc"))
+    }
+    assertTrue(ex.message!!.contains("expected exactly 1 resource"))
+    assertNothingCreatedFor("user-1", "multi-doc") // PVC created first is rolled back
+  }
+
+  @Test
+  fun `applyYaml refuses a resource with an unexpected name or namespace`() {
+    val basePvc = this::class.java.classLoader.getResource("templates/pvc.ftl")!!.readText()
+    val renamed = serviceWithTemplateOverride("pvc.ftl", basePvc.replace("name: wb-\${instanceId}-pvc", "name: someone-elses-pvc"))
+    assertThrows<IllegalStateException> { renamed.createWorkbench("user-1", WorkbenchCreateRequest(instanceName = "renamed")) }
+
+    val otherNs = serviceWithTemplateOverride("pvc.ftl", basePvc.replace("namespace: \${namespace}", "namespace: kube-system"))
+    assertThrows<IllegalStateException> { otherNs.createWorkbench("user-1", WorkbenchCreateRequest(instanceName = "other-ns")) }
+
+    assertTrue(client.persistentVolumeClaims().inAnyNamespace().list().items.isEmpty())
+  }
+
+  @Test
+  fun `applyYaml refuses an overlay that changes the resource kind`(@TempDir overlayDir: java.nio.file.Path) {
+    java.nio.file.Files.writeString(overlayDir.resolve("evil--service.yaml"), "kind: Secret\nstringData:\n  a: b")
+    val overlayService = OverlayService(OverlayProperties(enabled = true, path = overlayDir.toString()), freemarkerCfg)
+    val overlayEnabledService = WorkbenchService(repository, client, freemarkerCfg, transactionTemplate, workbenchProperties, overlayService)
+
+    val ex = assertThrows<IllegalStateException> {
+      overlayEnabledService.createWorkbench("user-1", WorkbenchCreateRequest(instanceName = "kind-swap", variant = "evil"))
+    }
+    assertTrue(ex.message!!.contains("Service"))
+    assertNothingCreatedFor("user-1", "kind-swap")
+  }
+
+  // ── Variant validation ────────────────────────────────────────────────
+
+  @Test
+  fun `createWorkbench rejects unknown or path-traversal variants when overlays are enabled`(@TempDir overlayDir: java.nio.file.Path) {
+    java.nio.file.Files.writeString(overlayDir.resolve("gpu--deployment.yaml"), "metadata:\n  annotations:\n    a: b")
+    val overlayService = OverlayService(OverlayProperties(enabled = true, path = overlayDir.toString()), freemarkerCfg)
+    val overlayEnabledService = WorkbenchService(repository, client, freemarkerCfg, transactionTemplate, workbenchProperties, overlayService)
+
+    for (variant in listOf("cpu", "../../etc/passwd", "../gpu", "gpu/../gpu", "gpu\n---", "")) {
+      assertThrows<IllegalArgumentException>("variant '$variant' must be rejected") {
+        overlayEnabledService.createWorkbench("user-1", WorkbenchCreateRequest(instanceName = "bad-variant", variant = variant))
+      }
+    }
+    assertNothingCreatedFor("user-1", "bad-variant")
+
+    val ok = overlayEnabledService.createWorkbench("user-1", WorkbenchCreateRequest(instanceName = "good-variant", variant = "gpu"))
+    assertEquals("gpu", ok.overlayVariant)
+  }
+
+  @Test
+  fun `createWorkbench rejects path-traversal variant even when overlays are disabled`() {
+    assertThrows<IllegalArgumentException> {
+      service.createWorkbench("user-1", WorkbenchCreateRequest(instanceName = "trav-variant", variant = "../../etc"))
+    }
+    assertNothingCreatedFor("user-1", "trav-variant")
   }
 }
