@@ -35,7 +35,7 @@ abstract class TriggerNodeModel : ContinuumNodeModel {
     node: ContinuumWorkflowModel.Node,
     nodeOutputWriter: NodeOutputWriter
   ) {
-    node.validatePropertiesOrFail()
+    validatePropertiesOrFail(node)
     return execute(
       node.data.properties,
       nodeOutputWriter

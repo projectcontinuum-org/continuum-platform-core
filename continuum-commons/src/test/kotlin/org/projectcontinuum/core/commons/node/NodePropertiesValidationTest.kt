@@ -98,6 +98,22 @@ class NodePropertiesValidationTest {
   }
 
   @Test
+  fun `the node's own schema is used, not the propertiesSchema sent with the workflow`() {
+    val process = RecordingProcessNode(metadata("Process"))
+    val trigger = RecordingTriggerNode(metadata("Trigger"))
+    // A client that blanks the schema in the workflow must not skip validation.
+    fun spoofed(data: ContinuumWorkflowModel.NodeData) =
+      workflowNode(data, mapOf("count" to "many")).let { it.copy(data = it.data.copy(propertiesSchema = emptyMap())) }
+
+    assertThrows<NodeRuntimeException> {
+      process.run(spoofed(process.metadata), emptyMap(), NodeOutputWriter(tempDir), noProgress, ExecutionContext.EMPTY)
+    }
+    assertThrows<NodeRuntimeException> { trigger.run(spoofed(trigger.metadata), NodeOutputWriter(tempDir)) }
+    assertFalse(process.executed)
+    assertFalse(trigger.executed)
+  }
+
+  @Test
   fun `process node with valid properties executes`() {
     val node = RecordingProcessNode(metadata("Process"))
 

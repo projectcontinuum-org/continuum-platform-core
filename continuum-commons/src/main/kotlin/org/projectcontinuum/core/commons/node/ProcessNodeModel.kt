@@ -55,7 +55,7 @@ abstract class ProcessNodeModel : ContinuumNodeModel {
     nodeProgressCallback: NodeProgressCallback,
     executionContext: ExecutionContext
   ) {
-    node.validatePropertiesOrFail()
+    validatePropertiesOrFail(node)
 
     execute(
       node.data.properties,

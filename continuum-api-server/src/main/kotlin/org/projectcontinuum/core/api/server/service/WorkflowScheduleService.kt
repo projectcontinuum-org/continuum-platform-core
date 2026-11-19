@@ -15,7 +15,6 @@ import org.projectcontinuum.core.api.server.exception.WorkflowScheduleNotFoundEx
 import org.projectcontinuum.core.api.server.model.CreateWorkflowScheduleRequest
 import org.projectcontinuum.core.api.server.model.WorkflowScheduleResponse
 import org.projectcontinuum.core.api.server.repository.jpa.WorkflowScheduleRepository
-import org.projectcontinuum.core.api.server.utils.WorkflowPropertiesValidator
 import org.projectcontinuum.core.commons.constant.TaskQueues
 import org.projectcontinuum.core.commons.context.ContinuumOwnerContext
 import org.projectcontinuum.core.commons.context.ContinuumScheduleContext
@@ -28,11 +27,12 @@ import java.util.UUID
 @Service
 class WorkflowScheduleService(
   private val scheduleClient: ScheduleClient,
-  private val workflowScheduleRepository: WorkflowScheduleRepository
+  private val workflowScheduleRepository: WorkflowScheduleRepository,
+  private val workflowPropertiesValidator: WorkflowPropertiesValidator
 ) {
 
   fun createSchedule(request: CreateWorkflowScheduleRequest, ownedBy: String): WorkflowScheduleResponse {
-    WorkflowPropertiesValidator.requireValidProperties(request.continuumWorkflowModel)
+    workflowPropertiesValidator.requireValidProperties(request.continuumWorkflowModel)
 
     val scheduleId = UUID.randomUUID()
 

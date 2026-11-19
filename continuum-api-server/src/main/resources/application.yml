@@ -12,6 +12,14 @@ spring:
     hibernate:
       ddl-auto: none
     open-in-view: false
+  # Spring cache (Caffeine). REGISTERED_NODES: node registry rows by node id (NodeTreeEntryRepository.findByNodeId),
+  # used by property validation, node docs and the MCP tools. Keep expireAfterWrite short: it is how long a
+  # re-registered node can lag behind (the message-bridge writes the registry, so nothing evicts here).
+  cache:
+    type: caffeine
+    cache-names: REGISTERED_NODES
+    caffeine:
+      spec: ${CONTINUUM_NODE_REGISTRY_CACHE_SPEC:maximumSize=10000,expireAfterWrite=30s}
 temporal:
   connection:
     target: ${TEMPORAL_SERVER_ADDRESS:localhost:7233}

@@ -160,4 +160,12 @@ class ContinuumNodeActivityValidationTest {
 
     assertFailedOnce(output)
   }
+
+  @Test
+  fun `an empty schema sent with the workflow does not skip the node's own validation`() {
+    val spoofed = workflowNode(trigger.metadata.copy(propertiesSchema = emptyMap()), mapOf("count" to "many"))
+
+    assertFailedOnce(runActivity(spoofed))
+    assertEquals(0, trigger.executions.get())
+  }
 }

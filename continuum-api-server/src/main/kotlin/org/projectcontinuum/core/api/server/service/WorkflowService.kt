@@ -5,7 +5,6 @@ import org.projectcontinuum.core.api.server.repository.jpa.WorkflowRunRepository
 import org.projectcontinuum.core.api.server.entity.jpa.WorkflowRunEntity
 import org.projectcontinuum.core.api.server.utils.TemporalVisibilityQuery
 import org.projectcontinuum.core.api.server.utils.TreeHelper
-import org.projectcontinuum.core.api.server.utils.WorkflowPropertiesValidator
 import org.projectcontinuum.core.commons.constant.TaskQueues
 import org.projectcontinuum.core.commons.model.ContinuumWorkflowModel
 import org.projectcontinuum.core.commons.model.ExecutionStatus
@@ -42,7 +41,8 @@ import java.util.UUID
 class WorkflowService(
   val workflowClient: WorkflowClient,
   val workflowRunRepository: WorkflowRunRepository,
-  val objectMapper: ObjectMapper
+  val objectMapper: ObjectMapper,
+  private val workflowPropertiesValidator: WorkflowPropertiesValidator
 ) {
 
   companion object {
@@ -59,8 +59,8 @@ class WorkflowService(
     ownedBy: String
   ): String {
 
-    // Invalid node properties are a 400 (InvalidRequestException), before any row or Temporal workflow exists.
-    WorkflowPropertiesValidator.requireValidProperties(continuumWorkflowModel)
+    // Invalid node properties (checked against the registry's schema) are a 400, before any row or Temporal workflow exists.
+    workflowPropertiesValidator.requireValidProperties(continuumWorkflowModel)
 
     val workflowId = UUID.randomUUID().toString()
 

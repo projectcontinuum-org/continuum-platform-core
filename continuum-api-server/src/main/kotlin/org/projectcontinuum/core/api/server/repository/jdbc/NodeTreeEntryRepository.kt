@@ -1,6 +1,8 @@
 package org.projectcontinuum.core.api.server.repository.jdbc
 
+import org.projectcontinuum.core.api.server.config.CacheConfig
 import org.projectcontinuum.core.api.server.entity.NodeTreeEntryEntity
+import org.springframework.cache.annotation.Cacheable
 import org.springframework.data.jdbc.repository.query.Query
 import org.springframework.data.repository.CrudRepository
 
@@ -37,6 +39,13 @@ interface NodeTreeEntryRepository : CrudRepository<NodeTreeEntryEntity, Long> {
   """)
   fun searchNodes(pattern: String): List<NodeTreeEntryEntity>
 
+  /**
+   * Cached in [CacheConfig.REGISTERED_NODES] (`spring.cache.caffeine.spec`, 30 s after write by default); a miss is
+   * cached as null too. Rows are written by `continuum-message-bridge` (another process), so there is nothing to evict
+   * on here: a re-registered node is seen once its entry expires. Backs `NodeExplorerService.getNodeMetadata` and
+   * `getDocumentation`, i.e. workflow property validation, the node documentation endpoints and the MCP tools.
+   */
+  @Cacheable(CacheConfig.REGISTERED_NODES)
   @Query("""
     SELECT * FROM node_tree_entries
     WHERE type = 'CONTINUUM_NODE' AND node_id = :nodeId

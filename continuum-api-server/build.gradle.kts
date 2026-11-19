@@ -63,6 +63,10 @@ dependencies {
     implementation("software.amazon.awssdk.crt:aws-crt:0.33.10")
     implementation("software.amazon.awssdk:s3-transfer-manager")
 
+    // Spring cache abstraction + Caffeine: short-lived cache of node registry schemas (versions from the Spring Boot BOM)
+    implementation("org.springframework.boot:spring-boot-starter-cache")
+    implementation("com.github.ben-manes.caffeine:caffeine")
+
     // Test dependencies
     testImplementation("org.springframework.boot:spring-boot-starter-test")
     testImplementation("org.springframework.boot:spring-boot-starter-webmvc-test")

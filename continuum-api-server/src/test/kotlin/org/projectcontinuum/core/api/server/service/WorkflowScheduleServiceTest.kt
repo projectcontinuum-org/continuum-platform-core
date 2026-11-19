@@ -36,6 +36,7 @@ class WorkflowScheduleServiceTest {
 
   private lateinit var scheduleClient: ScheduleClient
   private lateinit var workflowScheduleRepository: WorkflowScheduleRepository
+  private lateinit var nodeExplorerService: NodeExplorerService
   private lateinit var service: WorkflowScheduleService
 
   private val ownedBy = "alice"
@@ -44,7 +45,8 @@ class WorkflowScheduleServiceTest {
   fun setUp() {
     scheduleClient = mock()
     workflowScheduleRepository = mock()
-    service = WorkflowScheduleService(scheduleClient, workflowScheduleRepository)
+    nodeExplorerService = mock()
+    service = WorkflowScheduleService(scheduleClient, workflowScheduleRepository, WorkflowPropertiesValidator(nodeExplorerService))
   }
 
   private fun workflowModel(): ContinuumWorkflowModel =
@@ -106,6 +108,14 @@ class WorkflowScheduleServiceTest {
 
   @Test
   fun `createSchedule with an invalid node throws before any Temporal or DB interaction`() {
+    val registeredSchema = mapOf(
+      "type" to "object",
+      "properties" to mapOf("foo" to mapOf("type" to "integer")),
+      "required" to listOf("foo")
+    )
+    whenever(nodeExplorerService.getNodeMetadata("org.test.Bad")).thenReturn(
+      ContinuumWorkflowModel.NodeData(title = "Bad", description = "", nodeModel = "org.test.Bad", propertiesSchema = registeredSchema)
+    )
     val badNode = ContinuumWorkflowModel.Node(
       id = "n1",
       type = "process",
@@ -118,11 +128,8 @@ class WorkflowScheduleServiceTest {
         description = "",
         nodeModel = "org.test.Bad",
         properties = mapOf("foo" to "not-a-number"),
-        propertiesSchema = mapOf(
-          "type" to "object",
-          "properties" to mapOf("foo" to mapOf("type" to "integer")),
-          "required" to listOf("foo")
-        )
+        // The client blanks the schema; the registered one still applies.
+        propertiesSchema = emptyMap()
       )
     )
     val model = ContinuumWorkflowModel(id = "wf-1", name = "Bad Workflow", nodes = listOf(badNode), edges = emptyList())

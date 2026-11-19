@@ -44,6 +44,7 @@ class WorkflowServiceTest {
   private lateinit var workflowClient: WorkflowClient
   private lateinit var blockingStub: WorkflowServiceGrpc.WorkflowServiceBlockingStub
   private lateinit var workflowRunRepository: WorkflowRunRepository
+  private lateinit var nodeExplorerService: NodeExplorerService
   private lateinit var service: WorkflowService
 
   @BeforeEach
@@ -56,7 +57,10 @@ class WorkflowServiceTest {
     whenever(stubs.blockingStub()).thenReturn(blockingStub)
     whenever(blockingStub.listWorkflowExecutions(any())).thenReturn(ListWorkflowExecutionsResponse.getDefaultInstance())
     workflowRunRepository = mock()
-    service = WorkflowService(workflowClient, workflowRunRepository, JsonMapper.builder().build())
+    nodeExplorerService = mock()
+    service = WorkflowService(
+      workflowClient, workflowRunRepository, JsonMapper.builder().build(), WorkflowPropertiesValidator(nodeExplorerService)
+    )
   }
 
   private fun sentListQueries(times: Int = 1): List<String> {
@@ -324,9 +328,27 @@ class WorkflowServiceTest {
     verify(workflowRunRepository, never()).updateRunId(any(), any())
   }
 
-  // --- startWorkflow: node properties are validated before anything is stored or started ---
+  // --- startWorkflow: node properties are validated against the registry before anything is stored or started ---
 
-  private fun nodeWith(id: String, properties: Map<String, Any>) = ContinuumWorkflowModel.Node(
+  private val registeredSchema = mapOf(
+    "type" to "object",
+    "properties" to mapOf("width" to mapOf("type" to "integer")),
+    "required" to listOf("width")
+  )
+
+  private fun registerTypedNode() {
+    whenever(nodeExplorerService.getNodeMetadata("org.test.Typed")).thenReturn(
+      ContinuumWorkflowModel.NodeData(description = "", title = "Typed", nodeModel = "org.test.Typed", propertiesSchema = registeredSchema)
+    )
+  }
+
+  /** A node as a client sends it; [sentSchema] is what the client claims the schema is. */
+  private fun nodeWith(
+    id: String,
+    properties: Map<String, Any>,
+    nodeModel: String = "org.test.Typed",
+    sentSchema: Map<String, Any> = registeredSchema
+  ) = ContinuumWorkflowModel.Node(
     id = id,
     type = "default",
     position = ContinuumWorkflowModel.Position(0.0, 0.0),
@@ -336,35 +358,68 @@ class WorkflowServiceTest {
     data = ContinuumWorkflowModel.NodeData(
       description = "",
       title = "Typed",
-      nodeModel = "org.test.Typed",
+      nodeModel = nodeModel,
       properties = properties,
-      propertiesSchema = mapOf(
-        "type" to "object",
-        "properties" to mapOf("width" to mapOf("type" to "integer")),
-        "required" to listOf("width")
-      )
+      propertiesSchema = sentSchema
     )
   )
 
-  @Test
-  fun `start with invalid node properties is an InvalidRequestException and nothing is saved or started`() {
-    val workflow = emptyWorkflow.copy(nodes = listOf(nodeWith("ok", mapOf("width" to 1)), nodeWith("bad", mapOf("width" to "wide"))))
-
+  private fun assertRejectedBeforeStart(workflow: ContinuumWorkflowModel): InvalidRequestException {
     val e = assertThrows<InvalidRequestException> {
       withTemporalStart({ error("must not start") }) { service.startWorkflow(workflow, "alice") }
     }
+    verify(workflowRunRepository, never()).save(any<WorkflowRunEntity>())
+    return e
+  }
+
+  @Test
+  fun `start with invalid node properties is an InvalidRequestException and nothing is saved or started`() {
+    registerTypedNode()
+    val workflow = emptyWorkflow.copy(nodes = listOf(nodeWith("ok", mapOf("width" to 1)), nodeWith("bad", mapOf("width" to "wide"))))
+
+    val e = assertRejectedBeforeStart(workflow)
 
     assertTrue(e.message!!.contains("node 'bad'") && e.message!!.contains("/width"), e.message)
     assertTrue(!e.message!!.contains("node 'ok'"), e.message)
-    verify(workflowRunRepository, never()).save(any<WorkflowRunEntity>())
+  }
+
+  @Test
+  fun `a client-sent empty schema does not bypass validation`() {
+    registerTypedNode()
+    val workflow = emptyWorkflow.copy(nodes = listOf(nodeWith("bad", mapOf("width" to "wide"), sentSchema = emptyMap())))
+
+    val e = assertRejectedBeforeStart(workflow)
+
+    assertTrue(e.message!!.contains("node 'bad'") && e.message!!.contains("/width"), e.message)
+  }
+
+  @Test
+  fun `a client-sent schema cannot loosen the registered one`() {
+    registerTypedNode()
+    val loose = mapOf("type" to "object", "properties" to mapOf("width" to mapOf("type" to "string")))
+    val workflow = emptyWorkflow.copy(nodes = listOf(nodeWith("bad", mapOf("width" to "wide"), sentSchema = loose)))
+
+    assertRejectedBeforeStart(workflow)
+  }
+
+  @Test
+  fun `a node that is not in the registry is rejected`() {
+    val workflow = emptyWorkflow.copy(nodes = listOf(nodeWith("x", emptyMap(), nodeModel = "org.evil.Unknown", sentSchema = emptyMap())))
+
+    val e = assertRejectedBeforeStart(workflow)
+
+    assertTrue(e.message!!.contains("node 'x'") && e.message!!.contains("no registered node"), e.message)
   }
 
   @Test
   fun `start with valid node properties proceeds`() {
-    val workflow = emptyWorkflow.copy(nodes = listOf(nodeWith("ok", mapOf("width" to 1))))
+    registerTypedNode()
+    val workflow = emptyWorkflow.copy(nodes = listOf(nodeWith("ok", mapOf("width" to 1)), nodeWith("ok2", mapOf("width" to 2))))
 
     withTemporalStart({ execution("wf-1", "run-1") }) { service.startWorkflow(workflow, "alice") }
 
     verify(workflowRunRepository).save(any<WorkflowRunEntity>())
+    // Each node type is looked up once, however many times it appears.
+    verify(nodeExplorerService, times(1)).getNodeMetadata("org.test.Typed")
   }
 }
