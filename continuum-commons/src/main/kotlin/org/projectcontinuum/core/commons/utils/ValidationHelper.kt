@@ -68,8 +68,13 @@ class ValidationHelper {
     const val INVALID_SCHEMA_KEYWORD = "\$schema"
 
     /**
-     * A fresh registry per call: the registry caches schemas it loads through `$ref`, and node schemas come from
-     * clients, so one workflow's schema must not affect another's.
+     * A fresh registry per call. The registry caches every schema it loads, keyed by `$id`/`$ref` location. Node
+     * schemas come from many workers and feature repos, so a shared registry would let one node's schema (for example
+     * two nodes reusing the same `$id`) change how another node is validated.
+     *
+     * Callers pass a trusted schema: the one the worker registered (api-server), or the node class's own
+     * `metadata.propertiesSchema` (worker). Never pass the `propertiesSchema` carried in a submitted workflow, which
+     * is client-controlled.
      */
     private fun newRegistry(): SchemaRegistry = SchemaRegistry.withDefaultDialect(SpecificationVersion.DRAFT_7) {
       it.schemaRegistryConfig(SchemaRegistryConfig.builder().formatAssertionsEnabled(true).build())
