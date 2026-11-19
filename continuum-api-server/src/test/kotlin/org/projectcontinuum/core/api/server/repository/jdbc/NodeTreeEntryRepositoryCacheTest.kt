@@ -89,7 +89,7 @@ class NodeTreeEntryRepositoryCacheTest {
   }
 
   @Test
-  fun `an unknown node is cached as missing`() {
+  fun `an unknown node is not cached - every lookup goes to the database`() {
     whenever(db.findByNodeId("org.test.Unknown")).thenReturn(null)
 
     runner.withRepository { repository ->
@@ -97,7 +97,34 @@ class NodeTreeEntryRepositoryCacheTest {
       assertNull(repository.findByNodeId("org.test.Unknown"))
     }
 
-    verify(db, times(1)).findByNodeId("org.test.Unknown")
+    verify(db, times(2)).findByNodeId("org.test.Unknown")
+  }
+
+  @Test
+  fun `a node that registers after a miss is found on the next lookup, then cached`() {
+    whenever(db.findByNodeId("org.test.T")).thenReturn(null, v1)
+
+    runner.withRepository { repository ->
+      assertNull(repository.findByNodeId("org.test.T"))
+      assertSame(v1, repository.findByNodeId("org.test.T"), "no wait for an expiry after the worker registers")
+      assertSame(v1, repository.findByNodeId("org.test.T"))
+    }
+
+    verify(db, times(2)).findByNodeId("org.test.T")
+  }
+
+  @Test
+  fun `made-up ids leave no entries in the cache`() {
+    (1..20).forEach { whenever(db.findByNodeId("bogus-$it")).thenReturn(null) }
+
+    runner.run { ctx ->
+      val repository = ctx.getBean(NodeTreeEntryRepository::class.java)
+      (1..20).forEach { repository.findByNodeId("bogus-$it") }
+
+      @Suppress("UNCHECKED_CAST")
+      val native = ctx.getBean(CacheManager::class.java).getCache(CacheConfig.REGISTERED_NODES)!!.nativeCache as Cache<Any, Any>
+      assertEquals(0L, native.estimatedSize())
+    }
   }
 
   @Test
