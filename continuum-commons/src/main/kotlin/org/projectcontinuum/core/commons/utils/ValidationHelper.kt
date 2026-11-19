@@ -2,7 +2,9 @@ package org.projectcontinuum.core.commons.utils
 
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.networknt.schema.InputFormat
+import com.networknt.schema.SchemaException
 import com.networknt.schema.SchemaRegistry
+import com.networknt.schema.SchemaRegistryConfig
 import com.networknt.schema.SpecificationVersion
 import org.projectcontinuum.core.commons.exception.PropertiesValidationException
 
@@ -24,24 +26,34 @@ class ValidationHelper {
     }
 
     /**
-     * Validates [properties] against [propertiesSchema] (JSON Schema, draft 4 unless the schema declares another
-     * dialect) and returns one message per violation, e.g. "$.width: string found, integer expected".
+     * Validates [properties] against [propertiesSchema] and returns one [SchemaViolation] per problem, e.g. path
+     * "/width", keyword "type", message "string found, integer expected". A violation on the object itself (e.g. a
+     * missing required property) has an empty path.
+     *
+     * The dialect is draft 7 unless the schema declares another `$schema`, the same as the workbench: JSONForms
+     * validates with Ajv 8, whose default dialect is draft 7, so a value accepted in the node dialog is accepted
+     * here. `format` is checked, as `ajv-formats` does in the workbench.
+     *
+     * A schema that cannot be compiled (e.g. a dangling `$ref`, an invalid regex, a draft-4 boolean
+     * `exclusiveMinimum`) is reported as a single violation with keyword [INVALID_SCHEMA_KEYWORD], not thrown, so
+     * callers treat it as invalid input instead of an unexpected (retriable) error.
      */
     fun findSchemaViolations(
       properties: Map<String, Any?>,
       propertiesSchema: Map<String, Any?>
     ): List<SchemaViolation> {
-      val registry = SchemaRegistry.withDefaultDialect(
-        SpecificationVersion.DRAFT_4
-      )
-      val schema = registry.getSchema(
-        mapper.writeValueAsString(propertiesSchema),
-        InputFormat.JSON
-      )
-      return schema.validate(
-        mapper.writeValueAsString(properties),
-        InputFormat.JSON
-      ).map {
+      val schema = try {
+        newRegistry().getSchema(mapper.writeValueAsString(propertiesSchema), InputFormat.JSON)
+          .also { it.initializeValidators() }
+      } catch (e: SchemaException) {
+        return listOf(invalidSchema(e))
+      }
+      val errors = try {
+        schema.validate(mapper.writeValueAsString(properties), InputFormat.JSON)
+      } catch (e: SchemaException) {
+        return listOf(invalidSchema(e))
+      }
+      return errors.map {
         val location = it.instanceLocation
         SchemaViolation(
           keyword = it.keyword,
@@ -51,6 +63,24 @@ class ValidationHelper {
         )
       }
     }
+
+    /** Keyword of the violation returned when `propertiesSchema` itself is not a valid JSON Schema. */
+    const val INVALID_SCHEMA_KEYWORD = "\$schema"
+
+    /**
+     * A fresh registry per call: the registry caches schemas it loads through `$ref`, and node schemas come from
+     * clients, so one workflow's schema must not affect another's.
+     */
+    private fun newRegistry(): SchemaRegistry = SchemaRegistry.withDefaultDialect(SpecificationVersion.DRAFT_7) {
+      it.schemaRegistryConfig(SchemaRegistryConfig.builder().formatAssertionsEnabled(true).build())
+    }
+
+    private fun invalidSchema(e: SchemaException) = SchemaViolation(
+      keyword = INVALID_SCHEMA_KEYWORD,
+      path = "",
+      property = null,
+      message = "propertiesSchema is not a valid JSON Schema: ${e.message}"
+    )
   }
 
   /**

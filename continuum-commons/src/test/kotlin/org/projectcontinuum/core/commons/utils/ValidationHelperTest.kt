@@ -48,6 +48,7 @@ class ValidationHelperTest {
     val e = assertThrows<PropertiesValidationException> { ValidationHelper.validateJsonWithSchema(emptyMap(), schema) }
 
     assertEquals(listOf("required"), e.violations.map { it.keyword })
+    assertEquals(listOf(""), e.violations.map { it.path }, "a violation on the object itself has an empty path")
   }
 
   /**
@@ -73,7 +74,7 @@ class ValidationHelperTest {
     }
   }
 
-  // --- dialect: draft 4 by default, the schema's own $schema otherwise (unchanged behaviour) ---
+  // --- dialect: draft 7 by default, like the workbench (JSONForms + Ajv 8); the schema's own $schema otherwise ---
 
   private fun oneOfConst(dialect: String? = null) = buildMap<String, Any> {
     dialect?.let { put("\$schema", it) }
@@ -85,19 +86,76 @@ class ValidationHelperTest {
   }
 
   @Test
-  fun `draft 4 is the default and does not know const, so a oneOf of consts never matches exactly one`() {
-    // Nodes that use oneOf/const without declaring a newer $schema fail for every value under the default dialect.
+  fun `draft 7 is the default, so a oneOf of consts accepts exactly the listed values`() {
+    assertDoesNotThrow { ValidationHelper.validateJsonWithSchema(mapOf("backend" to "A"), oneOfConst()) }
     val e = assertThrows<PropertiesValidationException> {
-      ValidationHelper.validateJsonWithSchema(mapOf("backend" to "A"), oneOfConst())
+      ValidationHelper.validateJsonWithSchema(mapOf("backend" to "Z"), oneOfConst())
+    }
+    assertEquals(setOf("/backend"), e.violations.map { it.path }.toSet())
+  }
+
+  @Test
+  fun `draft 7 keywords are enforced by default`() {
+    val schema = mapOf(
+      "type" to "object",
+      "properties" to mapOf("n" to mapOf("type" to "number", "exclusiveMinimum" to 0)),
+      "if" to mapOf("properties" to mapOf("mode" to mapOf("const" to "custom"))),
+      "then" to mapOf("required" to listOf("url"))
+    )
+
+    assertDoesNotThrow { ValidationHelper.validateJsonWithSchema(mapOf("n" to 1, "mode" to "custom", "url" to "u"), schema) }
+    val e = assertThrows<PropertiesValidationException> {
+      ValidationHelper.validateJsonWithSchema(mapOf("n" to 0, "mode" to "custom"), schema)
+    }
+    assertEquals(setOf("exclusiveMinimum", "required"), e.violations.map { it.keyword }.toSet())
+  }
+
+  @Test
+  fun `a schema declaring draft 4 is still validated as draft 4`() {
+    // Draft 4 has no const, so each branch matches anything and oneOf fails: the declared dialect wins.
+    val e = assertThrows<PropertiesValidationException> {
+      ValidationHelper.validateJsonWithSchema(mapOf("backend" to "A"), oneOfConst("http://json-schema.org/draft-04/schema#"))
     }
     assertEquals(listOf("oneOf"), e.violations.map { it.keyword })
   }
 
-  @Test
-  fun `a schema declaring draft 7 is validated as draft 7`() {
-    val draft7 = oneOfConst("http://json-schema.org/draft-07/schema#")
+  // --- format: asserted, as ajv-formats does in the workbench ---
 
-    assertDoesNotThrow { ValidationHelper.validateJsonWithSchema(mapOf("backend" to "A"), draft7) }
-    assertThrows<PropertiesValidationException> { ValidationHelper.validateJsonWithSchema(mapOf("backend" to "Z"), draft7) }
+  private val emailSchema = mapOf(
+    "type" to "object",
+    "properties" to mapOf(
+      "email" to mapOf("type" to "string", "format" to "email"),
+      "credential" to mapOf("type" to "string", "format" to "credential")
+    )
+  )
+
+  @Test
+  fun `known formats are checked`() {
+    assertDoesNotThrow { ValidationHelper.validateJsonWithSchema(mapOf("email" to "a@b.co"), emailSchema) }
+    val e = assertThrows<PropertiesValidationException> {
+      ValidationHelper.validateJsonWithSchema(mapOf("email" to "not-an-email"), emailSchema)
+    }
+    assertEquals(listOf("format"), e.violations.map { it.keyword })
+  }
+
+  @Test
+  fun `unknown formats such as the workbench's credential picker are ignored`() {
+    assertDoesNotThrow { ValidationHelper.validateJsonWithSchema(mapOf("credential" to "my-cred"), emailSchema) }
+  }
+
+  // --- a schema that cannot be compiled is a violation, not an unexpected exception ---
+
+  @Test
+  fun `an invalid schema is reported as a violation`() {
+    listOf(
+      mapOf("type" to "object", "properties" to mapOf("n" to mapOf("type" to "number", "exclusiveMinimum" to true))),
+      mapOf("type" to "object", "properties" to mapOf("n" to mapOf("\$ref" to "#/definitions/missing"))),
+      mapOf("type" to "object", "properties" to mapOf("p" to mapOf("type" to "string", "pattern" to "([")))
+    ).forEach { schema ->
+      val e = assertThrows<PropertiesValidationException> {
+        ValidationHelper.validateJsonWithSchema(mapOf("n" to 1, "p" to "x"), schema)
+      }
+      assertEquals(listOf(ValidationHelper.INVALID_SCHEMA_KEYWORD), e.violations.map { it.keyword }, schema.toString())
+    }
   }
 }
