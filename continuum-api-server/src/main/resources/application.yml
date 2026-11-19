@@ -34,6 +34,11 @@ spring.ai.mcp.server:
 continuum.core:
   api-server:
     cache-directory-base-path: ${CONTINUUM_CACHE_DIRECTORY:./.continuum-cache/workflow-data}
+    # Operator endpoints under /api/v1/admin require the caller to be in one of these groups: a comma-separated list,
+    # matched against the comma-separated x-continuum-user-groups header (set by the ingress/auth layer, never by the
+    # client). Empty (the default) disables them: they answer 404.
+    admin:
+      groups: ${CONTINUUM_ADMIN_GROUPS:}
     storage:
       type: ${CONTINUUM_STORAGE_TYPE:minio}
       bucket-name: ${CONTINUUM_CACHE_BUCKET_NAME:continuum-worker-storage}

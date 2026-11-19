@@ -49,6 +49,15 @@ Core platform team. Container image: `projectcontinuum/continuum-api-server`. Ru
     - An empty `nodes` list is valid (warning "The workflow has no nodes yet.") and builds an empty workflow, so clients can save the file first and rebuild it after each added node.
   - `ContinuumNodeMcpResources` — resource template `continuum-node://{nodeId}/documentation`.
 - `WorkflowScheduleController` — generic Temporal-`ScheduleClient`-backed cron scheduling for any `ContinuumWorkflowModel` DAG, backed by `workflow_schedules` (JSONB embed, no separate schedule entity per node type). This module has zero KNIME awareness — KNIME-specific scheduling lives entirely in `continuum-knime-scheduler` in the `continuum-feature-knime` repo (`scheduler/`), which calls this controller's `/api/v1/workflow/schedule` API as a plain REST client.
+  - Node properties are validated only at `createSchedule`. A schedule's workflow is never revalidated when Temporal fires it; the worker's own check is the only guard at run time.
+  - To find schedules that will fail, operators call `POST /api/v1/admin/schedules/validate` (on demand, never at start-up). It runs `service.ScheduleValidationService.validateAll`, which pages through `workflow_schedules` (`PAGE_SIZE` 200, sorted by id) and checks each workflow with `WorkflowPropertiesValidator.findProblems`. It returns a `ScheduleValidationReport` with `invalid`, `unregisteredOnly` and `failedToCheck`.
+  - It is report-only: never make it pause, modify or delete schedules, which belong to their owners. One schedule failing to check does not stop the rest.
+- `AdminController` (`/api/v1/admin/**`) — operator endpoints that act across all tenants, so they are not owner-scoped.
+  - Every endpoint must call `requireAdmin`: at least one entry of the comma-separated `x-continuum-user-groups` header must be in `continuum.core.api-server.admin.groups` (env `CONTINUUM_ADMIN_GROUPS`, also comma-separated). Entries are trimmed, blanks are dropped, and matching is exact and case-sensitive.
+  - With no admin groups configured (default) they are disabled. A caller in no admin group gets the same 404 as a disabled endpoint, so they cannot be found by probing.
+  - `x-continuum-user-groups` is trusted the same way as `x-continuum-user-id`: the ingress/auth layer must set it from the authenticated identity and strip any client-sent value. If anything can reach the api-server without passing that layer, anyone can claim an admin group.
+  - `x-continuum-user-id` is not a group.
+  - Any new cross-tenant operation goes here, behind the same check.
 - Config defaults: PostgreSQL on `localhost:35432`, MinIO on `localhost:39000`, Temporal on `localhost:7233`.
 
 ## Work Guidance
