@@ -25,10 +25,17 @@ abstract class TriggerNodeModel : ContinuumNodeModel {
 
   abstract val outputPorts: Map<String, ContinuumWorkflowModel.NodePort>
 
+  /**
+   * Called by the worker framework. Validates properties, then calls [execute].
+   *
+   * @throws org.projectcontinuum.core.commons.exception.NodeRuntimeException non-retriable, when the properties
+   *   do not match `propertiesSchema`; [execute] is not called.
+   */
   fun run(
     node: ContinuumWorkflowModel.Node,
     nodeOutputWriter: NodeOutputWriter
   ) {
+    node.validatePropertiesOrFail()
     return execute(
       node.data.properties,
       nodeOutputWriter

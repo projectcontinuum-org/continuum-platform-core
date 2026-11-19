@@ -10,6 +10,7 @@ Core platform team. Container image: `projectcontinuum/continuum-api-server`. Ru
 
 - Node registry: workers register their nodes via Kafka (handled by `continuum-message-bridge`). The API server exposes `GET/POST /api/v1/node-explorer/nodes/task-queues` so the orchestration service can resolve which worker owns which node.
 - `WorkflowController` — CRUD for workflow definitions (stored as JSONB in PostgreSQL).
+- `utils.WorkflowPropertiesValidator.requireValidProperties` validates every node's `properties` against its `propertiesSchema`. `WorkflowService.startWorkflow` and `WorkflowScheduleService.createSchedule` call it first, before any DB row or Temporal call. It throws `InvalidRequestException` (400), naming each invalid node. Any new endpoint that accepts a workflow to run must call it.
 - `WorkflowRunController` / `WorkflowRunService` — execution lifecycle. Starting a run creates a Temporal workflow via the SDK client.
 - `NodeOutputController` / `NodeOutputService` — DuckDB reads Parquet from MinIO/S3 for in-browser data preview. DuckDB 1.2.2 is included as a JDBC driver. Outputs are stored under the Temporal **run id** (`{remote}<runId>/<nodeId>/output.<port>.parquet`), which is not the workflow id returned by `POST /api/v1/workflow`. The endpoint is `/api/v1/data/{runId}/nodes/{nodeId}/outputs/{outputId}`; the workbench sends the first segment of the stored path. `NodeOutputRepository` contract:
   - `runId`, `nodeId` and `outputId` must match `^[A-Za-z0-9._-]{1,255}$`, and must not be `.` or contain `..`.

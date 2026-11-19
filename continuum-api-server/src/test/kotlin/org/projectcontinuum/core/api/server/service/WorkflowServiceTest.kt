@@ -323,4 +323,48 @@ class WorkflowServiceTest {
 
     verify(workflowRunRepository, never()).updateRunId(any(), any())
   }
+
+  // --- startWorkflow: node properties are validated before anything is stored or started ---
+
+  private fun nodeWith(id: String, properties: Map<String, Any>) = ContinuumWorkflowModel.Node(
+    id = id,
+    type = "default",
+    position = ContinuumWorkflowModel.Position(0.0, 0.0),
+    width = 1,
+    height = 1,
+    selected = false,
+    data = ContinuumWorkflowModel.NodeData(
+      description = "",
+      title = "Typed",
+      nodeModel = "org.test.Typed",
+      properties = properties,
+      propertiesSchema = mapOf(
+        "type" to "object",
+        "properties" to mapOf("width" to mapOf("type" to "integer")),
+        "required" to listOf("width")
+      )
+    )
+  )
+
+  @Test
+  fun `start with invalid node properties is an InvalidRequestException and nothing is saved or started`() {
+    val workflow = emptyWorkflow.copy(nodes = listOf(nodeWith("ok", mapOf("width" to 1)), nodeWith("bad", mapOf("width" to "wide"))))
+
+    val e = assertThrows<InvalidRequestException> {
+      withTemporalStart({ error("must not start") }) { service.startWorkflow(workflow, "alice") }
+    }
+
+    assertTrue(e.message!!.contains("node 'bad'") && e.message!!.contains("/width"), e.message)
+    assertTrue(!e.message!!.contains("node 'ok'"), e.message)
+    verify(workflowRunRepository, never()).save(any<WorkflowRunEntity>())
+  }
+
+  @Test
+  fun `start with valid node properties proceeds`() {
+    val workflow = emptyWorkflow.copy(nodes = listOf(nodeWith("ok", mapOf("width" to 1))))
+
+    withTemporalStart({ execution("wf-1", "run-1") }) { service.startWorkflow(workflow, "alice") }
+
+    verify(workflowRunRepository).save(any<WorkflowRunEntity>())
+  }
 }

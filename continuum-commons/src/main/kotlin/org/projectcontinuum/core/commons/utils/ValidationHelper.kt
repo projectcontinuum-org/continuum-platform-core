@@ -4,18 +4,23 @@ import com.fasterxml.jackson.databind.ObjectMapper
 import com.networknt.schema.InputFormat
 import com.networknt.schema.SchemaRegistry
 import com.networknt.schema.SpecificationVersion
+import org.projectcontinuum.core.commons.exception.PropertiesValidationException
 
 class ValidationHelper {
   companion object {
 
     val mapper = ObjectMapper()
 
+    /**
+     * Throws [PropertiesValidationException] listing every violation when [properties] do not satisfy
+     * [propertiesSchema]. An explicit check, not `assert`, so it runs whether or not the JVM has `-ea`.
+     */
     fun validateJsonWithSchema(
       properties: Map<String, Any>,
       propertiesSchema: Map<String, Any>
     ) {
-      val errorMessages = findSchemaViolations(properties, propertiesSchema)
-      assert(errorMessages.isEmpty()) { "Validation failed: $errorMessages" }
+      val violations = findSchemaViolations(properties, propertiesSchema)
+      if (violations.isNotEmpty()) throw PropertiesValidationException(violations)
     }
 
     /**

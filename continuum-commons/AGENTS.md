@@ -10,13 +10,17 @@ Core platform team. No Spring Boot app — library only. Published to Maven Cent
 
 - `ProcessNodeModel` — abstract base for all data-processing nodes. Subclasses must declare `inputPorts` and `outputPorts` and implement `execute()`. Use the `ExecutionContext` overload when credentials are needed; the base overload is for nodes that don't.
 - `TriggerNodeModel` — base for source nodes (no inputs, only outputs).
+- Property validation: `ProcessNodeModel.run`, `TriggerNodeModel.run` and `KnimeNodeModel.run` call `validatePropertiesOrFail()` (`NodePropertiesValidation.kt`) before `execute()`. Invalid properties throw a non-retriable `NodeRuntimeException`, with `PropertiesValidationException` as the cause. A subclass that overrides `run` must keep this call.
 - `@ContinuumNode` — required on every concrete node class. Sets `SCOPE_PROTOTYPE` and `@Component`. Absence is caught at build time by the Gradle plugin's `validateContinuumNodeAnnotations` task and at runtime startup.
 - `ContinuumWorkflowModel` — canonical JSON-serialisable DAG model (nodes + edges). `getRootNodes()`, `getParentNodes()`, `getParentEdges()` helpers drive the orchestration loop.
 - `NodeOutputWriter` / `NodeInputReader` — Parquet I/O. Output files are `output.{portId}.parquet`; input files are `input.{portId}.parquet`. Snappy compression. Avro schema `DataRow`.
 - `ExecutionContext` — holds `ownerId` and pre-resolved credentials (label → data map). Populated by `ContinuumNodeActivity` before `execute()` is called.
 - `TaskQueues` — object (not enum) of const strings so they can appear in annotations: `WORKFLOW_TASK_QUEUE`, `ACTIVITY_TASK_QUEUE`, `ACTIVITY_TASK_QUEUE_INITIALIZE`.
 - `NodeProgressCallback` — rate-limited in the worker starter; nodes call `report(percentage)` or `report(NodeProgress(...))`.
-- `ValidationHelper` — JSON Schema (draft 4 default) checks of node properties. `validateJsonWithSchema` asserts (used by `ProcessNodeModel.run` and the api-server at workflow start); `findSchemaViolations` returns `SchemaViolation(keyword, path, property, message)` per problem for callers that report errors instead of failing.
+- `ValidationHelper` — JSON Schema checks of node properties: draft 4 by default, or the schema's own `$schema`. Do not change the default dialect: deployed node schemas depend on it.
+  - `validateJsonWithSchema` throws `PropertiesValidationException`, which carries every violation. It is an explicit check, never `assert`, because production JVMs run without `-ea`. `ValidationHelperTest` checks this in a class loader with assertions disabled.
+  - `findSchemaViolations` returns one `SchemaViolation(keyword, path, property, message)` per problem, for callers that report errors instead of failing.
+  - Draft 4 has no `const`, so a `oneOf` of `const`s fails for every value unless the schema declares draft 6 or later.
 - `KnimeNodeModel` — published base for nodes that run a single KNIME node in batch mode. It starts KNIME with `ProcessBuilder(buildKnimeCommand(...))`: an argv list with no shell, so paths, node ids and port ids reach KNIME verbatim. Never reintroduce `bash -c` or string-joined commands. `resolveWorkflowDir(runId, nodeId)` canonicalizes `{knimeWorkflowRootDir}/{runId}/{nodeId}` and throws a non-retriable `NodeRuntimeException` if it is the root itself or outside it. Use `prepareWorkflowInputOptions` (one `-option=...` per element). The space-joined `prepareWorkflowInputs` String API is `@Deprecated`, and only kept for binary compatibility.
 - Spring `context` and `beans` are `compileOnly` — this library does not pull in a Spring runtime.
 

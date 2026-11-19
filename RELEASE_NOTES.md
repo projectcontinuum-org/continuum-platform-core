@@ -46,6 +46,10 @@ This release is a security and multi-tenancy hardening release. Every workflow, 
 - A client query is rejected (400) when it has unbalanced parentheses, an unterminated quote, `;`, `--`, `/*`, `#`, a backslash or a control character. `/count` allows a trailing `GROUP BY ExecutionStatus`.
 - The owner filter is `WorkflowId IN (...)` in chunks of 500, with counts and groups merged across chunks.
 
+### continuum-api-server: node properties
+
+- `POST /api/v1/workflow` and `POST /api/v1/workflow/schedule` check every node's properties against its `propertiesSchema` before anything is stored or sent to Temporal. An invalid workflow is a **400** `ProblemDetail` (`InvalidRequestException`) whose detail names each invalid node and its violations. Before this change the check was an `assert`, and did nothing.
+
 ### continuum-api-server: run id and database
 
 - New column `workflow_runs.run_id`, written when the workflow starts and by the message bridge on every event (kept if a later event has none). `schema.sql` adds the column and an index on it, and **backfills existing rows** from the `{remote}<runId>/` prefix of their stored output paths.
@@ -54,6 +58,8 @@ This release is a security and multi-tenancy hardening release. Every workflow, 
 
 ### continuum-commons
 
+- **Node property validation runs in production.** `ValidationHelper.validateJsonWithSchema` used Kotlin `assert`, which does nothing unless the JVM runs with `-ea`, so properties were never checked. It now throws `PropertiesValidationException`, which carries every `SchemaViolation`. The JSON Schema dialect is unchanged: draft 4, unless the schema declares `$schema`.
+- `ProcessNodeModel.run`, `KnimeNodeModel.run` and now also `TriggerNodeModel.run` (which did not validate before) validate before `execute()`. A failure is a `NodeRuntimeException` with `isRetriable = false`, so the worker records the node as failed (`$error` output) and Temporal does not retry it.
 - `WorkflowUpdate` has a new nullable field `runId` (default `null`, so events from an older orchestration service still deserialize).
 - `KnimeNodeModel` starts KNIME with `ProcessBuilder(buildKnimeCommand(...))`, an argument list with no `bash -c`, so a node id or path can no longer be run as a command. `resolveWorkflowDir` rejects a node id that resolves to the KNIME workflow root or outside it. The string-joined `prepareWorkflowInputs` is `@Deprecated` and kept for binary compatibility; use `prepareWorkflowInputOptions`.
 
@@ -100,6 +106,8 @@ This release is a security and multi-tenancy hardening release. Every workflow, 
 - **Events.** Anything that deserializes `WorkflowUpdate` strictly must accept the new optional `runId`.
 - **`KnimeNodeModel` subclasses.** Prefer `prepareWorkflowInputOptions`; the string version is deprecated.
 - **`continuum-cloud-gateway` image.** No new version is published. The `/workbench/<name>/open` proxy path no longer exists in this repository.
-- **Not part of this release.** Schema validation of node properties (`validateJsonWithSchema`) still uses Kotlin `assert`, which does nothing at runtime unless the JVM runs with `-ea`. The Jackson dependency advisories are deferred to the Spring Boot upgrade.
+- **Not part of this release.** The Jackson dependency advisories are deferred to the Spring Boot upgrade.
+- **Node properties are now validated for real.** Workflows whose saved properties do not match a node's `propertiesSchema` used to run anyway. They are now refused at start or schedule creation (400), and on the worker the node fails without retries. Fix the properties, or the node's schema.
+  - **`ClaudeAIAgentNodeModel` (`continuum-feature-ai`) fails for every value until its schema is fixed.** Four fields (`backend`, `systemPromptMode`, `effort`, `onError`) use `oneOf` of `const`. `const` does not exist in draft 4, the default dialect, so every value matches more than one branch. Add `"$schema": "http://json-schema.org/draft-07/schema#"` to the schema, or use `enum`. Every saved workflow with a Claude node is refused until a fixed worker is deployed: the api-server validates against the `propertiesSchema` stored in the workflow file, so saved files also need the schema refreshed (re-add the node, or edit the file).
 
 **Full Changelog**: https://github.com/projectcontinuum-org/continuum-platform-core/compare/release/0.0.22...CONTNM-161

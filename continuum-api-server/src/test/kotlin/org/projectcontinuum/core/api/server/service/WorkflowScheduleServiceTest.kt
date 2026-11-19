@@ -18,6 +18,7 @@ import org.mockito.kotlin.never
 import org.mockito.kotlin.verify
 import org.mockito.kotlin.whenever
 import org.projectcontinuum.core.api.server.entity.jpa.WorkflowScheduleEntity
+import org.projectcontinuum.core.api.server.exception.InvalidRequestException
 import org.projectcontinuum.core.api.server.exception.WorkflowScheduleNotFoundException
 import org.projectcontinuum.core.api.server.model.CreateWorkflowScheduleRequest
 import org.projectcontinuum.core.api.server.repository.jpa.WorkflowScheduleRepository
@@ -127,7 +128,8 @@ class WorkflowScheduleServiceTest {
     val model = ContinuumWorkflowModel(id = "wf-1", name = "Bad Workflow", nodes = listOf(badNode), edges = emptyList())
     val req = CreateWorkflowScheduleRequest(name = "Bad", cronExpression = "0 * * * *", continuumWorkflowModel = model)
 
-    assertThrows<AssertionError> { service.createSchedule(req, ownedBy) }
+    val e = assertThrows<InvalidRequestException> { service.createSchedule(req, ownedBy) }
+    assertTrue(e.message!!.contains("node 'n1'"), e.message)
 
     verify(scheduleClient, never()).createSchedule(any(), any(), any())
     verify(workflowScheduleRepository, never()).save(any())
