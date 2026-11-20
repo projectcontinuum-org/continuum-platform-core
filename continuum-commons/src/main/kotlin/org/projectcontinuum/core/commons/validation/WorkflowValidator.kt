@@ -112,13 +112,15 @@ class WorkflowValidator(private val descriptors: NodeDescriptorSource) {
         errors += WorkflowIssue(unknownNodeMessage(key = key, nodeId = nodeId, mode = mode), node = key)
         return@forEachIndexed
       }
-      node.embedded?.let { warnOnEmbeddedDifference(
+      node.embedded?.let {
+        warnOnEmbeddedDifference(
           key = key,
           nodeId = nodeId,
           embedded = it,
           registered = descriptor,
           warnings = warnings
-        ) }
+        )
+      }
       validateProperties(
         key = key,
         given = node.properties.orEmpty(),
