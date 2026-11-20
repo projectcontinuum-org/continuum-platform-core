@@ -22,9 +22,7 @@ class WorkflowController(
     @RequestBody
     continuumWorkflowModel: ContinuumWorkflowModel
   ): StartWorkflowResponse {
-    return StartWorkflowResponse(
-      workflowId = workflowService.startWorkflow(continuumWorkflowModel, ownedBy)
-    )
+    return workflowService.startWorkflow(continuumWorkflowModel, ownedBy)
   }
 
   @GetMapping("/active")
