@@ -65,7 +65,11 @@ class FakeContinuumNodeActivity : IContinuumNodeActivity {
     Activity.getExecutionContext().workflowClient
       .newWorkflowStub(IContinuumWorkflow::class.java, Activity.getExecutionContext().info.workflowId)
       .updateNodeProgressSignal(
-        ContinuumNodeActivitySignal(node.id, NodeProgress(0), ContinuumWorkflowModel.NodeStatus.BUSY)
+        ContinuumNodeActivitySignal(
+          nodeId = node.id,
+          nodeProgress = NodeProgress(progressPercentage = 0),
+          nodeStatus = ContinuumWorkflowModel.NodeStatus.BUSY
+        )
       )
     attemptCount.computeIfAbsent(node.id) { AtomicInteger(0) }.incrementAndGet()
 

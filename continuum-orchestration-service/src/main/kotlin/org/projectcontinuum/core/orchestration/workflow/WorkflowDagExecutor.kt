@@ -53,8 +53,16 @@ class WorkflowDagExecutor(
 
     do {
       // Find nodes ready to execute (all parents have completed)
-      markUnrunnableNodesSkipped(continuumWorkflow, nodeToOutputsMap, nodeErrorsMap)
-      val nodesToExecute = NodeReadiness.getReadyNodes(continuumWorkflow, nodeToOutputsMap, nodeErrorsMap)
+      markUnrunnableNodesSkipped(
+        continuumWorkflow = continuumWorkflow,
+        nodeToOutputsMap = nodeToOutputsMap,
+        nodeErrorsMap = nodeErrorsMap
+      )
+      val nodesToExecute = NodeReadiness.getReadyNodes(
+        continuumWorkflow = continuumWorkflow,
+        nodeOutputMap = nodeToOutputsMap,
+        nodeErrorsMap = nodeErrorsMap
+      )
       LOGGER.info("Nodes to execute: ${nodesToExecute.map { it.id }}")
 
       // Start each ready node as an async activity
@@ -117,10 +125,17 @@ class WorkflowDagExecutor(
         nodeExecutionPromises.removeAll { it.first.id == nodeOutput.nodeId }
       }
       LOGGER.info("NodeExecutionPromises size: ${nodeExecutionPromises.size}")
-      markUnrunnableNodesSkipped(continuumWorkflow, nodeToOutputsMap, nodeErrorsMap)
-    } while (NodeReadiness.getReadyNodes(continuumWorkflow, nodeToOutputsMap, nodeErrorsMap).isNotEmpty() ||
-      nodeExecutionPromises.isNotEmpty()
-    )
+      markUnrunnableNodesSkipped(
+        continuumWorkflow = continuumWorkflow,
+        nodeToOutputsMap = nodeToOutputsMap,
+        nodeErrorsMap = nodeErrorsMap
+      )
+      val hasReadyNodes = NodeReadiness.getReadyNodes(
+        continuumWorkflow = continuumWorkflow,
+        nodeOutputMap = nodeToOutputsMap,
+        nodeErrorsMap = nodeErrorsMap
+      ).isNotEmpty()
+    } while (hasReadyNodes || nodeExecutionPromises.isNotEmpty())
     statusReporter.publishUpdate()
     LOGGER.info("All nodes executed----------------------------------")
   }
@@ -150,15 +165,30 @@ class WorkflowDagExecutor(
     return nodeInputs
   }
 
-  /** Marks every node that can never run as SKIPPED; the caller publishes the update. */
+  /**
+   * Marks every node that can never run as SKIPPED, then publishes each finished edge's status:
+   * DELIVERED, or BROKEN so the workbench can draw a broken wire. The caller publishes the update.
+   */
   private fun markUnrunnableNodesSkipped(
     continuumWorkflow: ContinuumWorkflowModel,
     nodeToOutputsMap: Map<String, Map<String, PortData>>,
     nodeErrorsMap: Map<String, Map<String, PortData>>
   ) {
-    NodeReadiness.getNodesToSkip(continuumWorkflow, nodeToOutputsMap, nodeErrorsMap).forEach {
-      LOGGER.info("Skipping node {}", it.id)
-      statusReporter.setNodeAnimationAndStatus(it, ContinuumWorkflowModel.NodeStatus.SKIPPED)
+    val nodesToSkip = NodeReadiness.getNodesToSkip(
+      continuumWorkflow = continuumWorkflow,
+      nodeOutputMap = nodeToOutputsMap,
+      nodeErrorsMap = nodeErrorsMap
+    )
+    nodesToSkip.forEach { node ->
+      LOGGER.info("Skipping node {}", node.id)
+      statusReporter.setNodeAnimationAndStatus(node = node, nodeStatus = ContinuumWorkflowModel.NodeStatus.SKIPPED)
+    }
+    NodeReadiness.getEdgeStatuses(
+      continuumWorkflow = continuumWorkflow,
+      nodeOutputMap = nodeToOutputsMap,
+      nodeErrorsMap = nodeErrorsMap
+    ).forEach { (edge, edgeStatus) ->
+      statusReporter.setEdgeStatus(edge = edge, edgeStatus = edgeStatus)
     }
   }
 }

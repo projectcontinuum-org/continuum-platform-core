@@ -3,6 +3,7 @@ package org.projectcontinuum.core.commons.model
 import org.projectcontinuum.core.commons.protocol.progress.NodeProgress
 import com.fasterxml.jackson.annotation.JsonCreator
 import com.fasterxml.jackson.annotation.JsonIgnore
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties
 import com.fasterxml.jackson.annotation.JsonProperty
 
 data class ContinuumWorkflowModel @JsonCreator constructor(
@@ -44,8 +45,24 @@ data class ContinuumWorkflowModel @JsonCreator constructor(
     @param:JsonProperty("source") val source: String,
     @param:JsonProperty("target") val target: String,
     @param:JsonProperty("sourceHandle") val sourceHandle: String,
-    @param:JsonProperty("targetHandle") val targetHandle: String
+    @param:JsonProperty("targetHandle") val targetHandle: String,
+    @param:JsonProperty("data") var data: EdgeData? = null
   )
+
+  /** Runtime state of an edge, set by the orchestrator. Under `data` so React Flow passes it to the edge component. */
+  @JsonIgnoreProperties(ignoreUnknown = true)
+  data class EdgeData(
+    @param:JsonProperty("status") val status: EdgeStatus? = null
+  )
+
+  /** Runtime state of an edge. `null` means its source has not finished yet. Mirrored by `EdgeStatus` in the workbench. */
+  enum class EdgeStatus {
+    /** The source finished and produced the edge's source port. */
+    DELIVERED,
+
+    /** The edge will never carry data: its source failed or was skipped, or finished without producing the port. */
+    BROKEN
+  }
 
   data class Node @JsonCreator constructor(
     @param:JsonProperty("id") val id: String,
@@ -101,6 +118,7 @@ data class ContinuumWorkflowModel @JsonCreator constructor(
     @param:JsonProperty("contentType") val contentType: String
   )
 
+  /** Mirrored by `NodeStatus` in the workbench (`continuum-core/src/types/IBaseNode.ts`); keep both in sync. */
   enum class NodeStatus {
     ACTIVE,
     CONFIGURED,

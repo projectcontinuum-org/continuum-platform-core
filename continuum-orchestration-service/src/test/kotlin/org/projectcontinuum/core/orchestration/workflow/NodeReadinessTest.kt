@@ -1,5 +1,7 @@
 package org.projectcontinuum.core.orchestration.workflow
 
+import org.projectcontinuum.core.commons.model.ContinuumWorkflowModel
+import org.projectcontinuum.core.commons.model.ContinuumWorkflowModel.EdgeStatus
 import org.projectcontinuum.core.commons.model.ContinuumWorkflowModel.NodeStatus
 import org.projectcontinuum.core.commons.model.PortData
 import org.projectcontinuum.core.commons.model.PortDataStatus
@@ -10,23 +12,42 @@ import kotlin.test.assertEquals
 class NodeReadinessTest {
 
   private val diamond = "/test-workflows/diamond-4node.cwf.json"
+  private val diamondJoin = "/test-workflows/diamond-join-4node.cwf.json"
 
-  private fun port() = mapOf(
-    "out-1" to PortData(status = PortDataStatus.SUCCESS, contentType = "text/plain", tableSpec = emptyList(), data = "x")
-  )
+  private fun portData(status: PortDataStatus, data: String) =
+    PortData(status = status, contentType = "text/plain", tableSpec = emptyList(), data = data)
 
-  private val error = mapOf(
-    "\$error" to PortData(status = PortDataStatus.FAILED, contentType = "text/plain", tableSpec = emptyList(), data = "e")
-  )
+  private val successOutputs = mapOf("out-1" to portData(status = PortDataStatus.SUCCESS, data = "x"))
+  private val errorOutputs = mapOf("\$error" to portData(status = PortDataStatus.FAILED, data = "e"))
+
+  private fun skippedIds(
+    model: ContinuumWorkflowModel,
+    outputs: Map<String, Map<String, PortData>>,
+    errors: Map<String, Map<String, PortData>>
+  ) = NodeReadiness.getNodesToSkip(continuumWorkflow = model, nodeOutputMap = outputs, nodeErrorsMap = errors)
+    .map { it.id }
+
+  private fun readyIds(
+    model: ContinuumWorkflowModel,
+    outputs: Map<String, Map<String, PortData>>,
+    errors: Map<String, Map<String, PortData>>
+  ) = NodeReadiness.getReadyNodes(continuumWorkflow = model, nodeOutputMap = outputs, nodeErrorsMap = errors)
+    .map { it.id }
+
+  private fun edgeStatusesById(
+    model: ContinuumWorkflowModel,
+    outputs: Map<String, Map<String, PortData>>,
+    errors: Map<String, Map<String, PortData>>
+  ) = NodeReadiness.getEdgeStatuses(continuumWorkflow = model, nodeOutputMap = outputs, nodeErrorsMap = errors)
+    .associate { (edge, status) -> edge.id to status }
 
   @Test
   fun `root failure skips all descendants transitively and readiness is pure`() {
     val model = WorkflowFixtures.loadWorkflow(diamond)
-    val errors = mapOf("A" to error)
+    val errors = mapOf("A" to errorOutputs)
 
-    val skip = NodeReadiness.getNodesToSkip(model, emptyMap(), errors)
-    assertEquals(listOf("B", "C", "D"), skip.map { it.id })
-    assertEquals(emptyList(), NodeReadiness.getReadyNodes(model, emptyMap(), errors).map { it.id })
+    assertEquals(listOf("B", "C", "D"), skippedIds(model = model, outputs = emptyMap(), errors = errors))
+    assertEquals(emptyList(), readyIds(model = model, outputs = emptyMap(), errors = errors))
     // Pure: model untouched
     assertEquals(listOf(null, null, null, null), model.nodes.map { it.data.status })
   }
@@ -34,20 +55,61 @@ class NodeReadinessTest {
   @Test
   fun `failed branch skips the join while the independent sibling stays ready`() {
     val model = WorkflowFixtures.loadWorkflow(diamond)
-    val outputs = mapOf("A" to port(), "B" to port())
-    val errors = mapOf("C" to error)
+    val outputs = mapOf("A" to successOutputs, "B" to successOutputs)
+    val errors = mapOf("C" to errorOutputs)
 
-    assertEquals(listOf("D"), NodeReadiness.getNodesToSkip(model, outputs, errors).map { it.id })
-    assertEquals(emptyList(), NodeReadiness.getReadyNodes(model, outputs, errors).map { it.id })
+    assertEquals(listOf("D"), skippedIds(model = model, outputs = outputs, errors = errors))
+    assertEquals(emptyList(), readyIds(model = model, outputs = outputs, errors = errors))
+    assertEquals(
+      mapOf(
+        "edge-A-B" to EdgeStatus.DELIVERED,
+        "edge-A-C" to EdgeStatus.DELIVERED,
+        "edge-B-D" to EdgeStatus.DELIVERED,
+        "edge-C-D" to EdgeStatus.BROKEN
+      ),
+      edgeStatusesById(model = model, outputs = outputs, errors = errors)
+    )
   }
 
   @Test
   fun `already skipped parent propagates and skipped nodes are not skipped again`() {
     val model = WorkflowFixtures.loadWorkflow(diamond)
     model.nodes.first { it.id == "B" }.data.status = NodeStatus.SKIPPED
-    val outputs = mapOf("A" to port())
+    val outputs = mapOf("A" to successOutputs)
 
-    assertEquals(listOf("D"), NodeReadiness.getNodesToSkip(model, outputs, emptyMap()).map { it.id })
-    assertEquals(listOf("C"), NodeReadiness.getReadyNodes(model, outputs, emptyMap()).map { it.id })
+    assertEquals(listOf("D"), skippedIds(model = model, outputs = outputs, errors = emptyMap()))
+    assertEquals(listOf("C"), readyIds(model = model, outputs = outputs, errors = emptyMap()))
+    assertEquals(
+      mapOf("edge-A-B" to EdgeStatus.DELIVERED, "edge-A-C" to EdgeStatus.DELIVERED, "edge-B-D" to EdgeStatus.BROKEN),
+      edgeStatusesById(model = model, outputs = outputs, errors = emptyMap())
+    )
+  }
+
+  @Test
+  fun `a parent that succeeds without producing the connected port skips the child`() {
+    val model = WorkflowFixtures.loadWorkflow(diamondJoin)
+    // B is wired to D through out-2 but only produced out-1
+    val outputs = mapOf("A" to successOutputs, "B" to successOutputs)
+
+    assertEquals(listOf("D"), skippedIds(model = model, outputs = outputs, errors = emptyMap()))
+    assertEquals(listOf("C"), readyIds(model = model, outputs = outputs, errors = emptyMap()))
+    // B delivered out-1 to nobody; the edge B -> D waits on out-2, which B never produced
+    assertEquals(
+      mapOf("edge-A-B" to EdgeStatus.DELIVERED, "edge-A-C" to EdgeStatus.DELIVERED, "edge-B-D" to EdgeStatus.BROKEN),
+      edgeStatusesById(model = model, outputs = outputs, errors = emptyMap())
+    )
+  }
+
+  @Test
+  fun `edges from a parent that has not finished yet have no status`() {
+    val model = WorkflowFixtures.loadWorkflow(diamond)
+    val outputs = mapOf("A" to successOutputs)
+
+    assertEquals(emptyList(), skippedIds(model = model, outputs = outputs, errors = emptyMap()))
+    assertEquals(listOf("B", "C"), readyIds(model = model, outputs = outputs, errors = emptyMap()))
+    assertEquals(
+      mapOf("edge-A-B" to EdgeStatus.DELIVERED, "edge-A-C" to EdgeStatus.DELIVERED),
+      edgeStatusesById(model = model, outputs = outputs, errors = emptyMap())
+    )
   }
 }

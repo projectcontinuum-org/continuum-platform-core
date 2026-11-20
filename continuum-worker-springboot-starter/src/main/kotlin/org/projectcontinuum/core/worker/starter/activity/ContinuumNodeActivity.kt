@@ -486,7 +486,7 @@ class ContinuumNodeActivity(
       ).updateNodeProgressSignal(
         ContinuumNodeActivitySignal(
           nodeId = nodeId,
-          nodeProgress = NodeProgress(0),
+          nodeProgress = NodeProgress(progressPercentage = 0),
           nodeStatus = ContinuumWorkflowModel.NodeStatus.BUSY
         )
       )

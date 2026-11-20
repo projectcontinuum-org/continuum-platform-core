@@ -2,43 +2,35 @@ package org.projectcontinuum.core.orchestration.workflow
 
 import com.fasterxml.jackson.module.kotlin.KotlinModule
 import io.temporal.api.enums.v1.IndexedValueType
-import io.temporal.client.WorkflowClient
-import io.temporal.client.WorkflowClientOptions
-import io.temporal.client.WorkflowFailedException
-import io.temporal.client.WorkflowOptions
-import io.temporal.client.WorkflowStub
+import io.temporal.client.*
 import io.temporal.common.converter.DefaultDataConverter
 import io.temporal.common.converter.JacksonJsonPayloadConverter
-import io.temporal.failure.ActivityFailure
 import io.temporal.failure.ApplicationFailure
 import io.temporal.failure.CanceledFailure
 import io.temporal.testing.TestEnvironmentOptions
 import io.temporal.testing.TestWorkflowEnvironment
 import org.junit.jupiter.api.Test
+import org.mockito.kotlin.any
+import org.mockito.kotlin.mock
+import org.mockito.kotlin.whenever
 import org.projectcontinuum.core.commons.activity.IContinuumNodeActivity
 import org.projectcontinuum.core.commons.constant.TaskQueues
 import org.projectcontinuum.core.commons.model.ContinuumWorkflowModel
 import org.projectcontinuum.core.commons.model.PortData
 import org.projectcontinuum.core.commons.model.PortDataStatus
+import org.projectcontinuum.core.commons.model.WorkflowUpdateEvent
 import org.projectcontinuum.core.commons.protocol.progress.ContinuumNodeActivitySignal
 import org.projectcontinuum.core.commons.protocol.progress.NodeProgress
 import org.projectcontinuum.core.commons.workflow.IContinuumWorkflow
+import org.projectcontinuum.core.orchestration.utils.StatusHelper
 import org.projectcontinuum.core.orchestration.workflow.fixtures.FakeContinuumNodeActivity
 import org.projectcontinuum.core.orchestration.workflow.fixtures.FakeInitializeActivity
 import org.projectcontinuum.core.orchestration.workflow.fixtures.WorkflowFixtures
-import org.mockito.kotlin.any
-import org.mockito.kotlin.mock
-import org.mockito.kotlin.whenever
-import org.projectcontinuum.core.commons.model.WorkflowUpdateEvent
-import org.projectcontinuum.core.orchestration.utils.StatusHelper
 import org.springframework.cloud.stream.function.StreamBridge
+import org.springframework.messaging.Message
 import java.io.Closeable
-import java.util.concurrent.CopyOnWriteArrayList
-import java.util.UUID
-import java.util.concurrent.CompletableFuture
-import java.util.concurrent.CountDownLatch
-import java.util.concurrent.ExecutionException
-import java.util.concurrent.TimeUnit
+import java.util.*
+import java.util.concurrent.*
 import java.util.concurrent.atomic.AtomicInteger
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -106,14 +98,29 @@ class ContinuumWorkflowTest {
     return stub to future
   }
 
-  /** Routes published status events into a list of nodeId -> status snapshots, one per event. */
-  private fun captureStatusEvents(): MutableList<Map<String, ContinuumWorkflowModel.NodeStatus?>> {
-    val events = CopyOnWriteArrayList<Map<String, ContinuumWorkflowModel.NodeStatus?>>()
+  /** One published status event, reduced to what the tests assert on. */
+  private data class StatusEvent(
+    val nodeStatuses: Map<String, ContinuumWorkflowModel.NodeStatus?>,
+    val edgeStatuses: Map<String, ContinuumWorkflowModel.EdgeStatus?>,
+    val progressPercentage: Int,
+    val workflowStatus: String
+  )
+
+  /** Routes published status events into a list, one entry per event. */
+  private fun captureStatusEvents(): MutableList<StatusEvent> {
+    val events = CopyOnWriteArrayList<StatusEvent>()
     val bridge = mock<StreamBridge>()
     whenever(bridge.send(any<String>(), any<Any>())).thenAnswer { invocation ->
-      val message = invocation.getArgument<org.springframework.messaging.Message<*>>(1)
-      val event = message.payload as WorkflowUpdateEvent
-      events.add(event.data.workflow.nodes.associate { it.id to it.data.status })
+      val message = invocation.getArgument<Message<*>>(1)
+      val update = (message.payload as WorkflowUpdateEvent).data
+      events.add(
+        StatusEvent(
+          nodeStatuses = update.workflow.nodes.associate { it.id to it.data.status },
+          edgeStatuses = update.workflow.edges.associate { it.id to it.data?.status },
+          progressPercentage = update.progressPercentage,
+          workflowStatus = update.status
+        )
+      )
       true
     }
     StatusHelper(bridge).postConstruct()
@@ -134,6 +141,7 @@ class ContinuumWorkflowTest {
   @Test
   fun `happy path linear workflow completes and returns all node outputs`() {
     newEnv().use { env ->
+      val events = captureStatusEvents()
       env.fakeNodeActivity.successOutputs["2"] =
         mapOf("output-1" to samplePortData("time"))
       env.fakeNodeActivity.successOutputs["3"] =
@@ -145,6 +153,10 @@ class ContinuumWorkflowTest {
 
       assertTrue(result.containsKey("2"))
       assertTrue(result.containsKey("3"))
+      assertEquals(
+        mapOf("reactflow__edge-2output-1-3input-1" to ContinuumWorkflowModel.EdgeStatus.DELIVERED),
+        events.last().edgeStatuses
+      )
     }
   }
 
@@ -307,7 +319,11 @@ class ContinuumWorkflowTest {
 
       assertEquals(setOf("root", "independent"), result.keys)
       assertFalse(env.fakeNodeActivity.invokedNodeIds.contains("skip-me"))
-      assertEquals(ContinuumWorkflowModel.NodeStatus.SKIPPED, events.last()["skip-me"])
+      val finalEvent = events.last()
+      assertEquals(ContinuumWorkflowModel.NodeStatus.SKIPPED, finalEvent.nodeStatuses["skip-me"])
+      assertEquals("FINISHED", finalEvent.workflowStatus)
+      // Skipped nodes count as done
+      assertEquals(100, finalEvent.progressPercentage)
     }
   }
 
@@ -322,16 +338,17 @@ class ContinuumWorkflowTest {
       val (_, future) = startWorkflow(env, model)
       future.get(10, TimeUnit.SECONDS)
 
-      val history = events.map { it["2"] }.fold(mutableListOf<ContinuumWorkflowModel.NodeStatus?>()) { acc, st ->
-        if (acc.lastOrNull() != st) acc.add(st)
-        acc
-      }
+      val distinctStatusesOfNode2 = events.map { it.nodeStatuses["2"] }
+        .fold(mutableListOf<ContinuumWorkflowModel.NodeStatus?>()) { statuses, status ->
+          if (statuses.lastOrNull() != status) statuses.add(status)
+          statuses
+        }
       val expected = listOf(
         ContinuumWorkflowModel.NodeStatus.SCHEDULED,
         ContinuumWorkflowModel.NodeStatus.BUSY,
         ContinuumWorkflowModel.NodeStatus.SUCCESS
       )
-      assertEquals(expected, history.filterNotNull())
+      assertEquals(expected, distinctStatusesOfNode2.filterNotNull())
     }
   }
 
@@ -724,6 +741,7 @@ class ContinuumWorkflowTest {
 
       // Only root node should have been invoked
       assertEquals(listOf("A"), env.fakeNodeActivity.invokedNodeIds)
+      val finalEvent = events.last()
       assertEquals(
         mapOf(
           "A" to ContinuumWorkflowModel.NodeStatus.FAILED,
@@ -731,8 +749,15 @@ class ContinuumWorkflowTest {
           "C" to ContinuumWorkflowModel.NodeStatus.SKIPPED,
           "D" to ContinuumWorkflowModel.NodeStatus.SKIPPED
         ),
-        events.last()
+        finalEvent.nodeStatuses
       )
+      // Every edge leads into a skipped node, so every wire is broken
+      val broken = ContinuumWorkflowModel.EdgeStatus.BROKEN
+      assertEquals(
+        mapOf("edge-A-B" to broken, "edge-A-C" to broken, "edge-B-D" to broken, "edge-C-D" to broken),
+        finalEvent.edgeStatuses
+      )
+      assertEquals(100, finalEvent.progressPercentage)
       // Skipped nodes are not errors
       @Suppress("UNCHECKED_CAST")
       val details = ((executionException.cause as WorkflowFailedException).cause as ApplicationFailure)
@@ -763,10 +788,47 @@ class ContinuumWorkflowTest {
       assertTrue(details.getValue("nodeToOutputsMap").containsKey("B"))
       assertTrue(details.getValue("nodeErrors").containsKey("C"))
       // The join is SKIPPED (not null) and is not an error
-      assertEquals(ContinuumWorkflowModel.NodeStatus.SKIPPED, events.last()["D"])
-      assertEquals(ContinuumWorkflowModel.NodeStatus.SUCCESS, events.last()["B"])
+      val finalEvent = events.last()
+      assertEquals(ContinuumWorkflowModel.NodeStatus.SKIPPED, finalEvent.nodeStatuses["D"])
+      assertEquals(ContinuumWorkflowModel.NodeStatus.SUCCESS, finalEvent.nodeStatuses["B"])
       assertFalse(details.getValue("nodeErrors").containsKey("D"))
       assertFalse(env.fakeNodeActivity.invokedNodeIds.contains("D"))
+      // Only the wire out of the failed node is broken; the others delivered their data
+      val delivered = ContinuumWorkflowModel.EdgeStatus.DELIVERED
+      assertEquals(
+        mapOf(
+          "edge-A-B" to delivered,
+          "edge-A-C" to delivered,
+          "edge-B-D" to delivered,
+          "edge-C-D" to ContinuumWorkflowModel.EdgeStatus.BROKEN
+        ),
+        finalEvent.edgeStatuses
+      )
+    }
+  }
+
+  @Test
+  fun `join is skipped and its wire broken when a parent succeeds without producing the connected port`() {
+    newEnv().use { env ->
+      val events = captureStatusEvents()
+      env.fakeNodeActivity.successOutputs["A"] = mapOf("out-1" to samplePortData("A"))
+      // B declares out-2 (wired to D) but only produces out-1
+      env.fakeNodeActivity.successOutputs["B"] = mapOf("out-1" to samplePortData("B"))
+      env.fakeNodeActivity.successOutputs["C"] = mapOf("out-1" to samplePortData("C"))
+
+      val model = WorkflowFixtures.loadWorkflow("/test-workflows/diamond-join-4node.cwf.json")
+      val (_, future) = startWorkflow(env, model)
+      val result = future.get(10, TimeUnit.SECONDS)
+
+      // A skipped node does not fail the workflow
+      assertEquals(setOf("A", "B", "C"), result.keys)
+      assertFalse(env.fakeNodeActivity.invokedNodeIds.contains("D"))
+      val finalEvent = events.last()
+      assertEquals("FINISHED", finalEvent.workflowStatus)
+      assertEquals(ContinuumWorkflowModel.NodeStatus.SKIPPED, finalEvent.nodeStatuses["D"])
+      assertEquals(ContinuumWorkflowModel.EdgeStatus.BROKEN, finalEvent.edgeStatuses["edge-B-D"])
+      assertEquals(ContinuumWorkflowModel.EdgeStatus.DELIVERED, finalEvent.edgeStatuses["edge-C-D"])
+      assertEquals(100, finalEvent.progressPercentage)
     }
   }
 

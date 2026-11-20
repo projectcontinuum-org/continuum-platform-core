@@ -105,16 +105,21 @@ class WorkflowStatusReporter(
   /**
    * Calculates the overall workflow progress percentage.
    *
-   * This method computes progress based on the number of completed nodes
-   * (both successful and failed) relative to the total number of nodes in the workflow.
+   * Progress is the share of nodes that are done: succeeded, failed or skipped. Skipped nodes
+   * count because they will never run, so a run with skipped nodes still ends at 100%.
    *
    * @return Progress percentage as an integer between 0 and 100
    */
   fun calculateProgressPercentage(): Int {
-    val totalNodes = currentRunningWorkflow()?.nodes?.size ?: 0
-    if (totalNodes == 0) return 100
-    val completedNodes = nodeToOutputsMap.size + nodeErrorsMap.size
-    return (completedNodes * 100) / totalNodes
+    val nodes = currentRunningWorkflow()?.nodes ?: emptyList()
+    if (nodes.isEmpty()) return 100
+    val skippedNodeCount = nodes.count { node ->
+      node.data.status == ContinuumWorkflowModel.NodeStatus.SKIPPED &&
+          !nodeToOutputsMap.containsKey(node.id) &&
+          !nodeErrorsMap.containsKey(node.id)
+    }
+    val doneNodeCount = nodeToOutputsMap.size + nodeErrorsMap.size + skippedNodeCount
+    return (doneNodeCount * 100) / nodes.size
   }
 
   /**
@@ -139,6 +144,17 @@ class WorkflowStatusReporter(
         it.animated = nodeStatus == ContinuumWorkflowModel.NodeStatus.BUSY ||
           nodeStatus == ContinuumWorkflowModel.NodeStatus.SCHEDULED
       }
+  }
+
+  /**
+   * Sets an edge's runtime status, published in `edge.data.status`. Animation is left to
+   * [setNodeAnimationAndStatus]: a DELIVERED edge stays animated while its target runs.
+   */
+  fun setEdgeStatus(
+    edge: ContinuumWorkflowModel.Edge,
+    edgeStatus: ContinuumWorkflowModel.EdgeStatus
+  ) {
+    edge.data = (edge.data ?: ContinuumWorkflowModel.EdgeData()).copy(status = edgeStatus)
   }
 
   /**
