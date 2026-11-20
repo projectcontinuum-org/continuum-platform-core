@@ -19,6 +19,7 @@ import org.mockito.kotlin.verify
 import org.mockito.kotlin.whenever
 import org.projectcontinuum.core.api.server.entity.jpa.WorkflowScheduleEntity
 import org.projectcontinuum.core.api.server.exception.InvalidRequestException
+import org.projectcontinuum.core.api.server.exception.WorkflowValidationException
 import org.projectcontinuum.core.api.server.exception.WorkflowScheduleNotFoundException
 import org.projectcontinuum.core.api.server.model.CreateWorkflowScheduleRequest
 import org.projectcontinuum.core.api.server.repository.jpa.WorkflowScheduleRepository
@@ -46,7 +47,7 @@ class WorkflowScheduleServiceTest {
     scheduleClient = mock()
     workflowScheduleRepository = mock()
     nodeExplorerService = mock()
-    service = WorkflowScheduleService(scheduleClient, workflowScheduleRepository, WorkflowPropertiesValidator(nodeExplorerService))
+    service = WorkflowScheduleService(scheduleClient, workflowScheduleRepository, nodeExplorerService)
   }
 
   private fun workflowModel(): ContinuumWorkflowModel =
@@ -136,7 +137,67 @@ class WorkflowScheduleServiceTest {
     val req = CreateWorkflowScheduleRequest(name = "Bad", cronExpression = "0 * * * *", continuumWorkflowModel = model)
 
     val e = assertThrows<InvalidRequestException> { service.createSchedule(req, ownedBy) }
-    assertTrue(e.message!!.contains("node 'n1'"), e.message)
+    assertTrue(e.message!!.contains("Node 'n1'"), e.message)
+
+    verify(scheduleClient, never()).createSchedule(any(), any(), any())
+    verify(workflowScheduleRepository, never()).save(any())
+  }
+
+  @Test
+  fun `createSchedule rejects cycles and invalid edge ports before any Temporal or DB interaction`() {
+    val descriptor = ContinuumWorkflowModel.NodeData(
+      title = "Node",
+      description = "",
+      nodeModel = "org.test.Node",
+      inputs = mapOf("in" to ContinuumWorkflowModel.NodePort("in", "application/json")),
+      outputs = mapOf("out" to ContinuumWorkflowModel.NodePort("out", "application/json"))
+    )
+    whenever(nodeExplorerService.getNodeMetadata("org.test.Node")).thenReturn(descriptor)
+
+    fun node(id: String) = ContinuumWorkflowModel.Node(
+      id = id,
+      type = "process",
+      position = ContinuumWorkflowModel.Position(0.0, 0.0),
+      width = 100,
+      height = 100,
+      selected = false,
+      data = descriptor
+    )
+
+    val cycle = ContinuumWorkflowModel(
+      id = "wf-cycle",
+      name = "Cycle",
+      nodes = listOf(node("a"), node("b")),
+      edges = listOf(
+        ContinuumWorkflowModel.Edge("ab", source = "a", target = "b", sourceHandle = "out", targetHandle = "in"),
+        ContinuumWorkflowModel.Edge("ba", source = "b", target = "a", sourceHandle = "out", targetHandle = "in")
+      )
+    )
+    val invalidPort = cycle.copy(
+      id = "wf-bad-port",
+      name = "Bad port",
+      edges = listOf(
+        ContinuumWorkflowModel.Edge("ab", source = "a", target = "b", sourceHandle = "missing", targetHandle = "in")
+      )
+    )
+
+    val invalidWorkflows = listOf(
+      cycle to "contain a cycle",
+      invalidPort to "has no output port 'missing'"
+    )
+    for ((workflow, expectedError) in invalidWorkflows) {
+      val exception = assertThrows<WorkflowValidationException> {
+        service.createSchedule(
+          CreateWorkflowScheduleRequest(
+            name = "Invalid",
+            cronExpression = "0 * * * *",
+            continuumWorkflowModel = workflow
+          ),
+          ownedBy
+        )
+      }
+      assertTrue(exception.errors.any { it.message.contains(expectedError) }, exception.errors.toString())
+    }
 
     verify(scheduleClient, never()).createSchedule(any(), any(), any())
     verify(workflowScheduleRepository, never()).save(any())

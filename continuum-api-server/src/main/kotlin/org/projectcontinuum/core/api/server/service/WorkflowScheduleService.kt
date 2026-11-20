@@ -11,6 +11,7 @@ import io.temporal.client.schedules.ScheduleOptions
 import io.temporal.client.schedules.ScheduleSpec
 import io.temporal.common.interceptors.Header
 import org.projectcontinuum.core.api.server.entity.jpa.WorkflowScheduleEntity
+import org.projectcontinuum.core.api.server.exception.WorkflowValidationException
 import org.projectcontinuum.core.api.server.exception.WorkflowScheduleNotFoundException
 import org.projectcontinuum.core.api.server.model.CreateWorkflowScheduleRequest
 import org.projectcontinuum.core.api.server.model.WorkflowScheduleResponse
@@ -18,6 +19,10 @@ import org.projectcontinuum.core.api.server.repository.jpa.WorkflowScheduleRepos
 import org.projectcontinuum.core.commons.constant.TaskQueues
 import org.projectcontinuum.core.commons.context.ContinuumOwnerContext
 import org.projectcontinuum.core.commons.context.ContinuumScheduleContext
+import org.projectcontinuum.core.commons.validation.GraphEdge
+import org.projectcontinuum.core.commons.validation.GraphNode
+import org.projectcontinuum.core.commons.validation.ValidationMode
+import org.projectcontinuum.core.commons.validation.WorkflowValidator
 import org.projectcontinuum.core.commons.workflow.IContinuumWorkflow
 import io.github.perplexhub.rsql.RSQLJPASupport
 import org.springframework.data.jpa.domain.Specification
@@ -28,11 +33,25 @@ import java.util.UUID
 class WorkflowScheduleService(
   private val scheduleClient: ScheduleClient,
   private val workflowScheduleRepository: WorkflowScheduleRepository,
-  private val workflowPropertiesValidator: WorkflowPropertiesValidator
+  nodeExplorerService: NodeExplorerService
 ) {
 
+  private val workflowValidator = WorkflowValidator { nodeModel -> nodeExplorerService.getNodeMetadata(nodeModel) }
+
   fun createSchedule(request: CreateWorkflowScheduleRequest, ownedBy: String): WorkflowScheduleResponse {
-    workflowPropertiesValidator.requireValidProperties(request.continuumWorkflowModel)
+    val workflow = request.continuumWorkflowModel
+    val validation = workflowValidator.validate(
+      nodes = workflow.nodes.map { node ->
+        GraphNode(key = node.id, nodeId = node.data.nodeModel, properties = node.data.properties, embedded = node.data)
+      },
+      edges = workflow.edges.map { edge ->
+        GraphEdge(from = edge.source, fromPort = edge.sourceHandle, to = edge.target, toPort = edge.targetHandle)
+      },
+      mode = ValidationMode.RUN
+    )
+    if (!validation.valid) {
+      throw WorkflowValidationException(errors = validation.errors, warnings = validation.warnings)
+    }
 
     val scheduleId = UUID.randomUUID()
 
