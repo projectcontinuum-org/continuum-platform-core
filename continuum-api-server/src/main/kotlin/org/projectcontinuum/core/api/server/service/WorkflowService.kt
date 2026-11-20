@@ -73,7 +73,7 @@ class WorkflowService(
     // An invalid graph or node properties (checked against the registry) are a 400, before any row or Temporal workflow exists.
     val warnings = requireValidWorkflow(continuumWorkflowModel)
     if (warnings.isNotEmpty()) {
-      LOGGER.warn(
+      LOGGER.info(
         "Starting workflow '{}' with {} validation warning(s): {}",
         continuumWorkflowModel.name,
         warnings.size,
