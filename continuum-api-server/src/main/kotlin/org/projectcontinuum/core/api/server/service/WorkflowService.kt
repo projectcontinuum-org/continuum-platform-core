@@ -1,6 +1,9 @@
 package org.projectcontinuum.core.api.server.service
 
+import org.projectcontinuum.core.api.server.exception.WorkflowValidationException
+import org.projectcontinuum.core.api.server.model.StartWorkflowResponse
 import org.projectcontinuum.core.api.server.model.WorkflowStatus
+import org.projectcontinuum.core.api.server.model.WorkflowValidationResponse
 import org.projectcontinuum.core.api.server.repository.jpa.WorkflowRunRepository
 import org.projectcontinuum.core.api.server.entity.jpa.WorkflowRunEntity
 import org.projectcontinuum.core.api.server.utils.TemporalVisibilityQuery
@@ -9,6 +12,12 @@ import org.projectcontinuum.core.commons.constant.TaskQueues
 import org.projectcontinuum.core.commons.model.ContinuumWorkflowModel
 import org.projectcontinuum.core.commons.model.ExecutionStatus
 import org.projectcontinuum.core.commons.model.PortData
+import org.projectcontinuum.core.commons.validation.GraphEdge
+import org.projectcontinuum.core.commons.validation.GraphNode
+import org.projectcontinuum.core.commons.validation.ValidationMode
+import org.projectcontinuum.core.commons.validation.WorkflowIssue
+import org.projectcontinuum.core.commons.validation.WorkflowValidationResult
+import org.projectcontinuum.core.commons.validation.WorkflowValidator
 import org.projectcontinuum.core.commons.workflow.IContinuumWorkflow
 import tools.jackson.core.type.TypeReference
 import tools.jackson.databind.ObjectMapper
@@ -42,8 +51,10 @@ class WorkflowService(
   val workflowClient: WorkflowClient,
   val workflowRunRepository: WorkflowRunRepository,
   val objectMapper: ObjectMapper,
-  private val workflowPropertiesValidator: WorkflowPropertiesValidator
+  nodeExplorerService: NodeExplorerService
 ) {
+
+  private val workflowValidator = WorkflowValidator { nodeModel -> nodeExplorerService.getNodeMetadata(nodeModel) }
 
   companion object {
     private val LOGGER = LoggerFactory.getLogger(WorkflowService::class.java)
@@ -57,10 +68,18 @@ class WorkflowService(
   fun startWorkflow(
     continuumWorkflowModel: ContinuumWorkflowModel,
     ownedBy: String
-  ): String {
+  ): StartWorkflowResponse {
 
-    // Invalid node properties (checked against the registry's schema) are a 400, before any row or Temporal workflow exists.
-    workflowPropertiesValidator.requireValidProperties(continuumWorkflowModel)
+    // An invalid graph or node properties (checked against the registry) are a 400, before any row or Temporal workflow exists.
+    val warnings = requireValidWorkflow(continuumWorkflowModel)
+    if (warnings.isNotEmpty()) {
+      LOGGER.info(
+        "Starting workflow '{}' with {} validation warning(s): {}",
+        continuumWorkflowModel.name,
+        warnings.size,
+        warnings.map { it.message }
+      )
+    }
 
     val workflowId = UUID.randomUUID().toString()
 
@@ -113,8 +132,52 @@ class WorkflowService(
     }
 
     recordRunId(workflowId, workflowExecution.runId)
-    return workflowExecution.workflowId
+    return StartWorkflowResponse(workflowId = workflowExecution.workflowId, warnings = warnings)
   }
+
+  /**
+   * Checks [workflow] exactly as a start would, without starting anything: no run row, no Temporal call. Invalid is a
+   * normal result here, so the workbench can show every error and warning while the user is still editing.
+   *
+   * [ownedBy] is the caller. The static checks do not use it yet; it is in the signature for the planned partial run,
+   * which will execute part of the workflow on the caller's behalf to check that properties line up.
+   */
+  @Suppress("UNUSED_PARAMETER")
+  fun validateWorkflow(workflow: ContinuumWorkflowModel, ownedBy: String): WorkflowValidationResponse {
+    val result = runValidation(workflow)
+    return WorkflowValidationResponse(
+      valid = result.valid,
+      nodeCount = workflow.nodes.size,
+      edgeCount = workflow.edges.size,
+      errors = result.errors,
+      warnings = result.warnings
+    )
+  }
+
+  /** Returns the warnings, or throws [WorkflowValidationException] (HTTP 400) carrying every error. */
+  private fun requireValidWorkflow(workflow: ContinuumWorkflowModel): List<WorkflowIssue> {
+    val result = runValidation(workflow)
+    if (!result.valid) throw WorkflowValidationException(errors = result.errors, warnings = result.warnings)
+    return result.warnings
+  }
+
+  /**
+   * Runs the shared [WorkflowValidator] in [ValidationMode.RUN]. Ports and the properties schema come from the node
+   * registry, never from the submitted workflow, whose copies are client-controlled. A submitted definition that
+   * differs from the registered one is a warning, and the registered one decides. A node whose `nodeModel` is not
+   * registered is an error: without its descriptor nothing about it can be checked, and a start that skipped the check
+   * would only fail later on the worker.
+   */
+  private fun runValidation(workflow: ContinuumWorkflowModel): WorkflowValidationResult =
+    workflowValidator.validate(
+      nodes = workflow.nodes.map { node ->
+        GraphNode(key = node.id, nodeId = node.data.nodeModel, properties = node.data.properties, embedded = node.data)
+      },
+      edges = workflow.edges.map { edge ->
+        GraphEdge(from = edge.source, fromPort = edge.sourceHandle, to = edge.target, toPort = edge.targetHandle)
+      },
+      mode = ValidationMode.RUN
+    )
 
   /**
    * Stores the Temporal run id, which node outputs are stored under, as soon as the workflow has started. Only

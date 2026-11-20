@@ -3,6 +3,7 @@ package org.projectcontinuum.core.api.server.controller
 import org.projectcontinuum.core.api.server.model.CountWorkflowResponse
 import org.projectcontinuum.core.api.server.model.StartWorkflowResponse
 import org.projectcontinuum.core.api.server.model.WorkflowStatus
+import org.projectcontinuum.core.api.server.model.WorkflowValidationResponse
 import org.projectcontinuum.core.api.server.service.WorkflowService
 import org.projectcontinuum.core.api.server.utils.TreeHelper
 import org.projectcontinuum.core.commons.model.ContinuumWorkflowModel
@@ -22,9 +23,20 @@ class WorkflowController(
     @RequestBody
     continuumWorkflowModel: ContinuumWorkflowModel
   ): StartWorkflowResponse {
-    return StartWorkflowResponse(
-      workflowId = workflowService.startWorkflow(continuumWorkflowModel, ownedBy)
-    )
+    return workflowService.startWorkflow(continuumWorkflowModel, ownedBy)
+  }
+
+  /**
+   * Validates a workflow with the same checks as [startWorkflow] and nothing else: no run row and no Temporal call.
+   * Always 200 for a well-formed body; `valid` and `errors` carry the verdict.
+   */
+  @PostMapping("/validate")
+  fun validateWorkflow(
+    @RequestHeader("x-continuum-user-id", required = false, defaultValue = "anonymous") ownedBy: String,
+    @RequestBody
+    continuumWorkflowModel: ContinuumWorkflowModel
+  ): WorkflowValidationResponse {
+    return workflowService.validateWorkflow(workflow = continuumWorkflowModel, ownedBy = ownedBy)
   }
 
   @GetMapping("/active")

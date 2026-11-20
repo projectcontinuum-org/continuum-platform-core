@@ -78,6 +78,8 @@ Default section order:
 
 When the user requests a durable behavior change, record it here or in the relevant child AGENTS.md
 
+- Kotlin must read descriptively. Use named parameters at call sites (constructors, data classes, functions with 2+ arguments), in tests too, and prefer descriptive names and explanatory locals over dense one-liners
+
 ## Project Reference
 
 ### Commands

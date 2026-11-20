@@ -29,6 +29,7 @@ import org.mockito.kotlin.verify
 import org.mockito.kotlin.whenever
 import org.projectcontinuum.core.api.server.entity.jpa.WorkflowRunEntity
 import org.projectcontinuum.core.api.server.exception.InvalidRequestException
+import org.projectcontinuum.core.api.server.exception.WorkflowValidationException
 import org.projectcontinuum.core.api.server.repository.jpa.WorkflowRunRepository
 import org.projectcontinuum.core.commons.model.ContinuumWorkflowModel
 import org.projectcontinuum.core.commons.model.PortData
@@ -59,7 +60,7 @@ class WorkflowServiceTest {
     workflowRunRepository = mock()
     nodeExplorerService = mock()
     service = WorkflowService(
-      workflowClient, workflowRunRepository, JsonMapper.builder().build(), WorkflowPropertiesValidator(nodeExplorerService)
+      workflowClient, workflowRunRepository, JsonMapper.builder().build(), nodeExplorerService
     )
   }
 
@@ -274,7 +275,7 @@ class WorkflowServiceTest {
   @Test
   fun `start records the Temporal run id on the run row`() {
     val workflowId = withTemporalStart({ execution("ignored", "run-123") }) {
-      service.startWorkflow(emptyWorkflow, "alice")
+      service.startWorkflow(emptyWorkflow, "alice").workflowId
     }
 
     val saved = argumentCaptor<WorkflowRunEntity>()
@@ -316,7 +317,7 @@ class WorkflowServiceTest {
   fun `failing to record the run id does not fail a workflow that is already running`() {
     whenever(workflowRunRepository.updateRunId(any(), any())).thenThrow(RuntimeException("db down"))
 
-    val workflowId = withTemporalStart({ execution("wf-1", "run-1") }) { service.startWorkflow(emptyWorkflow, "alice") }
+    val workflowId = withTemporalStart({ execution("wf-1", "run-1") }) { service.startWorkflow(emptyWorkflow, "alice").workflowId }
 
     assertEquals("wf-1", workflowId)
   }
@@ -379,8 +380,8 @@ class WorkflowServiceTest {
 
     val e = assertRejectedBeforeStart(workflow)
 
-    assertTrue(e.message!!.contains("node 'bad'") && e.message!!.contains("/width"), e.message)
-    assertTrue(!e.message!!.contains("node 'ok'"), e.message)
+    assertTrue(e.message!!.contains("Node 'bad'") && e.message!!.contains("/width"), e.message)
+    assertTrue(!e.message!!.contains("Node 'ok'"), e.message)
   }
 
   @Test
@@ -390,7 +391,7 @@ class WorkflowServiceTest {
 
     val e = assertRejectedBeforeStart(workflow)
 
-    assertTrue(e.message!!.contains("node 'bad'") && e.message!!.contains("/width"), e.message)
+    assertTrue(e.message!!.contains("Node 'bad'") && e.message!!.contains("/width"), e.message)
   }
 
   @Test
@@ -408,7 +409,7 @@ class WorkflowServiceTest {
 
     val e = assertRejectedBeforeStart(workflow)
 
-    assertTrue(e.message!!.contains("node 'x'") && e.message!!.contains("no registered node"), e.message)
+    assertTrue(e.message!!.contains("Node 'x'") && e.message!!.contains("no registered node"), e.message)
   }
 
   @Test
@@ -421,5 +422,67 @@ class WorkflowServiceTest {
     verify(workflowRunRepository).save(any<WorkflowRunEntity>())
     // Each node type is looked up once, however many times it appears.
     verify(nodeExplorerService, times(1)).getNodeMetadata("org.test.Typed")
+  }
+
+  // --- startWorkflow: graph checks and warnings ---
+
+  private val portType = ContinuumWorkflowModel.NodePort(name = "table", contentType = "application/x-parquet")
+
+  private fun registerStepNode() {
+    whenever(nodeExplorerService.getNodeMetadata("org.test.Step")).thenReturn(
+      ContinuumWorkflowModel.NodeData(
+        description = "", title = "Step", nodeModel = "org.test.Step",
+        inputs = mapOf("in" to portType), outputs = mapOf("out" to portType)
+      )
+    )
+  }
+
+  private fun stepNode(id: String) =
+    nodeWith(id = id, properties = emptyMap(), nodeModel = "org.test.Step", sentSchema = emptyMap())
+
+  @Test
+  fun `a node with an unconnected input still starts, and the warning is returned and logged not thrown`() {
+    registerStepNode()
+    val workflow = emptyWorkflow.copy(nodes = listOf(stepNode("a")))
+
+    val response = withTemporalStart({ execution("wf-1", "run-1") }) { service.startWorkflow(workflow, "alice") }
+
+    assertEquals("wf-1", response.workflowId)
+    assertTrue(response.warnings.any { it.message.contains("input port 'in' has no incoming edge") }, response.warnings.toString())
+    verify(workflowRunRepository).save(any<WorkflowRunEntity>())
+  }
+
+  @Test
+  fun `a cyclic workflow is rejected before anything is saved or started`() {
+    registerStepNode()
+    fun edge(source: String, target: String) = ContinuumWorkflowModel.Edge(
+      id = "$source-$target",
+      source = source,
+      target = target,
+      sourceHandle = "out",
+      targetHandle = "in"
+    )
+    val workflow = emptyWorkflow.copy(
+      nodes = listOf(stepNode("a"), stepNode("b")),
+      edges = listOf(edge(source = "a", target = "b"), edge(source = "b", target = "a"))
+    )
+
+    val e = assertThrows<WorkflowValidationException> {
+      withTemporalStart({ error("must not start") }) { service.startWorkflow(workflow, "alice") }
+    }
+
+    assertTrue(e.errors.single().message.contains("cycle"), e.message)
+    verify(workflowRunRepository, never()).save(any<WorkflowRunEntity>())
+  }
+
+  @Test
+  fun `a client schema that differs from the registered one is a warning and the registered schema decides`() {
+    registerTypedNode()
+    val loose = mapOf("type" to "object", "properties" to mapOf("width" to mapOf("type" to "integer")))
+    val workflow = emptyWorkflow.copy(nodes = listOf(nodeWith(id = "ok", properties = mapOf("width" to 1), sentSchema = loose)))
+
+    val response = withTemporalStart({ execution("wf-1", "run-1") }) { service.startWorkflow(workflow, "alice") }
+
+    assertTrue(response.warnings.any { it.node == "ok" && it.message.contains("propertiesSchema") }, response.warnings.toString())
   }
 }
