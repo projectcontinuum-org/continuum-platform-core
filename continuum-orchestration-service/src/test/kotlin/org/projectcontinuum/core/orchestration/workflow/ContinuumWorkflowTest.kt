@@ -9,6 +9,7 @@ import io.temporal.failure.ApplicationFailure
 import io.temporal.failure.CanceledFailure
 import io.temporal.testing.TestEnvironmentOptions
 import io.temporal.testing.TestWorkflowEnvironment
+import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Test
 import org.mockito.kotlin.any
 import org.mockito.kotlin.mock
@@ -46,6 +47,12 @@ import kotlin.test.assertTrue
 class ContinuumWorkflowTest {
 
   private val activityTaskQueue = "TEST_FAKE_CONTINUUM_NODE_ACTIVITY_TASK_QUEUE"
+
+  @AfterEach
+  fun resetStatusPublisher() {
+    // captureStatusEvents() installs a mock in the static StatusHelper; don't leak it into other tests
+    StatusHelper.reset()
+  }
 
   private class Env(
     val testEnv: TestWorkflowEnvironment,
@@ -335,7 +342,7 @@ class ContinuumWorkflowTest {
       env.fakeNodeActivity.successOutputs["3"] = mapOf("output-1" to samplePortData("part1"))
 
       val model = WorkflowFixtures.loadWorkflow("/test-workflows/linear-2node.cwf.json")
-      val (_, future) = startWorkflow(env, model)
+      val (_, future) = startWorkflow(env = env, model = model)
       future.get(10, TimeUnit.SECONDS)
 
       val distinctStatusesOfNode2 = events.map { it.nodeStatuses["2"] }
@@ -817,7 +824,7 @@ class ContinuumWorkflowTest {
       env.fakeNodeActivity.successOutputs["C"] = mapOf("out-1" to samplePortData("C"))
 
       val model = WorkflowFixtures.loadWorkflow("/test-workflows/diamond-join-4node.cwf.json")
-      val (_, future) = startWorkflow(env, model)
+      val (_, future) = startWorkflow(env = env, model = model)
       val result = future.get(10, TimeUnit.SECONDS)
 
       // A skipped node does not fail the workflow

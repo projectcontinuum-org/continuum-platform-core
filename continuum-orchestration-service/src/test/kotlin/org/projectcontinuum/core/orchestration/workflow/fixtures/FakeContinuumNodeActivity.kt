@@ -63,7 +63,10 @@ class FakeContinuumNodeActivity : IContinuumNodeActivity {
     invokedNodeIds.add(node.id)
     // Mirror the real worker: report BUSY as soon as the activity starts
     Activity.getExecutionContext().workflowClient
-      .newWorkflowStub(IContinuumWorkflow::class.java, Activity.getExecutionContext().info.workflowId)
+      .newWorkflowStub(
+        IContinuumWorkflow::class.java,
+        Activity.getExecutionContext().info.workflowId
+      )
       .updateNodeProgressSignal(
         ContinuumNodeActivitySignal(
           nodeId = node.id,

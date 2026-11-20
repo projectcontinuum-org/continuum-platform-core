@@ -158,19 +158,19 @@ class WorkflowStatusReporter(
   }
 
   /**
-   * Marks all nodes currently in SCHEDULED or BUSY status with the given status.
+   * Marks all in-flight nodes (SCHEDULED or BUSY) with the given status.
    *
    * This is used during workflow failure, cancellation, or termination to
    * update any in-progress nodes so the UI reflects their final state.
    *
-   * @param status The status to assign to busy nodes (e.g., FAILED, CANCELLED)
+   * @param status The status to assign to in-flight nodes (e.g., FAILED, CANCELLED)
    */
-  fun markBusyNodesAs(status: ContinuumWorkflowModel.NodeStatus) {
+  fun markInFlightNodesAs(status: ContinuumWorkflowModel.NodeStatus) {
     currentRunningWorkflow()?.nodes
       ?.filter {
         it.data.status == ContinuumWorkflowModel.NodeStatus.BUSY ||
           it.data.status == ContinuumWorkflowModel.NodeStatus.SCHEDULED
       }
-      ?.forEach { setNodeAnimationAndStatus(it, status) }
+      ?.forEach { node -> setNodeAnimationAndStatus(node = node, nodeStatus = status) }
   }
 }

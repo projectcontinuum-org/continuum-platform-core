@@ -70,7 +70,7 @@ class WorkflowDagExecutor(
         // Gather inputs from parent nodes' outputs
         val nodeInputs = getNodeInputs(continuumWorkflow, node, nodeToOutputsMap)
         // Mark node as scheduled and animate incoming edges; the activity reports BUSY once it starts
-        statusReporter.setNodeAnimationAndStatus(node, ContinuumWorkflowModel.NodeStatus.SCHEDULED)
+        statusReporter.setNodeAnimationAndStatus(node = node, nodeStatus = ContinuumWorkflowModel.NodeStatus.SCHEDULED)
         // Start the activity asynchronously, catching ActivityFailure to treat it as a node error
         Pair(node, Async.function {
           try {
@@ -113,11 +113,11 @@ class WorkflowDagExecutor(
         // Check if node succeeded or failed based on error output port
         if (!nodeOutput.outputs.containsKey(IContinuumNodeActivity.NodeOutputSystemPort.ERROR.key)) {
           // Success: update status and store outputs
-          statusReporter.setNodeAnimationAndStatus(completedNode, ContinuumWorkflowModel.NodeStatus.SUCCESS)
+          statusReporter.setNodeAnimationAndStatus(node = completedNode, nodeStatus = ContinuumWorkflowModel.NodeStatus.SUCCESS)
           nodeToOutputsMap[nodeOutput.nodeId] = nodeOutput.outputs
         } else {
           // Failure: update status and store error info
-          statusReporter.setNodeAnimationAndStatus(completedNode, ContinuumWorkflowModel.NodeStatus.FAILED)
+          statusReporter.setNodeAnimationAndStatus(node = completedNode, nodeStatus = ContinuumWorkflowModel.NodeStatus.FAILED)
           nodeErrorsMap[nodeOutput.nodeId] = nodeOutput.outputs
         }
 
@@ -136,7 +136,6 @@ class WorkflowDagExecutor(
         nodeErrorsMap = nodeErrorsMap
       ).isNotEmpty()
     } while (hasReadyNodes || nodeExecutionPromises.isNotEmpty())
-    statusReporter.publishUpdate()
     LOGGER.info("All nodes executed----------------------------------")
   }
 

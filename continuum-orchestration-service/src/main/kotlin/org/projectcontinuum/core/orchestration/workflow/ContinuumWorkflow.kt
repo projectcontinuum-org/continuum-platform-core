@@ -162,7 +162,7 @@ class ContinuumWorkflow : IContinuumWorkflow {
    */
   private fun handleCancellation(e: Throwable) {
     LOGGER.warn("Workflow was cancelled or terminated", e)
-    statusReporter.markBusyNodesAs(ContinuumWorkflowModel.NodeStatus.CANCELLED)
+    statusReporter.markInFlightNodesAs(status = ContinuumWorkflowModel.NodeStatus.CANCELLED)
     Workflow.upsertTypedSearchAttributes(
       IContinuumWorkflow.WORKFLOW_STATUS
         .valueSet(ExecutionStatus.WORKFLOW_EXECUTION_CANCELED.value)
@@ -178,7 +178,7 @@ class ContinuumWorkflow : IContinuumWorkflow {
    */
   private fun handleUnexpectedFailure(e: Throwable) {
     LOGGER.error("Error in executing workflow", e)
-    statusReporter.markBusyNodesAs(ContinuumWorkflowModel.NodeStatus.FAILED)
+    statusReporter.markInFlightNodesAs(status = ContinuumWorkflowModel.NodeStatus.FAILED)
     Workflow.upsertTypedSearchAttributes(
       IContinuumWorkflow.WORKFLOW_STATUS
         .valueSet(ExecutionStatus.WORKFLOW_EXECUTION_FAILED.value)
@@ -227,7 +227,7 @@ class ContinuumWorkflow : IContinuumWorkflow {
     if (continuumNodeActivitySignal.nodeStatus == ContinuumWorkflowModel.NodeStatus.BUSY &&
       nodeToUpdate.data.status == ContinuumWorkflowModel.NodeStatus.SCHEDULED
     ) {
-      statusReporter.setNodeAnimationAndStatus(nodeToUpdate, ContinuumWorkflowModel.NodeStatus.BUSY)
+      statusReporter.setNodeAnimationAndStatus(node = nodeToUpdate, nodeStatus = ContinuumWorkflowModel.NodeStatus.BUSY)
     }
 
     LOGGER.info("Node id: ${nodeToUpdate.data.id} Node title: ${nodeToUpdate.data.title} Node current progress: ${nodeToUpdate.data.nodeProgress?.progressPercentage ?: "null"}%")
