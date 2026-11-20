@@ -153,4 +153,68 @@ class WorkflowControllerGraphValidationTest {
     verifyNoInteractions(workflowClient)
     verify(workflowRunRepository, never()).save(any<WorkflowRunEntity>())
   }
+
+  // --- POST /api/v1/workflow/validate: the same checks, no run ---
+
+  private fun validateWorkflow(body: String, userId: String? = null) =
+    mockMvc.perform(
+      post("/api/v1/workflow/validate")
+        .contentType(MediaType.APPLICATION_JSON)
+        .content(body)
+        .apply { userId?.let { header("x-continuum-user-id", it) } }
+    )
+
+  @Test
+  fun `validate reports every error as a 200 and never touches Temporal or the database`() {
+    val body = workflow(
+      nodes = listOf(node(id = "a", model = "org.test.Step", properties = "{}"), node(id = "x", model = "org.test.Missing")),
+      edges = listOf(edge(source = "a", sourceHandle = "out", target = "a", targetHandle = "in"))
+    )
+
+    validateWorkflow(body)
+      .andExpect(status().isOk)
+      .andExpect(jsonPath("$.valid").value(false))
+      .andExpect(jsonPath("$.nodeCount").value(2))
+      .andExpect(jsonPath("$.edgeCount").value(1))
+      .andExpect(jsonPath("$.errors", hasSize<Any>(3)))
+
+    verifyNoInteractions(workflowClient)
+    verifyNoInteractions(workflowRunRepository)
+  }
+
+  @Test
+  fun `validate of a good workflow is valid and returns warnings without starting it`() {
+    val body = workflow(nodes = listOf(node(id = "a", model = "org.test.Step")), edges = emptyList())
+
+    validateWorkflow(body)
+      .andExpect(status().isOk)
+      .andExpect(jsonPath("$.valid").value(true))
+      .andExpect(jsonPath("$.errors", hasSize<Any>(0)))
+      .andExpect(jsonPath("$.warnings[?(@.message =~ /.*input port 'in' has no incoming edge.*/)].node").value("a"))
+
+    verifyNoInteractions(workflowClient)
+    verifyNoInteractions(workflowRunRepository)
+  }
+
+  @Test
+  fun `validate accepts the owner header and works without it`() {
+    val body = workflow(nodes = listOf(node(id = "a", model = "org.test.Step")), edges = emptyList())
+
+    validateWorkflow(body = body, userId = "alice").andExpect(status().isOk).andExpect(jsonPath("$.valid").value(true))
+    validateWorkflow(body = body).andExpect(status().isOk).andExpect(jsonPath("$.valid").value(true))
+  }
+
+  @Test
+  fun `validate and start agree on what is invalid`() {
+    val body = workflow(
+      nodes = listOf(node(id = "a", model = "org.test.Step"), node(id = "b", model = "org.test.Step")),
+      edges = listOf(
+        edge(source = "a", sourceHandle = "out", target = "b", targetHandle = "in"),
+        edge(source = "b", sourceHandle = "out", target = "a", targetHandle = "in")
+      )
+    )
+
+    validateWorkflow(body).andExpect(jsonPath("$.valid").value(false))
+    startWorkflow(body).andExpect(status().isBadRequest)
+  }
 }
