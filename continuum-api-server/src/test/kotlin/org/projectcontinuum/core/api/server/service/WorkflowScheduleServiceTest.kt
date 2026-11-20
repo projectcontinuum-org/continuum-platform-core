@@ -144,6 +144,43 @@ class WorkflowScheduleServiceTest {
   }
 
   @Test
+  fun `createSchedule rejects an unregistered node before any Temporal or DB interaction`() {
+    val unregisteredNode = ContinuumWorkflowModel.Node(
+      id = "n1",
+      type = "process",
+      position = ContinuumWorkflowModel.Position(0.0, 0.0),
+      width = 100,
+      height = 100,
+      selected = false,
+      data = ContinuumWorkflowModel.NodeData(
+        title = "Not registered",
+        description = "",
+        nodeModel = "org.test.NotRegistered"
+      )
+    )
+    val workflow = ContinuumWorkflowModel(
+      id = "wf-unregistered",
+      name = "Unregistered node",
+      nodes = listOf(unregisteredNode)
+    )
+
+    val exception = assertThrows<WorkflowValidationException> {
+      service.createSchedule(
+        CreateWorkflowScheduleRequest(
+          name = "Unregistered node",
+          cronExpression = "0 * * * *",
+          continuumWorkflowModel = workflow
+        ),
+        ownedBy
+      )
+    }
+
+    assertTrue(exception.errors.any { it.message.contains("no registered node with id 'org.test.NotRegistered'") })
+    verify(scheduleClient, never()).createSchedule(any(), any(), any())
+    verify(workflowScheduleRepository, never()).save(any())
+  }
+
+  @Test
   fun `createSchedule rejects cycles and invalid edge ports before any Temporal or DB interaction`() {
     val descriptor = ContinuumWorkflowModel.NodeData(
       title = "Node",
