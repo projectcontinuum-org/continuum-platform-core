@@ -53,10 +53,8 @@ class WorkflowDagExecutor(
 
     do {
       // Find nodes ready to execute (all parents have completed)
-      val nodesToExecute = getNextNodesToExecute(
-        continuumWorkflow,
-        nodeToOutputsMap
-      )
+      markUnrunnableNodesSkipped(continuumWorkflow, nodeToOutputsMap, nodeErrorsMap)
+      val nodesToExecute = NodeReadiness.getReadyNodes(continuumWorkflow, nodeToOutputsMap, nodeErrorsMap)
       LOGGER.info("Nodes to execute: ${nodesToExecute.map { it.id }}")
 
       // Start each ready node as an async activity
@@ -119,11 +117,11 @@ class WorkflowDagExecutor(
         nodeExecutionPromises.removeAll { it.first.id == nodeOutput.nodeId }
       }
       LOGGER.info("NodeExecutionPromises size: ${nodeExecutionPromises.size}")
-    } while (getNextNodesToExecute(
-        continuumWorkflow,
-        nodeToOutputsMap
-      ).isNotEmpty() || nodeExecutionPromises.isNotEmpty()
+      markUnrunnableNodesSkipped(continuumWorkflow, nodeToOutputsMap, nodeErrorsMap)
+    } while (NodeReadiness.getReadyNodes(continuumWorkflow, nodeToOutputsMap, nodeErrorsMap).isNotEmpty() ||
+      nodeExecutionPromises.isNotEmpty()
     )
+    statusReporter.publishUpdate()
     LOGGER.info("All nodes executed----------------------------------")
   }
 
@@ -152,67 +150,15 @@ class WorkflowDagExecutor(
     return nodeInputs
   }
 
-  /**
-   * Determines which nodes are ready to execute.
-   *
-   * A node is ready to execute when:
-   * 1. All parent nodes have completed successfully
-   * 2. All required input ports have data available
-   * 3. The node hasn't been executed yet
-   * 4. The node doesn't have a status (not currently running)
-   *
-   * @param continuumWorkflow The workflow model containing node and edge definitions
-   * @param nodeOutputMap Map of completed node IDs to their outputs
-   * @return List of nodes ready for execution
-   */
-  private fun getNextNodesToExecute(
+  /** Marks every node that can never run as SKIPPED; the caller publishes the update. */
+  private fun markUnrunnableNodesSkipped(
     continuumWorkflow: ContinuumWorkflowModel,
-    nodeOutputMap: Map<String, Map<String, PortData>>
-  ): List<ContinuumWorkflowModel.Node> {
-    val nodesToExecute = mutableListOf<ContinuumWorkflowModel.Node>()
-
-    for (node in continuumWorkflow.nodes) {
-      // Get parent nodes and connecting edges
-      val nodeParents = continuumWorkflow.getParentNodes(node)
-      val nodeParentEdges = continuumWorkflow.getParentEdges(node)
-
-      // Check if all parent nodes have produced the required outputs
-      val allParentsProducedOutput = nodeParents.all { parent ->
-        val connectingEdgesToParent = nodeParentEdges.filter { it.source == parent.id }
-        // Parent must have outputs AND all connected output ports must have data
-        nodeOutputMap.containsKey(parent.id) &&
-            connectingEdgesToParent.all { edge ->
-              nodeOutputMap[parent.id]?.containsKey(edge.sourceHandle) ?: false
-            }
-      }
-
-      // Check if all input ports are connected to a parent node's output port
-      val allInputPortsConnected = node.data.inputs?.all { inputPort ->
-          nodeParentEdges.any { edge -> edge.targetHandle == inputPort.key }
-      } ?: true
-
-      if(!allInputPortsConnected) {
-        node.data.status = ContinuumWorkflowModel.NodeStatus.SKIPPED
-      }
-
-      LOGGER.debug(
-        "Node: {} allParentsProducedOutput: {} allInputPortsConnected: {} executed: {} status: {}",
-        node.id,
-        allParentsProducedOutput,
-        allInputPortsConnected,
-        nodeOutputMap.containsKey(node.id),
-        node.data.status
-      )
-
-      // Node is ready if: parents done, not yet executed, and not currently running
-      if (allParentsProducedOutput &&
-        allInputPortsConnected &&
-        !nodeOutputMap.containsKey(node.id) &&
-        node.data.status == null
-      ) {
-        nodesToExecute.add(node)
-      }
+    nodeToOutputsMap: Map<String, Map<String, PortData>>,
+    nodeErrorsMap: Map<String, Map<String, PortData>>
+  ) {
+    NodeReadiness.getNodesToSkip(continuumWorkflow, nodeToOutputsMap, nodeErrorsMap).forEach {
+      LOGGER.info("Skipping node {}", it.id)
+      statusReporter.setNodeAnimationAndStatus(it, ContinuumWorkflowModel.NodeStatus.SKIPPED)
     }
-    return nodesToExecute
   }
 }

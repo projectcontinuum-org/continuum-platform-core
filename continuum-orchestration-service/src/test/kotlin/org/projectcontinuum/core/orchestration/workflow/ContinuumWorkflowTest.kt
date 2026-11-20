@@ -26,7 +26,14 @@ import org.projectcontinuum.core.commons.workflow.IContinuumWorkflow
 import org.projectcontinuum.core.orchestration.workflow.fixtures.FakeContinuumNodeActivity
 import org.projectcontinuum.core.orchestration.workflow.fixtures.FakeInitializeActivity
 import org.projectcontinuum.core.orchestration.workflow.fixtures.WorkflowFixtures
+import org.mockito.kotlin.any
+import org.mockito.kotlin.mock
+import org.mockito.kotlin.whenever
+import org.projectcontinuum.core.commons.model.WorkflowUpdateEvent
+import org.projectcontinuum.core.orchestration.utils.StatusHelper
+import org.springframework.cloud.stream.function.StreamBridge
 import java.io.Closeable
+import java.util.concurrent.CopyOnWriteArrayList
 import java.util.UUID
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.CountDownLatch
@@ -97,6 +104,20 @@ class ContinuumWorkflowTest {
     )
     val future = WorkflowClient.execute(stub::start, model)
     return stub to future
+  }
+
+  /** Routes published status events into a list of nodeId -> status snapshots, one per event. */
+  private fun captureStatusEvents(): MutableList<Map<String, ContinuumWorkflowModel.NodeStatus?>> {
+    val events = CopyOnWriteArrayList<Map<String, ContinuumWorkflowModel.NodeStatus?>>()
+    val bridge = mock<StreamBridge>()
+    whenever(bridge.send(any<String>(), any<Any>())).thenAnswer { invocation ->
+      val message = invocation.getArgument<org.springframework.messaging.Message<*>>(1)
+      val event = message.payload as WorkflowUpdateEvent
+      events.add(event.data.workflow.nodes.associate { it.id to it.data.status })
+      true
+    }
+    StatusHelper(bridge).postConstruct()
+    return events
   }
 
   private fun samplePortData(value: String = "sample"): PortData =
@@ -276,6 +297,7 @@ class ContinuumWorkflowTest {
   @Test
   fun `node with unconnected declared input port is skipped while independent siblings still complete`() {
     newEnv().use { env ->
+      val events = captureStatusEvents()
       env.fakeNodeActivity.successOutputs["root"] = mapOf("out-1" to samplePortData("root"))
       env.fakeNodeActivity.successOutputs["independent"] = mapOf("out-1" to samplePortData("independent"))
 
@@ -285,6 +307,7 @@ class ContinuumWorkflowTest {
 
       assertEquals(setOf("root", "independent"), result.keys)
       assertFalse(env.fakeNodeActivity.invokedNodeIds.contains("skip-me"))
+      assertEquals(ContinuumWorkflowModel.NodeStatus.SKIPPED, events.last()["skip-me"])
     }
   }
 
@@ -667,21 +690,37 @@ class ContinuumWorkflowTest {
   @Test
   fun `failure at workflow start prevents downstream nodes from executing`() {
     newEnv().use { env ->
+      val events = captureStatusEvents()
       env.fakeNodeActivity.errorOutputs["A"] = mapOf("\$error" to samplePortData("root failed"))
 
       val model = WorkflowFixtures.loadWorkflow("/test-workflows/diamond-4node.cwf.json")
       val (_, future) = startWorkflow(env, model)
 
-      assertFailsWith<ExecutionException> { future.get(10, TimeUnit.SECONDS) }
+      val executionException = assertFailsWith<ExecutionException> { future.get(10, TimeUnit.SECONDS) }
 
       // Only root node should have been invoked
       assertEquals(listOf("A"), env.fakeNodeActivity.invokedNodeIds)
+      assertEquals(
+        mapOf(
+          "A" to ContinuumWorkflowModel.NodeStatus.FAILED,
+          "B" to ContinuumWorkflowModel.NodeStatus.SKIPPED,
+          "C" to ContinuumWorkflowModel.NodeStatus.SKIPPED,
+          "D" to ContinuumWorkflowModel.NodeStatus.SKIPPED
+        ),
+        events.last()
+      )
+      // Skipped nodes are not errors
+      @Suppress("UNCHECKED_CAST")
+      val details = ((executionException.cause as WorkflowFailedException).cause as ApplicationFailure)
+        .details.get(0, Map::class.java) as Map<String, Map<*, *>>
+      assertEquals(setOf("A"), details.getValue("nodeErrors").keys)
     }
   }
 
   @Test
   fun `failure in middle of DAG allows independent branches to complete`() {
     newEnv().use { env ->
+      val events = captureStatusEvents()
       env.fakeNodeActivity.successOutputs["A"] = mapOf("out-1" to samplePortData("A"))
       env.fakeNodeActivity.successOutputs["B"] = mapOf("out-1" to samplePortData("B"))
       env.fakeNodeActivity.errorOutputs["C"] = mapOf("\$error" to samplePortData("C failed"))
@@ -699,6 +738,11 @@ class ContinuumWorkflowTest {
       // B succeeded even though C failed (parallel branches)
       assertTrue(details.getValue("nodeToOutputsMap").containsKey("B"))
       assertTrue(details.getValue("nodeErrors").containsKey("C"))
+      // The join is SKIPPED (not null) and is not an error
+      assertEquals(ContinuumWorkflowModel.NodeStatus.SKIPPED, events.last()["D"])
+      assertEquals(ContinuumWorkflowModel.NodeStatus.SUCCESS, events.last()["B"])
+      assertFalse(details.getValue("nodeErrors").containsKey("D"))
+      assertFalse(env.fakeNodeActivity.invokedNodeIds.contains("D"))
     }
   }
 
