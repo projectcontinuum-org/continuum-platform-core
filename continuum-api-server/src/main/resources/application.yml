@@ -12,6 +12,14 @@ spring:
     hibernate:
       ddl-auto: none
     open-in-view: false
+  # Spring cache (Caffeine). REGISTERED_NODES: node registry rows by node id (NodeTreeEntryRepository.findByNodeId),
+  # used by property validation, node docs and the MCP tools. Keep expireAfterWrite short: it is how long a
+  # re-registered node can lag behind (the message-bridge writes the registry, so nothing evicts here).
+  cache:
+    type: caffeine
+    cache-names: REGISTERED_NODES
+    caffeine:
+      spec: ${CONTINUUM_NODE_REGISTRY_CACHE_SPEC:maximumSize=10000,expireAfterWrite=30s}
 temporal:
   connection:
     target: ${TEMPORAL_SERVER_ADDRESS:localhost:7233}
@@ -26,6 +34,11 @@ spring.ai.mcp.server:
 continuum.core:
   api-server:
     cache-directory-base-path: ${CONTINUUM_CACHE_DIRECTORY:./.continuum-cache/workflow-data}
+    # Operator endpoints under /api/v1/admin require the caller to be in one of these groups: a comma-separated list,
+    # matched against the comma-separated x-continuum-user-groups header (set by the ingress/auth layer, never by the
+    # client). Empty (the default) disables them: they answer 404.
+    admin:
+      groups: ${CONTINUUM_ADMIN_GROUPS:}
     storage:
       type: ${CONTINUUM_STORAGE_TYPE:minio}
       bucket-name: ${CONTINUUM_CACHE_BUCKET_NAME:continuum-worker-storage}

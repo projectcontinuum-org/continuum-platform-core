@@ -46,6 +46,11 @@ This release is a security and multi-tenancy hardening release. Every workflow, 
 - A client query is rejected (400) when it has unbalanced parentheses, an unterminated quote, `;`, `--`, `/*`, `#`, a backslash or a control character. `/count` allows a trailing `GROUP BY ExecutionStatus`.
 - The owner filter is `WorkflowId IN (...)` in chunks of 500, with counts and groups merged across chunks.
 
+### continuum-api-server: node properties
+
+- `POST /api/v1/workflow` and `POST /api/v1/workflow/schedule` check every node's properties against the schema **the worker registered** for that node (the node registry), never the `propertiesSchema` sent in the request body, so a client cannot skip the check by sending `{}`. This happens before anything is stored or sent to Temporal. An invalid workflow, or a node whose `nodeModel` is not registered, is a **400** `ProblemDetail` (`InvalidRequestException`) whose detail names each invalid node and its violations. Before this change the check was an `assert`, and did nothing.
+- Node registry lookups by node id are cached for a short time with Spring's cache abstraction (`@Cacheable("REGISTERED_NODES")` on `NodeTreeEntryRepository.findByNodeId`), backed by Caffeine. This speeds up property validation, the node documentation endpoints and the MCP tools. The setting is `spring.cache.caffeine.spec`, env `CONTINUUM_NODE_REGISTRY_CACHE_SPEC`, default `maximumSize=10000,expireAfterWrite=30s`. A worker that re-registers a node with a new schema or documentation is picked up within the expiry. Lookups that find no node are not cached, so a node is found as soon as its worker registers.
+
 ### continuum-api-server: run id and database
 
 - New column `workflow_runs.run_id`, written when the workflow starts and by the message bridge on every event (kept if a later event has none). `schema.sql` adds the column and an index on it, and **backfills existing rows** from the `{remote}<runId>/` prefix of their stored output paths.
@@ -54,6 +59,12 @@ This release is a security and multi-tenancy hardening release. Every workflow, 
 
 ### continuum-commons
 
+- **Node property validation runs in production.** `ValidationHelper.validateJsonWithSchema` used Kotlin `assert`, which does nothing unless the JVM runs with `-ea`, so properties were never checked. It now throws `PropertiesValidationException`, which carries every `SchemaViolation`.
+- **The backend now uses the same JSON Schema rules as the workbench.** JSONForms validates node properties with Ajv 8 (draft 7 by default, with `ajv-formats`). The backend used draft 4. It now defaults to draft 7 and checks `format`, so a value the node dialog accepts is accepted at run time, and the other way round. A schema can still pick its own dialect with `$schema`.
+  - Draft 4 has no `const`, so a `oneOf` of `const`s (used by `ClaudeAIAgentNodeModel`) failed for every value. It now works. Draft 7 also adds `if`/`then`/`else`, `contains`, `propertyNames` and numeric `exclusiveMinimum`/`exclusiveMaximum`.
+  - A schema that cannot be compiled (a dangling `$ref`, an invalid regex, a draft-4 boolean `exclusiveMinimum`) is reported as one violation with keyword `$schema`, so it is a 400 or a non-retriable node error. Before, it threw.
+  - Checked against Ajv with JSONForms' own `createAjv`: the defaults of all 58 feature nodes, every node in the 44 saved `.cwf` and fixture workflows, and 17 edge cases. All 252 cases get the same verdict from both validators. Under draft 4, 14 differed.
+- `ProcessNodeModel.run`, `KnimeNodeModel.run` and now also `TriggerNodeModel.run` (which did not validate before) validate before `execute()`, against the node class's own schema (`metadata.propertiesSchema`), not the copy carried in the workflow. A failure is a `NodeRuntimeException` with `isRetriable = false`, so the worker records the node as failed (`$error` output) and Temporal does not retry it.
 - `WorkflowUpdate` has a new nullable field `runId` (default `null`, so events from an older orchestration service still deserialize).
 - `KnimeNodeModel` starts KNIME with `ProcessBuilder(buildKnimeCommand(...))`, an argument list with no `bash -c`, so a node id or path can no longer be run as a command. `resolveWorkflowDir` rejects a node id that resolves to the KNIME workflow root or outside it. The string-joined `prepareWorkflowInputs` is `@Deprecated` and kept for binary compatibility; use `prepareWorkflowInputOptions`.
 
@@ -100,6 +111,18 @@ This release is a security and multi-tenancy hardening release. Every workflow, 
 - **Events.** Anything that deserializes `WorkflowUpdate` strictly must accept the new optional `runId`.
 - **`KnimeNodeModel` subclasses.** Prefer `prepareWorkflowInputOptions`; the string version is deprecated.
 - **`continuum-cloud-gateway` image.** No new version is published. The `/workbench/<name>/open` proxy path no longer exists in this repository.
-- **Not part of this release.** Schema validation of node properties (`validateJsonWithSchema`) still uses Kotlin `assert`, which does nothing at runtime unless the JVM runs with `-ea`. The Jackson dependency advisories are deferred to the Spring Boot upgrade.
+- **Not part of this release.** The Jackson dependency advisories are deferred to the Spring Boot upgrade.
+- **Node properties are now validated for real.** Workflows whose saved properties do not match a node's `propertiesSchema` used to run anyway. They are now refused at start or schedule creation (400), and on the worker the node fails without retries. The rules are the workbench's (draft 7), so a node the dialog shows as valid passes. Properties written by hand or by another client can fail: for example, a number sent as a string (`"10"`) to an `integer` field, which `ClaudeAIAgentNodeModel` used to accept. None of the saved example workflows do this.
+  - A node schema written for draft 4 that uses boolean `exclusiveMinimum`/`exclusiveMaximum` must declare `"$schema": "http://json-schema.org/draft-04/schema#"`, or switch to numeric values. No current node does.
+- **Schedules created before this release are not re-checked when they fire.** The 400 only applies when a schedule is created. A schedule already in `workflow_schedules` with invalid properties keeps firing: Temporal starts the run, and the invalid node then fails on the worker (non-retriable, no retries), so every run of it fails.
+  - To find them, use the new admin endpoint `POST /api/v1/admin/schedules/validate`. It checks every stored schedule against the current node registry and returns the ones that will fail: schedule id, name, owner, node, and the violation. Run it after upgrading, once the workers are up. It is on demand only and does not run at start-up.
+  - Only admins can call it. Set `CONTINUUM_ADMIN_GROUPS` on the api-server container to a comma-separated list of admin groups, for example `platform-admins,ops`. A caller is an admin when the comma-separated `x-continuum-user-groups` header contains one of them; matching is exact and case-sensitive. With no admin groups set, the endpoint does not exist (404). A caller in no admin group also gets a 404.
+  - **The auth layer in front of the api-server must set `x-continuum-user-groups`** from the authenticated identity and strip any value sent by the client, just as it does for `x-continuum-user-id`. Otherwise anyone can send the header and claim an admin group. Do not set `CONTINUUM_ADMIN_GROUPS` until that is in place.
+    ```bash
+    # as sent by the auth layer for an admin user
+    curl -X POST -H "x-continuum-user-groups: platform-admins" http://<api-server>/api/v1/admin/schedules/validate
+    ```
+  - It only reports. Nothing is paused, changed or deleted. Fix each reported schedule (delete it and create it again with valid properties), or pause it with `POST /api/v1/workflow/schedule/{id}/pause`.
+  - The response lists `invalid` schedules (every run fails), `unregisteredOnly` schedules, and `failedToCheck` ids. `unregisteredOnly` means the only problem is a node type that is not registered: its worker may not be up yet, or the node type was removed. `failedToCheck` means the registry could not be read; call again.
 
 **Full Changelog**: https://github.com/projectcontinuum-org/continuum-platform-core/compare/release/0.0.22...CONTNM-161

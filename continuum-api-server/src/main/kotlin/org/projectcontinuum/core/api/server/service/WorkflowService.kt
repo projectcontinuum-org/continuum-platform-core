@@ -9,7 +9,6 @@ import org.projectcontinuum.core.commons.constant.TaskQueues
 import org.projectcontinuum.core.commons.model.ContinuumWorkflowModel
 import org.projectcontinuum.core.commons.model.ExecutionStatus
 import org.projectcontinuum.core.commons.model.PortData
-import org.projectcontinuum.core.commons.utils.ValidationHelper.Companion.validateJsonWithSchema
 import org.projectcontinuum.core.commons.workflow.IContinuumWorkflow
 import tools.jackson.core.type.TypeReference
 import tools.jackson.databind.ObjectMapper
@@ -42,7 +41,8 @@ import java.util.UUID
 class WorkflowService(
   val workflowClient: WorkflowClient,
   val workflowRunRepository: WorkflowRunRepository,
-  val objectMapper: ObjectMapper
+  val objectMapper: ObjectMapper,
+  private val workflowPropertiesValidator: WorkflowPropertiesValidator
 ) {
 
   companion object {
@@ -59,13 +59,8 @@ class WorkflowService(
     ownedBy: String
   ): String {
 
-    // Validate the workflow model
-    continuumWorkflowModel.nodes.forEach { node ->
-      validateJsonWithSchema(
-        node.data.properties,
-        node.data.propertiesSchema
-      )
-    }
+    // Invalid node properties (checked against the registry's schema) are a 400, before any row or Temporal workflow exists.
+    workflowPropertiesValidator.requireValidProperties(continuumWorkflowModel)
 
     val workflowId = UUID.randomUUID().toString()
 

@@ -5,7 +5,6 @@ import org.projectcontinuum.core.commons.model.ContinuumWorkflowModel
 import org.projectcontinuum.core.commons.protocol.progress.NodeProgressCallback
 import org.projectcontinuum.core.commons.utils.NodeInputReader
 import org.projectcontinuum.core.commons.utils.NodeOutputWriter
-import org.projectcontinuum.core.commons.utils.ValidationHelper
 import jakarta.annotation.PostConstruct
 import org.projectcontinuum.core.commons.protocol.progress.NodeProgress
 
@@ -45,6 +44,9 @@ abstract class ProcessNodeModel : ContinuumNodeModel {
    *
    * Called by the worker framework. Validates properties, then delegates to the
    * [execute] overload that accepts [ExecutionContext].
+   *
+   * @throws org.projectcontinuum.core.commons.exception.NodeRuntimeException non-retriable, when the properties
+   *   do not match `propertiesSchema`; [execute] is not called.
    */
   open fun run(
     node: ContinuumWorkflowModel.Node,
@@ -53,11 +55,7 @@ abstract class ProcessNodeModel : ContinuumNodeModel {
     nodeProgressCallback: NodeProgressCallback,
     executionContext: ExecutionContext
   ) {
-    // Validate properties
-    ValidationHelper.Companion.validateJsonWithSchema(
-      node.data.properties,
-      node.data.propertiesSchema
-    )
+    validatePropertiesOrFail(node)
 
     execute(
       node.data.properties,

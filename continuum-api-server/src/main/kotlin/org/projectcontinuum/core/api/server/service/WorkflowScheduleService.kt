@@ -18,7 +18,6 @@ import org.projectcontinuum.core.api.server.repository.jpa.WorkflowScheduleRepos
 import org.projectcontinuum.core.commons.constant.TaskQueues
 import org.projectcontinuum.core.commons.context.ContinuumOwnerContext
 import org.projectcontinuum.core.commons.context.ContinuumScheduleContext
-import org.projectcontinuum.core.commons.utils.ValidationHelper.Companion.validateJsonWithSchema
 import org.projectcontinuum.core.commons.workflow.IContinuumWorkflow
 import io.github.perplexhub.rsql.RSQLJPASupport
 import org.springframework.data.jpa.domain.Specification
@@ -28,13 +27,12 @@ import java.util.UUID
 @Service
 class WorkflowScheduleService(
   private val scheduleClient: ScheduleClient,
-  private val workflowScheduleRepository: WorkflowScheduleRepository
+  private val workflowScheduleRepository: WorkflowScheduleRepository,
+  private val workflowPropertiesValidator: WorkflowPropertiesValidator
 ) {
 
   fun createSchedule(request: CreateWorkflowScheduleRequest, ownedBy: String): WorkflowScheduleResponse {
-    request.continuumWorkflowModel.nodes.forEach { node ->
-      validateJsonWithSchema(node.data.properties, node.data.propertiesSchema)
-    }
+    workflowPropertiesValidator.requireValidProperties(request.continuumWorkflowModel)
 
     val scheduleId = UUID.randomUUID()
 

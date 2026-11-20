@@ -54,6 +54,7 @@ abstract class KnimeNodeModel : ProcessNodeModel() {
     nodeOutputWriter: NodeOutputWriter,
     nodeProgressCallback: NodeProgressCallback
   ) {
+    validatePropertiesOrFail(node)
     try {
       val workflowRunId = Activity.getExecutionContext().info.runId
       // Create temporary directory for the workflow

@@ -34,7 +34,13 @@
                         "contentType": "string"
                     }
                 },
-                "properties": {},
+                "properties": {
+                    "columnName": "message",
+                    "outputs": [
+                        { "columnName": "message-1" },
+                        { "columnName": "message-2" }
+                    ]
+                },
                 "propertiesSchema": {},
                 "propertiesUISchema": {},
                 "status": null

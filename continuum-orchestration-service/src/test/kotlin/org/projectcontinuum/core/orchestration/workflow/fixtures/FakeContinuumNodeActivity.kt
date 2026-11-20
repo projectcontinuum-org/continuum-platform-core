@@ -2,8 +2,11 @@ package org.projectcontinuum.core.orchestration.workflow.fixtures
 
 import org.projectcontinuum.core.commons.activity.IContinuumNodeActivity
 import org.projectcontinuum.core.commons.activity.IContinuumNodeActivity.NodeActivityOutput
+import org.projectcontinuum.core.commons.exception.PropertiesValidationException
 import org.projectcontinuum.core.commons.model.ContinuumWorkflowModel
 import org.projectcontinuum.core.commons.model.PortData
+import org.projectcontinuum.core.commons.model.PortDataStatus
+import org.projectcontinuum.core.commons.utils.ValidationHelper
 import java.util.Collections
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.CountDownLatch
@@ -42,12 +45,37 @@ class FakeContinuumNodeActivity : IContinuumNodeActivity {
   /** Track attempt count per node. */
   val attemptCount: MutableMap<String, AtomicInteger> = ConcurrentHashMap()
 
+  /**
+   * When set, nodes are checked like the real worker does (`ProcessNodeModel.run` → `ValidationHelper`): a node whose
+   * properties violate the schema in this map (keyed by `data.nodeModel`) returns the `$error` output the worker
+   * produces for a non-retriable `NodeRuntimeException`, instead of running.
+   */
+  val registeredSchemas: MutableMap<String, Map<String, Any>> = ConcurrentHashMap()
+
   override fun run(
     node: ContinuumWorkflowModel.Node,
     inputs: Map<String, PortData>
   ): NodeActivityOutput {
     invokedNodeIds.add(node.id)
     attemptCount.computeIfAbsent(node.id) { AtomicInteger(0) }.incrementAndGet()
+
+    registeredSchemas[node.data.nodeModel]?.let { schema ->
+      val violations = ValidationHelper.findSchemaViolations(node.data.properties, schema)
+      if (violations.isNotEmpty()) {
+        return NodeActivityOutput(
+          node.id,
+          mapOf(
+            IContinuumNodeActivity.NodeOutputSystemPort.ERROR.key to PortData(
+              status = PortDataStatus.FAILED,
+              contentType = "text/plain",
+              tableSpec = emptyList(),
+              data = "Invalid properties for node '${node.id}' (${node.data.nodeModel}): " +
+                PropertiesValidationException.describe(violations)
+            )
+          )
+        )
+      }
+    }
 
     // Check for immediate exception
     throwOnInvoke[node.id]?.also { 
