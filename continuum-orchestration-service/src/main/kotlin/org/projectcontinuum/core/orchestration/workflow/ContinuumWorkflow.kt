@@ -223,6 +223,12 @@ class ContinuumWorkflow : IContinuumWorkflow {
     val nodeToUpdate = currentRunningWorkflow?.nodes
       ?.find { it.id == continuumNodeActivitySignal.nodeId }!!
     nodeToUpdate.data.nodeProgress = nodeProgress
+    // Only SCHEDULED -> BUSY: a late or retried signal must not overwrite a terminal status
+    if (continuumNodeActivitySignal.nodeStatus == ContinuumWorkflowModel.NodeStatus.BUSY &&
+      nodeToUpdate.data.status == ContinuumWorkflowModel.NodeStatus.SCHEDULED
+    ) {
+      statusReporter.setNodeAnimationAndStatus(nodeToUpdate, ContinuumWorkflowModel.NodeStatus.BUSY)
+    }
 
     LOGGER.info("Node id: ${nodeToUpdate.data.id} Node title: ${nodeToUpdate.data.title} Node current progress: ${nodeToUpdate.data.nodeProgress?.progressPercentage ?: "null"}%")
 

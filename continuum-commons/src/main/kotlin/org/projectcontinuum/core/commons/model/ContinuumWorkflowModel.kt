@@ -104,6 +104,7 @@ data class ContinuumWorkflowModel @JsonCreator constructor(
   enum class NodeStatus {
     ACTIVE,
     CONFIGURED,
+    SCHEDULED,
     BUSY,
     SUCCESS,
     FAILED,

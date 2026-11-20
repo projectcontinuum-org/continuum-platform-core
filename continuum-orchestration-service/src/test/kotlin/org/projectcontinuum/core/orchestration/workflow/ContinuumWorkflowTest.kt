@@ -312,6 +312,30 @@ class ContinuumWorkflowTest {
   }
 
   @Test
+  fun `a node is published as SCHEDULED when dispatched and BUSY once its activity starts`() {
+    newEnv().use { env ->
+      val events = captureStatusEvents()
+      env.fakeNodeActivity.successOutputs["2"] = mapOf("output-1" to samplePortData("time"))
+      env.fakeNodeActivity.successOutputs["3"] = mapOf("output-1" to samplePortData("part1"))
+
+      val model = WorkflowFixtures.loadWorkflow("/test-workflows/linear-2node.cwf.json")
+      val (_, future) = startWorkflow(env, model)
+      future.get(10, TimeUnit.SECONDS)
+
+      val history = events.map { it["2"] }.fold(mutableListOf<ContinuumWorkflowModel.NodeStatus?>()) { acc, st ->
+        if (acc.lastOrNull() != st) acc.add(st)
+        acc
+      }
+      val expected = listOf(
+        ContinuumWorkflowModel.NodeStatus.SCHEDULED,
+        ContinuumWorkflowModel.NodeStatus.BUSY,
+        ContinuumWorkflowModel.NodeStatus.SUCCESS
+      )
+      assertEquals(expected, history.filterNotNull())
+    }
+  }
+
+  @Test
   fun `cancellation while a node is busy marks the workflow cancelled and rethrows to the client`() {
     newEnv().use { env ->
       env.fakeNodeActivity.successOutputs["2"] =

@@ -208,6 +208,9 @@ class ContinuumNodeActivity(
     val activityContext = Activity.getExecutionContext()
     val heartbeatScheduler = startHeartbeatScheduler(node.id, activityContext, cancellation)
 
+    // Report BUSY before any input download so the UI sees the node start working
+    reportBusy(node.id)
+
     return try {
       when {
         processNodeClassNames.contains(nodeModel) -> executeProcessNode(node, inputs, progressCallback, executionStartTime)
@@ -471,6 +474,24 @@ class ContinuumNodeActivity(
       override fun report(progressPercentage: Int) {
         report(NodeProgress(progressPercentage))
       }
+    }
+  }
+
+  /** Tells the workflow this node's activity has started. Best effort: a failed signal must not fail the node. */
+  private fun reportBusy(nodeId: String) {
+    try {
+      Activity.getExecutionContext().workflowClient.newWorkflowStub(
+        IContinuumWorkflow::class.java,
+        Activity.getExecutionContext().info.workflowId
+      ).updateNodeProgressSignal(
+        ContinuumNodeActivitySignal(
+          nodeId = nodeId,
+          nodeProgress = NodeProgress(0),
+          nodeStatus = ContinuumWorkflowModel.NodeStatus.BUSY
+        )
+      )
+    } catch (e: Exception) {
+      LOGGER.warn("Failed to report BUSY for node $nodeId: ${e.message}")
     }
   }
 

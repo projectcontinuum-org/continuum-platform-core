@@ -136,12 +136,13 @@ class WorkflowStatusReporter(
     currentRunningWorkflow()?.edges
       ?.filter { it.target == node.id }
       ?.forEach {
-        it.animated = nodeStatus == ContinuumWorkflowModel.NodeStatus.BUSY
+        it.animated = nodeStatus == ContinuumWorkflowModel.NodeStatus.BUSY ||
+          nodeStatus == ContinuumWorkflowModel.NodeStatus.SCHEDULED
       }
   }
 
   /**
-   * Marks all nodes currently in BUSY status with the given status.
+   * Marks all nodes currently in SCHEDULED or BUSY status with the given status.
    *
    * This is used during workflow failure, cancellation, or termination to
    * update any in-progress nodes so the UI reflects their final state.
@@ -150,7 +151,10 @@ class WorkflowStatusReporter(
    */
   fun markBusyNodesAs(status: ContinuumWorkflowModel.NodeStatus) {
     currentRunningWorkflow()?.nodes
-      ?.filter { it.data.status == ContinuumWorkflowModel.NodeStatus.BUSY }
+      ?.filter {
+        it.data.status == ContinuumWorkflowModel.NodeStatus.BUSY ||
+          it.data.status == ContinuumWorkflowModel.NodeStatus.SCHEDULED
+      }
       ?.forEach { setNodeAnimationAndStatus(it, status) }
   }
 }

@@ -61,8 +61,8 @@ class WorkflowDagExecutor(
       val morePromises = nodesToExecute.map { node ->
         // Gather inputs from parent nodes' outputs
         val nodeInputs = getNodeInputs(continuumWorkflow, node, nodeToOutputsMap)
-        // Mark node as running and animate incoming edges
-        statusReporter.setNodeAnimationAndStatus(node, ContinuumWorkflowModel.NodeStatus.BUSY)
+        // Mark node as scheduled and animate incoming edges; the activity reports BUSY once it starts
+        statusReporter.setNodeAnimationAndStatus(node, ContinuumWorkflowModel.NodeStatus.SCHEDULED)
         // Start the activity asynchronously, catching ActivityFailure to treat it as a node error
         Pair(node, Async.function {
           try {
