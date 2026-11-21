@@ -32,6 +32,7 @@ Core platform team. No Spring Boot app — library only. Published to Maven Cent
 
 ## Work Guidance
 
+- A change to an API-facing model here (see Local Contracts) is an API change: follow the root `AGENTS.md` rule "Rule for AI agents: every API change updates the OpenAPI spec" and regenerate every affected `docs/api/*.openapi.yaml`.
 - Keep this module free of Spring Boot runtime dependencies. `compileOnly` is intentional.
 - `DataRow` Avro schema is in `continuum-avro-schemas` (a sibling dep). Do not duplicate it here.
 - `NodeProgressCallback` no-op defaults in `ProcessNodeModel` are for testing convenience; the real implementation is in the worker starter.

@@ -70,6 +70,7 @@ Core platform team. Container image: `projectcontinuum/continuum-api-server`. Ru
 
 ## Work Guidance
 
+- Any change to an endpoint, a request/response model or a status code follows the root `AGENTS.md` rule "Rule for AI agents: every API change updates the OpenAPI spec": inventory, annotations, regenerated `docs/api/continuum-api-server.openapi.yaml`, Redocly lint and release notes, in the same change.
 - DDL is managed via `src/main/resources/schema.sql` (applied by `spring.sql.init.mode = always`). JPA `ddl-auto` is `none`.
 - OpenAPI: follow `docs/api/CONVENTIONS.md`; the endpoint facts behind the annotations are in `docs/api/ENDPOINT_INVENTORY.md` (keep it current with any behavior change).
   - Swagger UI at `/swagger-ui/index.html` (`/` redirects there only while the docs are enabled), spec at `/v3/api-docs/public`; `CONTINUUM_API_DOCS_ENABLED` (default `true`, Helm `false`), `CONTINUUM_API_DOCS_INTERNAL_ENABLED`, `CONTINUUM_API_DOCS_SERVER_URL`.
