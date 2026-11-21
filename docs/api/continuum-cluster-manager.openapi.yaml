@@ -64,6 +64,22 @@ paths:
                 $ref: "#/components/schemas/ProblemDetail"
           description: "Malformed request: an invalid `x-continuum-user-id`, a missing\
             \ or unparsable parameter, or a body that is not valid JSON."
+        "406":
+          content:
+            application/problem+json:
+              examples:
+                error:
+                  value:
+                    detail: "Acceptable representations: [application/json]."
+                    error: "Acceptable representations: [application/json]."
+                    instance: /api/v1/workbench
+                    status: 406
+                    title: Not Acceptable
+                    type: about:blank
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+          description: The `Accept` header asks for a media type this operation does
+            not produce.
         "500":
           content:
             application/problem+json:
@@ -165,6 +181,22 @@ paths:
           description: "A value is invalid (user id, quantity, image or variant),\
             \ the image is not allowed, `instanceName` is missing, or the body is\
             \ not JSON."
+        "406":
+          content:
+            application/problem+json:
+              examples:
+                error:
+                  value:
+                    detail: "Acceptable representations: [application/json]."
+                    error: "Acceptable representations: [application/json]."
+                    instance: /api/v1/workbench
+                    status: 406
+                    title: Not Acceptable
+                    type: about:blank
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+          description: The `Accept` header asks for a media type this operation does
+            not produce.
         "409":
           content:
             application/problem+json:
@@ -366,6 +398,22 @@ paths:
               schema:
                 $ref: "#/components/schemas/ProblemDetail"
           description: The caller has no active workbench with this name.
+        "406":
+          content:
+            application/problem+json:
+              examples:
+                error:
+                  value:
+                    detail: "Acceptable representations: [application/json]."
+                    error: "Acceptable representations: [application/json]."
+                    instance: /api/v1/workbench
+                    status: 406
+                    title: Not Acceptable
+                    type: about:blank
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+          description: The `Accept` header asks for a media type this operation does
+            not produce.
         "500":
           content:
             application/problem+json:
@@ -459,6 +507,22 @@ paths:
               schema:
                 $ref: "#/components/schemas/ProblemDetail"
           description: The caller has no active workbench with this name.
+        "406":
+          content:
+            application/problem+json:
+              examples:
+                error:
+                  value:
+                    detail: "Acceptable representations: [application/json]."
+                    error: "Acceptable representations: [application/json]."
+                    instance: /api/v1/workbench
+                    status: 406
+                    title: Not Acceptable
+                    type: about:blank
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+          description: The `Accept` header asks for a media type this operation does
+            not produce.
         "500":
           content:
             application/problem+json:
@@ -534,6 +598,22 @@ paths:
               schema:
                 $ref: "#/components/schemas/ProblemDetail"
           description: The caller has no active workbench with this name.
+        "406":
+          content:
+            application/problem+json:
+              examples:
+                error:
+                  value:
+                    detail: "Acceptable representations: [application/json]."
+                    error: "Acceptable representations: [application/json]."
+                    instance: /api/v1/workbench
+                    status: 406
+                    title: Not Acceptable
+                    type: about:blank
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+          description: The `Accept` header asks for a media type this operation does
+            not produce.
         "500":
           content:
             application/problem+json:
@@ -611,6 +691,22 @@ paths:
               schema:
                 $ref: "#/components/schemas/ProblemDetail"
           description: The caller has no active workbench with this name.
+        "406":
+          content:
+            application/problem+json:
+              examples:
+                error:
+                  value:
+                    detail: "Acceptable representations: [application/json]."
+                    error: "Acceptable representations: [application/json]."
+                    instance: /api/v1/workbench
+                    status: 406
+                    title: Not Acceptable
+                    type: about:blank
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+          description: The `Accept` header asks for a media type this operation does
+            not produce.
         "500":
           content:
             application/problem+json:
@@ -681,6 +777,22 @@ paths:
               schema:
                 $ref: "#/components/schemas/ProblemDetail"
           description: The caller has no active workbench with this name.
+        "406":
+          content:
+            application/problem+json:
+              examples:
+                error:
+                  value:
+                    detail: "Acceptable representations: [application/json]."
+                    error: "Acceptable representations: [application/json]."
+                    instance: /api/v1/workbench
+                    status: 406
+                    title: Not Acceptable
+                    type: about:blank
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+          description: The `Accept` header asks for a media type this operation does
+            not produce.
         "500":
           content:
             application/problem+json:
@@ -750,6 +862,22 @@ paths:
               schema:
                 $ref: "#/components/schemas/ProblemDetail"
           description: The caller has no active workbench with this name.
+        "406":
+          content:
+            application/problem+json:
+              examples:
+                error:
+                  value:
+                    detail: "Acceptable representations: [application/json]."
+                    error: "Acceptable representations: [application/json]."
+                    instance: /api/v1/workbench
+                    status: 406
+                    title: Not Acceptable
+                    type: about:blank
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+          description: The `Accept` header asks for a media type this operation does
+            not produce.
         "500":
           content:
             application/problem+json:

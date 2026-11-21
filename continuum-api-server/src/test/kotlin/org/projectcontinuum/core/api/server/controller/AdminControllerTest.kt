@@ -14,11 +14,14 @@ import org.projectcontinuum.core.api.server.service.ScheduleValidationService
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest
 import org.springframework.context.annotation.Import
+import org.springframework.http.MediaType
 import org.springframework.test.context.TestPropertySource
 import org.springframework.test.context.bean.override.mockito.MockitoBean
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post
+import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put
+import org.springframework.test.web.servlet.result.MockMvcResultMatchers.header
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.status
 import java.util.UUID
@@ -118,9 +121,36 @@ class AdminControllerTest {
     }
 
     @Test
-    fun `only POST triggers the check`() {
-      mockMvc.perform(get(endpoint).header("x-continuum-user-groups", "ops")).andExpect(status().isMethodNotAllowed)
+    fun `only POST triggers the check, an admin gets the real 405 for other methods`() {
+      mockMvc.perform(get(endpoint).header("x-continuum-user-groups", "ops"))
+        .andExpect(status().isMethodNotAllowed)
+        .andExpect(header().string("Allow", "POST"))
 
+      verifyNoInteractions(scheduleValidationService)
+    }
+
+    @Test
+    fun `a non-admin cannot tell the endpoint from an unknown path by method or Accept`() {
+      val unknownPath = "/api/v1/admin/no-such-endpoint"
+      val probes = listOf(
+        get(endpoint) to get(unknownPath),
+        put(endpoint) to put(unknownPath),
+        post(endpoint).accept(MediaType.TEXT_PLAIN) to post(unknownPath).accept(MediaType.TEXT_PLAIN),
+        post(endpoint).contentType(MediaType.TEXT_PLAIN).content("x") to post(unknownPath).contentType(MediaType.TEXT_PLAIN).content("x")
+      )
+
+      for ((adminRequest, unknownRequest) in probes) {
+        val adminResponse = mockMvc.perform(adminRequest.header("x-continuum-user-groups", "developers")).andReturn().response
+        val unknownResponse = mockMvc.perform(unknownRequest.header("x-continuum-user-groups", "developers")).andReturn().response
+
+        assertEquals(404, adminResponse.status, "admin endpoint for a non-admin")
+        assertEquals(unknownResponse.status, adminResponse.status)
+        assertEquals(unknownResponse.contentType, adminResponse.contentType)
+        assertEquals(
+          unknownResponse.contentAsString.replace(unknownPath, "<path>").replace(unknownPath.removePrefix("/"), "<path>"),
+          adminResponse.contentAsString.replace(endpoint, "<path>").replace(endpoint.removePrefix("/"), "<path>")
+        )
+      }
       verifyNoInteractions(scheduleValidationService)
     }
   }

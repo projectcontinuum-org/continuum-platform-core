@@ -18,8 +18,11 @@ import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExcep
  * Every error of the cluster-manager API is an RFC 9457 [ProblemDetail] (`application/problem+json`), the error
  * contract of all Continuum services. Each body also carries the message in the legacy `error` property (deprecated),
  * because the embedded UI and existing clients read `error` from the former `{"error": "..."}` bodies.
+ *
+ * Not scoped by `basePackages` on purpose: Spring only applies a scoped advice when a controller method was resolved,
+ * so 404 (unknown path), 405, 406 and 415 would fall back to Boot's default error body.
  */
-@RestControllerAdvice(basePackages = ["org.projectcontinuum.core.cluster.manager.controller"])
+@RestControllerAdvice
 class GlobalExceptionHandler : ResponseEntityExceptionHandler() {
 
   private val log = LoggerFactory.getLogger(GlobalExceptionHandler::class.java)

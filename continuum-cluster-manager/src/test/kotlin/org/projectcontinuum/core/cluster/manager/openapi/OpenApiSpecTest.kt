@@ -161,6 +161,14 @@ class OpenApiSpecTest {
   }
 
   @Test
+  fun `no TODO reaches a published spec`() {
+    for (specPath in listOf("/v3/api-docs/public", "/v3/api-docs/internal")) {
+      val body = mockMvc.perform(get(specPath)).andExpect(status().isOk).andReturn().response.contentAsString
+      assertFalse(body.contains("TODO"), "$specPath contains a TODO; open questions belong in docs/api/ENDPOINT_INVENTORY.md")
+    }
+  }
+
+  @Test
   fun `the public spec equals the committed docs-api spec`() {
     val generated = mockMvc.perform(get("/v3/api-docs.yaml/public"))
       .andExpect(status().isOk)

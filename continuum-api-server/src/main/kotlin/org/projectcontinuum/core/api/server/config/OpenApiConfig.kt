@@ -29,6 +29,7 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnBooleanProp
 import org.springframework.boot.info.BuildProperties
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
+import org.springframework.http.HttpStatus
 
 /**
  * OpenAPI metadata, groups and the shared error contract of the API server. Conventions:
@@ -163,13 +164,16 @@ class OpenApiConfig(
 
   /**
    * The ungrouped `/v3/api-docs` must not reveal internal paths either. It is built from every handler, so they are
-   * removed here; the internal group only matches internal paths, so this is a no-op for it.
+   * removed here, together with the component schemas only they used (e.g. `ScheduleValidationReport`), which would
+   * otherwise still hint at the admin endpoints. The internal group only matches internal paths, so this is a no-op
+   * for it.
    */
   @Bean
   fun hideInternalPathsFromUngroupedSpec() = GlobalOpenApiCustomizer { openApi ->
     val internalGroupOnly = openApi.paths?.keys?.all { path -> isInternalPath(path) } == true
-    if (!internalGroupOnly) {
-      openApi.paths?.keys?.removeIf { path -> isInternalPath(path) }
+    val removedInternalPaths = !internalGroupOnly && openApi.paths?.keys?.removeIf { path -> isInternalPath(path) } == true
+    if (removedInternalPaths) {
+      OpenApiSchemaPruner.removeUnreferencedSchemas(openApi)
     }
   }
 
@@ -182,8 +186,9 @@ class OpenApiConfig(
   }
 
   /**
-   * Adds the shared error responses every operation can return: `500` always, and `400` (malformed request) to
-   * operations that take parameters or a body. An operation that documents its own `400`/`500` keeps it.
+   * Adds the shared error responses every operation can return: `406` and `500` always (every operation declares the
+   * media type it produces, so an unsupported `Accept` is a 406), and `400` (malformed request) to operations that take
+   * parameters or a body. An operation that documents its own response for one of these statuses keeps it.
    */
   @Bean
   fun sharedErrorResponses() = GlobalOperationCustomizer { operation, _ ->
@@ -192,15 +197,17 @@ class OpenApiConfig(
       responses.addApiResponse(
         "400",
         problemResponse(
+          status = 400,
           description = "Malformed request: a missing or unparsable parameter, or a body that is not valid JSON for this operation.",
           exampleDetail = "Required request parameter 'baseDir' for method parameter type String is not present"
         )
       )
     }
-    if (!takesInput(operation) && responses.keys.none { status -> status.startsWith("4") }) {
+    if (!responses.containsKey("406")) {
       responses.addApiResponse(
         "406",
         problemResponse(
+          status = 406,
           description = "The `Accept` header asks for a media type this operation does not produce.",
           exampleDetail = "Acceptable representations: [application/json]."
         )
@@ -210,6 +217,7 @@ class OpenApiConfig(
       responses.addApiResponse(
         "500",
         problemResponse(
+          status = 500,
           description = "Unexpected server error, or a dependency (PostgreSQL, Temporal, S3) failed.",
           exampleDetail = "Internal server error"
         )
@@ -223,19 +231,10 @@ class OpenApiConfig(
   private fun takesInput(operation: Operation): Boolean =
     !operation.parameters.isNullOrEmpty() || operation.requestBody != null
 
-  private fun problemResponse(description: String, exampleDetail: String): ApiResponse {
-    val status = when {
-      exampleDetail == "Internal server error" -> 500
-      exampleDetail.startsWith("Acceptable representations") -> 406
-      else -> 400
-    }
+  private fun problemResponse(status: Int, description: String, exampleDetail: String): ApiResponse {
     val example = mapOf(
       "type" to "about:blank",
-      "title" to when (status) {
-        500 -> "Internal Server Error"
-        406 -> "Not Acceptable"
-        else -> "Bad Request"
-      },
+      "title" to HttpStatus.valueOf(status).reasonPhrase,
       "status" to status,
       "detail" to exampleDetail,
       "instance" to "/api/v1/workflow/tree"

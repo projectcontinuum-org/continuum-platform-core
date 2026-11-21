@@ -9,13 +9,15 @@ import java.net.URI
 import java.time.Instant
 import java.util.UUID
 
-/** Values of `workflow_runs.status`: `PENDING` from the API server, the rest from the orchestration service's run events. */
+/**
+ * Values of `workflow_runs.status`: `PENDING` from the API server, the rest from the orchestration service's run events.
+ * The `allowableValues` of the `status` fields below repeat the list, because annotation arguments must be literals.
+ */
 object WorkflowRunStatusValues {
   const val DESCRIPTION =
     "Run status as last reported. `PENDING`: accepted, no event yet. `STARTED`: the orchestrator picked it up. " +
       "`RUNNING`: nodes are executing. `FINISHED`: every node is done (some may have failed or been skipped; see the " +
       "node statuses). `FAILED`: the run failed. `CANCELLED` / `TERMINATED`: stopped through the API."
-  val VALUES = arrayOf("PENDING", "STARTED", "RUNNING", "FINISHED", "FAILED", "CANCELLED", "TERMINATED")
 }
 
 @Schema(

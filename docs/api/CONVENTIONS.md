@@ -85,12 +85,19 @@ continuum.core.api-docs:
   - Services migrating from `Map<String,String>` bodies keep an `error` property with the same text (documented as
     deprecated) so existing clients that read `.error` keep working.
 - Each service's `@RestControllerAdvice` extends `ResponseEntityExceptionHandler` (Spring MVC errors such as a missing
-  parameter, a malformed body, an unparsable UUID or 405/415 become ProblemDetail) and has a catch-all
-  `Exception` → 500 ProblemDetail with a generic `detail` (no exception message, no stack trace).
-- A per-service `OperationCustomizer` adds `500` (ProblemDetail) to every operation, and `400` (ProblemDetail, "malformed
-  request") to operations with parameters or a body, unless the operation already declares them. An operation with no
-  input and no other 4xx gets `406` (an unsupported `Accept`), so every operation documents a client error (Redocly
-  `operation-4xx-response`). Specific errors (`404`, `409`, validation `400`) are declared per endpoint with an example.
+  parameter, a malformed body, an unparsable UUID, an unknown path or 405/406/415 become ProblemDetail) and has a
+  catch-all `Exception` → 500 ProblemDetail with a generic `detail` (no exception message, no stack trace).
+- Never scope that advice with `basePackages`/`assignableTypes`/`annotations`: Spring applies a scoped advice only when a
+  controller method was resolved, so unknown paths, 405, 406 and 415 would get Boot's default error body.
+- Map a wrapping exception by its cause, never as a whole. The Temporal SDK wraps every schedule failure in
+  `ScheduleException`; only its gRPC status (`INVALID_ARGUMENT` → 400, `NOT_FOUND` → 404, else 500) says whose fault it is.
+- A per-service `OperationCustomizer` adds `406` (an unsupported `Accept`; every operation declares `produces`, so the
+  service really answers it) and `500` (ProblemDetail) to every operation, and `400` (ProblemDetail, "malformed
+  request") to operations with parameters or a body, unless the operation already declares them. Specific errors
+  (`404`, `409`, validation `400`) are declared per endpoint with an example.
+- Exceptions to `produces`: an endpoint called with someone else's headers (Traefik ForwardAuth `/authorize` gets the
+  browser's `Accept: text/html`) declares `produces = */*`; an internal endpoint that must be undiscoverable declares
+  no `produces`/`consumes` at all (they would answer 406/415 before its access check).
 - Every extra property a problem body can carry (`errors`, `warnings`, `fieldErrors`, the legacy `error`) is part of the
   documented problem schema, or Redocly rejects the examples.
 - Numeric query parameters declare `@Parameter(schema = Schema(type = "integer", format = "int32", ...))` whenever

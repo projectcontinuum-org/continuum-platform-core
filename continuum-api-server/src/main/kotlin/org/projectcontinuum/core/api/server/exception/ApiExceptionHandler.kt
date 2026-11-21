@@ -54,14 +54,24 @@ class ApiExceptionHandler : ResponseEntityExceptionHandler() {
   fun handleScheduleNotFound(e: WorkflowScheduleNotFoundException): ProblemDetail =
     ProblemDetail.forStatusAndDetail(HttpStatus.NOT_FOUND, "Schedule not found")
 
-  /** Temporal rejected the schedule (for example an invalid cron expression or time zone). */
+  /**
+   * The Temporal SDK wraps every schedule failure (create, describe, pause, trigger, delete, ...) in a
+   * [ScheduleException], so only its gRPC cause says whose fault it is. `INVALID_ARGUMENT` means Temporal rejected
+   * what the client sent (an invalid cron expression or time zone): 400. Everything else (Temporal unreachable, a
+   * timeout, a schedule that exists in the database but not in Temporal) is a 500, not a client error.
+   * [org.projectcontinuum.core.api.server.service.WorkflowScheduleService] turns a missing Temporal schedule into a
+   * [WorkflowScheduleNotFoundException] where that is a 404.
+   */
   @ExceptionHandler(ScheduleException::class)
-  fun handleScheduleRejected(e: ScheduleException): ProblemDetail {
-    LOGGER.info("Temporal rejected a schedule: {}", e.message)
-    return ProblemDetail.forStatusAndDetail(
-      HttpStatus.BAD_REQUEST,
-      "The schedule was rejected by Temporal; check cronExpression and timeZone"
-    )
+  fun handleScheduleFailure(e: ScheduleException): ProblemDetail {
+    if (TemporalErrors.grpcStatusCode(e) == Status.Code.INVALID_ARGUMENT) {
+      LOGGER.info("Temporal rejected a schedule: {}", e.message)
+      return ProblemDetail.forStatusAndDetail(
+        HttpStatus.BAD_REQUEST,
+        "The schedule was rejected by Temporal; check cronExpression and timeZone"
+      )
+    }
+    return handleUnexpected(e)
   }
 
   /**

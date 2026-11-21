@@ -23,6 +23,10 @@ Conventions for the spec itself are in [CONVENTIONS.md](CONVENTIONS.md).
     responses built with `ResponseEntity.notFound()/badRequest()` had **empty bodies**. Spring MVC errors used Boot's
     default `/error` JSON.
   - credentials-server and cluster-manager: `{"error": "<message>"}` maps. Clients read `.error`.
+- **Error bodies now.** Every error of all three services is a `ProblemDetail`, including the ones Spring raises before
+  a controller method is chosen: 404 for an unknown path, 405, 406 (unsupported `Accept`; every operation declares the
+  media type it produces) and 415. For that the `@RestControllerAdvice` of each service is not scoped by
+  `basePackages`: Spring only applies a scoped advice when a handler method was resolved.
 - **Run status.** `workflow_runs.status` is a free string: `PENDING` (inserted by the api-server at start), then the
   value the orchestration service publishes and the message-bridge upserts: `STARTED`, `RUNNING`, `FINISHED`, `FAILED`,
   `CANCELLED`, `TERMINATED` (`ContinuumWorkflow.kt`, `WorkflowStatusReporter.publishUpdate`).
@@ -176,10 +180,16 @@ is not part of the OpenAPI spec.
 - **Identity.** User-scoped.
 - **Body.** `CreateWorkflowScheduleRequest {name, cronExpression, timeZone?, continuumWorkflowModel}`. The workbench
   uses `name = "<workflow>/<schedule>.schedule"`. `cronExpression` is a Temporal cron string (5 fields, or `@daily`
-  style); `timeZone` an IANA zone (default UTC). The workflow is validated exactly like a start.
+  style); `timeZone` an IANA zone (default UTC). The workflow is validated exactly like a start
+  (`WorkflowRunValidator`, shared with start and validate), including the workflow `name` check: a name that is not a
+  valid URI path (e.g. a KNIME schedule name with spaces) is a 400. Before platform 0.0.23 schedule creation skipped
+  that check, so runs of such schedules stored a `workflow_uri` `URI.create` rejects; `UriAttributeConverter` reads
+  those rows percent-encoded instead of failing the caller's run listing with a 500.
 - **201** `WorkflowScheduleResponse` (was 200 before platform 0.0.23; the KNIME scheduler accepts any 2xx).
-- **400** invalid workflow (`ProblemDetail` with `errors`/`warnings`); Temporal `ScheduleException` (e.g. bad cron, bad
-  zone) was an **empty** 400, now `ProblemDetail`. Malformed body → 400.
+- **400** invalid workflow (`ProblemDetail` with `errors`/`warnings`); Temporal rejecting the schedule (gRPC
+  `INVALID_ARGUMENT`, e.g. bad cron or zone) was an **empty** 400, now `ProblemDetail`. Malformed body → 400.
+- **500** any other Temporal failure (unreachable, timeout). The SDK wraps every schedule failure in
+  `ScheduleException`; `ApiExceptionHandler` maps it by its gRPC cause, never as a whole to 400.
 - **Side effects.** Creates Temporal schedule (id = new UUID) starting `IContinuumWorkflow` with workflow id = schedule
   id and the owner + schedule id in the header, then inserts `workflow_schedules`. Each fire creates runs whose
   `workflow_runs.schedule_id` is set. Not idempotent. The workflow is not revalidated when the schedule fires.
@@ -188,7 +198,8 @@ is not part of the OpenAPI spec.
 
 - **Query.** `name` optional exact match.
 - **200** `WorkflowScheduleResponse[]`; each entry calls Temporal `describe()` for `paused` and `nextRunTimes`.
-  **500** a schedule row whose Temporal schedule is missing. **TODO:** one stale row fails the whole list.
+  **500** a schedule row whose Temporal schedule is missing, or Temporal failing.
+  **TODO:** one stale row fails the whole list; skipping or reporting it per entry is a product decision.
 
 ### GET /api/v1/workflow/schedule/filter — list schedules by RSQL
 
@@ -197,7 +208,11 @@ is not part of the OpenAPI spec.
 
 ### GET /api/v1/workflow/schedule/{scheduleId} — get one schedule
 
-- **Path.** UUID (non-UUID → 400). **200** response; **404** unknown or unowned (empty body before).
+- **Path.** UUID (non-UUID → 400). **200** response; **404** unknown or unowned (empty body before), or a row whose
+  Temporal schedule no longer exists (gRPC `NOT_FOUND`).
+
+The single-schedule operations below (pause, unpause, trigger, delete) map a missing Temporal schedule to the same 404,
+and any other Temporal failure to 500. A delete that fails in Temporal keeps the row.
 
 ### POST /api/v1/workflow/schedule/{scheduleId}/pause | /unpause — pause or resume firing
 
@@ -263,6 +278,11 @@ is not part of the OpenAPI spec.
 - **Callers.** Operators only, through the proxy. Never in the public spec.
 - **Identity.** Not owner-scoped (all tenants). Requires one entry of `x-continuum-user-groups` to be in
   `CONTINUUM_ADMIN_GROUPS`; otherwise, and when no admin groups are configured, **404** exactly like an unknown path.
+- **Undiscoverable.** For a non-admin the response equals an unknown path's for every method and `Accept`/`Content-Type`:
+  `requireAdmin` throws Spring's `NoResourceFoundException` (same body as an unknown path), the mapping declares no
+  `produces`/`consumes` (those would answer 406/415 before the check), and a catch-all mapping turns other methods
+  into the 404 too. An admin gets the real 405 (`Allow: POST`). Its schemas are pruned from the ungrouped
+  `/v3/api-docs`.
 - **200** `ScheduleValidationReport {checked, valid, invalid[], unregisteredOnly[], failedToCheck[]}`; results carry
   `scheduleId, name, ownedBy, problems[{nodeId, nodeModel, kind: INVALID_PROPERTIES|UNREGISTERED_NODE, detail}]`.
 - **Side effects.** None (report only). Pages through `workflow_schedules` 200 at a time.
@@ -295,6 +315,8 @@ Port 8080. Embedded React UI at `/ui/` (`/` redirects there).
   otherwise. Empty bodies. Lookup by ingress URL is cached.
 - **Constraint.** `server.forward-headers-strategy: framework` would remove `X-Forwarded-Host` before the controller:
   this path must be excluded from the forwarded-header filter.
+- **Any `Accept`.** ForwardAuth forwards the browser's headers (a page load sends `Accept: text/html`), so the mapping
+  is `produces = */*`; the class-level `application/json` would make every check a 406.
 
 ### POST /api/v1/workbench — create a workbench
 

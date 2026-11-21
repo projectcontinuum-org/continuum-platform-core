@@ -150,6 +150,21 @@ paths:
           description: "No run with this run id is owned by the caller (unknown and\
             \ other tenants' runs are indistinguishable), or the run has no stored\
             \ output for this node and port."
+        "406":
+          content:
+            application/problem+json:
+              examples:
+                error:
+                  value:
+                    detail: "Acceptable representations: [application/json]."
+                    instance: /api/v1/workflow/tree
+                    status: 406
+                    title: Not Acceptable
+                    type: about:blank
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+          description: The `Accept` header asks for a media type this operation does
+            not produce.
         "500":
           content:
             application/problem+json:
@@ -214,6 +229,21 @@ paths:
                 $ref: "#/components/schemas/ProblemDetail"
           description: "Malformed request: a missing or unparsable parameter, or a\
             \ body that is not valid JSON for this operation."
+        "406":
+          content:
+            application/problem+json:
+              examples:
+                error:
+                  value:
+                    detail: "Acceptable representations: [application/json]."
+                    instance: /api/v1/workflow/tree
+                    status: 406
+                    title: Not Acceptable
+                    type: about:blank
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+          description: The `Accept` header asks for a media type this operation does
+            not produce.
         "500":
           content:
             application/problem+json:
@@ -286,6 +316,21 @@ paths:
               schema:
                 $ref: "#/components/schemas/ProblemDetail"
           description: "The node is not registered, or has no documentation."
+        "406":
+          content:
+            application/problem+json:
+              examples:
+                error:
+                  value:
+                    detail: "Acceptable representations: [application/json]."
+                    instance: /api/v1/workflow/tree
+                    status: 406
+                    title: Not Acceptable
+                    type: about:blank
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+          description: The `Accept` header asks for a media type this operation does
+            not produce.
         "500":
           content:
             application/problem+json:
@@ -352,6 +397,21 @@ paths:
                 $ref: "#/components/schemas/ProblemDetail"
           description: "Malformed request: a missing or unparsable parameter, or a\
             \ body that is not valid JSON for this operation."
+        "406":
+          content:
+            application/problem+json:
+              examples:
+                error:
+                  value:
+                    detail: "Acceptable representations: [application/json]."
+                    instance: /api/v1/workflow/tree
+                    status: 406
+                    title: Not Acceptable
+                    type: about:blank
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+          description: The `Accept` header asks for a media type this operation does
+            not produce.
         "500":
           content:
             application/problem+json:
@@ -424,6 +484,21 @@ paths:
               schema:
                 $ref: "#/components/schemas/ProblemDetail"
           description: "The node is not registered, or has no documentation."
+        "406":
+          content:
+            application/problem+json:
+              examples:
+                error:
+                  value:
+                    detail: "Acceptable representations: [application/json]."
+                    instance: /api/v1/workflow/tree
+                    status: 406
+                    title: Not Acceptable
+                    type: about:blank
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+          description: The `Accept` header asks for a media type this operation does
+            not produce.
         "500":
           content:
             application/problem+json:
@@ -451,8 +526,8 @@ paths:
         Not user-scoped: every caller sees the same registry. Read-only.
       operationId: searchNodes
       parameters:
-      - description: "Text to look for. `%` and `_` match any characters (SQL LIKE\
-          \ wildcards; TODO: probably unintended)."
+      - description: Text to look for. `%` and `_` match any characters (SQL LIKE
+          wildcards).
         example: normalize
         in: query
         name: query
@@ -484,6 +559,21 @@ paths:
                 $ref: "#/components/schemas/ProblemDetail"
           description: "Malformed request: a missing or unparsable parameter, or a\
             \ body that is not valid JSON for this operation."
+        "406":
+          content:
+            application/problem+json:
+              examples:
+                error:
+                  value:
+                    detail: "Acceptable representations: [application/json]."
+                    instance: /api/v1/workflow/tree
+                    status: 406
+                    title: Not Acceptable
+                    type: about:blank
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+          description: The `Accept` header asks for a media type this operation does
+            not produce.
         "500":
           content:
             application/problem+json:
@@ -618,6 +708,21 @@ paths:
                 $ref: "#/components/schemas/WorkflowValidationProblem"
           description: "The workflow is invalid (`errors` lists every problem), or\
             \ the body is malformed."
+        "406":
+          content:
+            application/problem+json:
+              examples:
+                error:
+                  value:
+                    detail: "Acceptable representations: [application/json]."
+                    instance: /api/v1/workflow/tree
+                    status: 406
+                    title: Not Acceptable
+                    type: about:blank
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+          description: The `Accept` header asks for a media type this operation does
+            not produce.
         "500":
           content:
             application/problem+json:
@@ -708,6 +813,21 @@ paths:
                 $ref: "#/components/schemas/ProblemDetail"
           description: "The `filter` is not valid RSQL, names a field that cannot\
             \ be filtered on, or has a value of the wrong type."
+        "406":
+          content:
+            application/problem+json:
+              examples:
+                error:
+                  value:
+                    detail: "Acceptable representations: [application/json]."
+                    instance: /api/v1/workflow/tree
+                    status: 406
+                    title: Not Acceptable
+                    type: about:blank
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+          description: The `Accept` header asks for a media type this operation does
+            not produce.
         "500":
           content:
             application/problem+json:
@@ -765,6 +885,21 @@ paths:
                 $ref: "#/components/schemas/ProblemDetail"
           description: "The `filter` is not valid RSQL, names a field that cannot\
             \ be filtered on, or has a value of the wrong type."
+        "406":
+          content:
+            application/problem+json:
+              examples:
+                error:
+                  value:
+                    detail: "Acceptable representations: [application/json]."
+                    instance: /api/v1/workflow/tree
+                    status: 406
+                    title: Not Acceptable
+                    type: about:blank
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+          description: The `Accept` header asks for a media type this operation does
+            not produce.
         "500":
           content:
             application/problem+json:
@@ -845,6 +980,21 @@ paths:
                 $ref: "#/components/schemas/ProblemDetail"
           description: "The `filter` is not valid RSQL, names a field that cannot\
             \ be filtered on, or has a value of the wrong type."
+        "406":
+          content:
+            application/problem+json:
+              examples:
+                error:
+                  value:
+                    detail: "Acceptable representations: [application/json]."
+                    instance: /api/v1/workflow/tree
+                    status: 406
+                    title: Not Acceptable
+                    type: about:blank
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+          description: The `Accept` header asks for a media type this operation does
+            not produce.
         "500":
           content:
             application/problem+json:
@@ -918,6 +1068,21 @@ paths:
                 $ref: "#/components/schemas/ProblemDetail"
           description: No run with this id is owned by the caller (unknown and other
             tenants' ids are indistinguishable).
+        "406":
+          content:
+            application/problem+json:
+              examples:
+                error:
+                  value:
+                    detail: "Acceptable representations: [application/json]."
+                    instance: /api/v1/workflow/tree
+                    status: 406
+                    title: Not Acceptable
+                    type: about:blank
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+          description: The `Accept` header asks for a media type this operation does
+            not produce.
         "500":
           content:
             application/problem+json:
@@ -1035,6 +1200,21 @@ paths:
                 $ref: "#/components/schemas/ProblemDetail"
           description: "The `query` could escape the caller's filter, or Temporal\
             \ rejected it (e.g. an unknown search attribute)."
+        "406":
+          content:
+            application/problem+json:
+              examples:
+                error:
+                  value:
+                    detail: "Acceptable representations: [application/json]."
+                    instance: /api/v1/workflow/tree
+                    status: 406
+                    title: Not Acceptable
+                    type: about:blank
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+          description: The `Accept` header asks for a media type this operation does
+            not produce.
         "500":
           content:
             application/problem+json:
@@ -1096,6 +1276,21 @@ paths:
                 $ref: "#/components/schemas/ProblemDetail"
           description: "The `query` could escape the caller's filter, or Temporal\
             \ rejected it (e.g. an unknown search attribute)."
+        "406":
+          content:
+            application/problem+json:
+              examples:
+                error:
+                  value:
+                    detail: "Acceptable representations: [application/json]."
+                    instance: /api/v1/workflow/tree
+                    status: 406
+                    title: Not Acceptable
+                    type: about:blank
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+          description: The `Accept` header asks for a media type this operation does
+            not produce.
         "500":
           content:
             application/problem+json:
@@ -1156,13 +1351,28 @@ paths:
                 $ref: "#/components/schemas/ProblemDetail"
           description: "Malformed request: a missing or unparsable parameter, or a\
             \ body that is not valid JSON for this operation."
+        "406":
+          content:
+            application/problem+json:
+              examples:
+                error:
+                  value:
+                    detail: "Acceptable representations: [application/json]."
+                    instance: /api/v1/workflow/tree
+                    status: 406
+                    title: Not Acceptable
+                    type: about:blank
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+          description: The `Accept` header asks for a media type this operation does
+            not produce.
         "500":
           content:
             application/problem+json:
               schema:
                 $ref: "#/components/schemas/ProblemDetail"
-          description: "A stored schedule no longer exists in Temporal (TODO: one\
-            \ stale schedule fails the whole list), or Temporal failed."
+          description: "A stored schedule no longer exists in Temporal (the whole\
+            \ list fails), or Temporal failed."
       security:
       - continuumUserId: []
       summary: List the caller's schedules
@@ -1277,8 +1487,24 @@ paths:
                 warnings: []
               schema:
                 $ref: "#/components/schemas/WorkflowValidationProblem"
-          description: "The workflow is invalid (`errors` lists every problem), Temporal\
-            \ rejected the cron expression or time zone, or the body is malformed."
+          description: "The workflow is invalid (`errors` lists every problem, including\
+            \ a workflow `name` that is not a valid URI path), Temporal rejected the\
+            \ cron expression or time zone, or the body is malformed."
+        "406":
+          content:
+            application/problem+json:
+              examples:
+                error:
+                  value:
+                    detail: "Acceptable representations: [application/json]."
+                    instance: /api/v1/workflow/tree
+                    status: 406
+                    title: Not Acceptable
+                    type: about:blank
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+          description: The `Accept` header asks for a media type this operation does
+            not produce.
         "500":
           content:
             application/problem+json:
@@ -1337,6 +1563,21 @@ paths:
                 $ref: "#/components/schemas/ProblemDetail"
           description: "The `filter` is not valid RSQL, names a field that cannot\
             \ be filtered on, or has a value of the wrong type."
+        "406":
+          content:
+            application/problem+json:
+              examples:
+                error:
+                  value:
+                    detail: "Acceptable representations: [application/json]."
+                    instance: /api/v1/workflow/tree
+                    status: 406
+                    title: Not Acceptable
+                    type: about:blank
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+          description: The `Accept` header asks for a media type this operation does
+            not produce.
         "500":
           content:
             application/problem+json:
@@ -1403,7 +1644,23 @@ paths:
                 instance: /api/v1/workflow/schedule/1d0f3c52-7a3b-4c8e-9d4f-2b6a8e1f0c3d
               schema:
                 $ref: "#/components/schemas/ProblemDetail"
-          description: No schedule with this id is owned by the caller.
+          description: "No schedule with this id is owned by the caller, or it no\
+            \ longer exists in Temporal."
+        "406":
+          content:
+            application/problem+json:
+              examples:
+                error:
+                  value:
+                    detail: "Acceptable representations: [application/json]."
+                    instance: /api/v1/workflow/tree
+                    status: 406
+                    title: Not Acceptable
+                    type: about:blank
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+          description: The `Accept` header asks for a media type this operation does
+            not produce.
         "500":
           content:
             application/problem+json:
@@ -1471,7 +1728,23 @@ paths:
                 instance: /api/v1/workflow/schedule/1d0f3c52-7a3b-4c8e-9d4f-2b6a8e1f0c3d
               schema:
                 $ref: "#/components/schemas/ProblemDetail"
-          description: No schedule with this id is owned by the caller.
+          description: "No schedule with this id is owned by the caller, or it no\
+            \ longer exists in Temporal."
+        "406":
+          content:
+            application/problem+json:
+              examples:
+                error:
+                  value:
+                    detail: "Acceptable representations: [application/json]."
+                    instance: /api/v1/workflow/tree
+                    status: 406
+                    title: Not Acceptable
+                    type: about:blank
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+          description: The `Accept` header asks for a media type this operation does
+            not produce.
         "500":
           content:
             application/problem+json:
@@ -1543,7 +1816,23 @@ paths:
                 instance: /api/v1/workflow/schedule/1d0f3c52-7a3b-4c8e-9d4f-2b6a8e1f0c3d
               schema:
                 $ref: "#/components/schemas/ProblemDetail"
-          description: No schedule with this id is owned by the caller.
+          description: "No schedule with this id is owned by the caller, or it no\
+            \ longer exists in Temporal."
+        "406":
+          content:
+            application/problem+json:
+              examples:
+                error:
+                  value:
+                    detail: "Acceptable representations: [application/json]."
+                    instance: /api/v1/workflow/tree
+                    status: 406
+                    title: Not Acceptable
+                    type: about:blank
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+          description: The `Accept` header asks for a media type this operation does
+            not produce.
         "500":
           content:
             application/problem+json:
@@ -1569,8 +1858,8 @@ paths:
       description: |2-
 
         Starts one run of the schedule's workflow immediately, outside the cron, even while paused. Not idempotent. The run's
-        workflow id is the schedule id, so Temporal's overlap policy decides what happens while an earlier run of the schedule
-        is still going (TODO: not handled explicitly).
+        workflow id is the schedule id, so Temporal's default overlap policy decides what happens while an earlier run of the
+        schedule is still going.
       operationId: triggerWorkflowSchedule
       parameters:
       - description: Schedule id (UUID) returned when the schedule was created.
@@ -1611,7 +1900,23 @@ paths:
                 instance: /api/v1/workflow/schedule/1d0f3c52-7a3b-4c8e-9d4f-2b6a8e1f0c3d
               schema:
                 $ref: "#/components/schemas/ProblemDetail"
-          description: No schedule with this id is owned by the caller.
+          description: "No schedule with this id is owned by the caller, or it no\
+            \ longer exists in Temporal."
+        "406":
+          content:
+            application/problem+json:
+              examples:
+                error:
+                  value:
+                    detail: "Acceptable representations: [application/json]."
+                    instance: /api/v1/workflow/tree
+                    status: 406
+                    title: Not Acceptable
+                    type: about:blank
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+          description: The `Accept` header asks for a media type this operation does
+            not produce.
         "500":
           content:
             application/problem+json:
@@ -1683,7 +1988,23 @@ paths:
                 instance: /api/v1/workflow/schedule/1d0f3c52-7a3b-4c8e-9d4f-2b6a8e1f0c3d
               schema:
                 $ref: "#/components/schemas/ProblemDetail"
-          description: No schedule with this id is owned by the caller.
+          description: "No schedule with this id is owned by the caller, or it no\
+            \ longer exists in Temporal."
+        "406":
+          content:
+            application/problem+json:
+              examples:
+                error:
+                  value:
+                    detail: "Acceptable representations: [application/json]."
+                    instance: /api/v1/workflow/tree
+                    status: 406
+                    title: Not Acceptable
+                    type: about:blank
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+          description: The `Accept` header asks for a media type this operation does
+            not produce.
         "500":
           content:
             application/problem+json:
@@ -1754,6 +2075,21 @@ paths:
                 $ref: "#/components/schemas/ProblemDetail"
           description: "`baseDir` is missing, or the `query` could escape the caller's\
             \ filter or was rejected by Temporal."
+        "406":
+          content:
+            application/problem+json:
+              examples:
+                error:
+                  value:
+                    detail: "Acceptable representations: [application/json]."
+                    instance: /api/v1/workflow/tree
+                    status: 406
+                    title: Not Acceptable
+                    type: about:blank
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+          description: The `Accept` header asks for a media type this operation does
+            not produce.
         "500":
           content:
             application/problem+json:
@@ -1892,6 +2228,21 @@ paths:
                 $ref: "#/components/schemas/ProblemDetail"
           description: "Malformed request: a missing or unparsable parameter, or a\
             \ body that is not valid JSON for this operation."
+        "406":
+          content:
+            application/problem+json:
+              examples:
+                error:
+                  value:
+                    detail: "Acceptable representations: [application/json]."
+                    instance: /api/v1/workflow/tree
+                    status: 406
+                    title: Not Acceptable
+                    type: about:blank
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+          description: The `Accept` header asks for a media type this operation does
+            not produce.
         "500":
           content:
             application/problem+json:
@@ -1967,6 +2318,21 @@ paths:
                 $ref: "#/components/schemas/ProblemDetail"
           description: "No running workflow with this id is owned by the caller (unknown,\
             \ another tenant's, or already finished)."
+        "406":
+          content:
+            application/problem+json:
+              examples:
+                error:
+                  value:
+                    detail: "Acceptable representations: [application/json]."
+                    instance: /api/v1/workflow/tree
+                    status: 406
+                    title: Not Acceptable
+                    type: about:blank
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+          description: The `Accept` header asks for a media type this operation does
+            not produce.
         "500":
           content:
             application/problem+json:
@@ -2039,6 +2405,21 @@ paths:
           description: "No run with this id is owned by the caller (unknown and other\
             \ tenants' ids are indistinguishable), or Temporal no longer has its execution\
             \ (retention expired)."
+        "406":
+          content:
+            application/problem+json:
+              examples:
+                error:
+                  value:
+                    detail: "Acceptable representations: [application/json]."
+                    instance: /api/v1/workflow/tree
+                    status: 406
+                    title: Not Acceptable
+                    type: about:blank
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+          description: The `Accept` header asks for a media type this operation does
+            not produce.
         "500":
           content:
             application/problem+json:
@@ -2114,6 +2495,21 @@ paths:
                 $ref: "#/components/schemas/ProblemDetail"
           description: "No running workflow with this id is owned by the caller (unknown,\
             \ another tenant's, or already finished)."
+        "406":
+          content:
+            application/problem+json:
+              examples:
+                error:
+                  value:
+                    detail: "Acceptable representations: [application/json]."
+                    instance: /api/v1/workflow/tree
+                    status: 406
+                    title: Not Acceptable
+                    type: about:blank
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+          description: The `Accept` header asks for a media type this operation does
+            not produce.
         "500":
           content:
             application/problem+json:

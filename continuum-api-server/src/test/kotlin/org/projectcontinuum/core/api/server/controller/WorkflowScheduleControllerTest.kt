@@ -1,5 +1,7 @@
 package org.projectcontinuum.core.api.server.controller
 
+import io.grpc.Status
+import io.grpc.StatusRuntimeException
 import io.temporal.client.schedules.ScheduleException
 import org.junit.jupiter.api.Test
 import org.mockito.kotlin.any
@@ -95,8 +97,9 @@ class WorkflowScheduleControllerTest {
   }
 
   @Test
-  fun `POST schedule with ScheduleException returns 400`() {
-    whenever(workflowScheduleService.createSchedule(any(), any())).thenThrow(ScheduleException(RuntimeException("bad cron")))
+  fun `POST schedule that Temporal rejects as INVALID_ARGUMENT returns 400`() {
+    val rejectedByTemporal = StatusRuntimeException(Status.INVALID_ARGUMENT.withDescription("invalid cron string"))
+    whenever(workflowScheduleService.createSchedule(any(), any())).thenThrow(ScheduleException(rejectedByTemporal))
 
     mockMvc.perform(
       post("/api/v1/workflow/schedule")
@@ -104,6 +107,31 @@ class WorkflowScheduleControllerTest {
         .content(workflowJson)
     )
       .andExpect(status().isBadRequest)
+      .andExpect(jsonPath("$.detail").value("The schedule was rejected by Temporal; check cronExpression and timeZone"))
+  }
+
+  @Test
+  fun `a schedule operation failing because Temporal is down is a 500, not a client error`() {
+    val scheduleId = UUID.randomUUID()
+    val temporalDown = StatusRuntimeException(Status.UNAVAILABLE.withDescription("connection refused"))
+    whenever(workflowScheduleService.pauseSchedule(eq("alice"), eq(scheduleId), anyOrNull()))
+      .thenThrow(ScheduleException(temporalDown))
+
+    mockMvc.perform(post("/api/v1/workflow/schedule/$scheduleId/pause").header("x-continuum-user-id", "alice"))
+      .andExpect(status().isInternalServerError)
+      .andExpect(jsonPath("$.detail").value("Internal server error"))
+  }
+
+  @Test
+  fun `a schedule failure without a gRPC cause is a 500`() {
+    whenever(workflowScheduleService.createSchedule(any(), any())).thenThrow(ScheduleException(RuntimeException("boom")))
+
+    mockMvc.perform(
+      post("/api/v1/workflow/schedule")
+        .contentType(MediaType.APPLICATION_JSON)
+        .content(workflowJson)
+    )
+      .andExpect(status().isInternalServerError)
   }
 
   @Test

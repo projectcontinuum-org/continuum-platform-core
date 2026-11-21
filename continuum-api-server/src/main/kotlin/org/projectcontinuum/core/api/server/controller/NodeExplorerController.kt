@@ -77,7 +77,7 @@ $NOT_USER_SCOPED Read-only."""
     )
     fun search(
         @Parameter(
-            description = "Text to look for. `%` and `_` match any characters (SQL LIKE wildcards; TODO: probably unintended).",
+            description = "Text to look for. `%` and `_` match any characters (SQL LIKE wildcards).",
             example = "normalize",
             required = true
         )

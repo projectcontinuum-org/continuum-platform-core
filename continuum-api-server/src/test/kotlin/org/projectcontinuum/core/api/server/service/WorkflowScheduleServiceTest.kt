@@ -1,5 +1,7 @@
 package org.projectcontinuum.core.api.server.service
 
+import io.grpc.Status
+import io.grpc.StatusRuntimeException
 import io.temporal.client.schedules.Schedule
 import io.temporal.client.schedules.ScheduleActionStartWorkflow
 import io.temporal.client.schedules.ScheduleClient
@@ -50,8 +52,8 @@ class WorkflowScheduleServiceTest {
     service = WorkflowScheduleService(scheduleClient, workflowScheduleRepository, nodeExplorerService)
   }
 
-  private fun workflowModel(): ContinuumWorkflowModel =
-    ContinuumWorkflowModel(id = "wf-1", name = "My Workflow", nodes = emptyList(), edges = emptyList())
+  private fun workflowModel(name: String = "examples/my-workflow.cwf"): ContinuumWorkflowModel =
+    ContinuumWorkflowModel(id = "wf-1", name = name, nodes = emptyList(), edges = emptyList())
 
   private fun request(cron: String = "0 * * * *"): CreateWorkflowScheduleRequest =
     CreateWorkflowScheduleRequest(name = "Hourly run", cronExpression = cron, continuumWorkflowModel = workflowModel())
@@ -247,6 +249,50 @@ class WorkflowScheduleServiceTest {
     assertThrows<ScheduleException> { service.createSchedule(request(), ownedBy) }
 
     verify(workflowScheduleRepository, never()).save(any())
+  }
+
+  @Test
+  fun `createSchedule rejects a workflow name that is not a valid URI, like a start, before Temporal or the DB`() {
+    val requestWithSpaceInName = CreateWorkflowScheduleRequest(
+      name = "Nightly",
+      cronExpression = "0 * * * *",
+      continuumWorkflowModel = workflowModel(name = "My Workflow.cwf")
+    )
+
+    val exception = assertThrows<WorkflowValidationException> { service.createSchedule(requestWithSpaceInName, ownedBy) }
+
+    assertTrue(exception.errors.any { it.message.contains("is not a valid URI path") }, exception.errors.toString())
+    verify(scheduleClient, never()).createSchedule(any(), any(), any())
+    verify(workflowScheduleRepository, never()).save(any())
+  }
+
+  @Test
+  fun `a schedule stored in the DB but missing in Temporal is not found`() {
+    val scheduleId = UUID.randomUUID()
+    val entity = WorkflowScheduleEntity(scheduleId, "N", ownedBy, "0 0 * * *", workflow = workflowModel())
+    whenever(workflowScheduleRepository.findById(scheduleId)).thenReturn(Optional.of(entity))
+    val handle: ScheduleHandle = mock()
+    val missingInTemporal = ScheduleException(StatusRuntimeException(Status.NOT_FOUND.withDescription("schedule not found")))
+    whenever(handle.describe()).thenThrow(missingInTemporal)
+    whenever(handle.trigger()).thenThrow(missingInTemporal)
+    whenever(scheduleClient.getHandle(scheduleId.toString())).thenReturn(handle)
+
+    assertThrows<WorkflowScheduleNotFoundException> { service.getSchedule(ownedBy, scheduleId) }
+    assertThrows<WorkflowScheduleNotFoundException> { service.triggerNow(ownedBy, scheduleId) }
+  }
+
+  @Test
+  fun `a Temporal outage on a schedule operation is not turned into not found`() {
+    val scheduleId = UUID.randomUUID()
+    val entity = WorkflowScheduleEntity(scheduleId, "N", ownedBy, "0 0 * * *", workflow = workflowModel())
+    whenever(workflowScheduleRepository.findById(scheduleId)).thenReturn(Optional.of(entity))
+    val handle: ScheduleHandle = mock()
+    whenever(handle.delete()).thenThrow(ScheduleException(StatusRuntimeException(Status.UNAVAILABLE)))
+    whenever(scheduleClient.getHandle(scheduleId.toString())).thenReturn(handle)
+
+    assertThrows<ScheduleException> { service.deleteSchedule(ownedBy, scheduleId) }
+
+    verify(workflowScheduleRepository, never()).deleteById(any())
   }
 
   @Test

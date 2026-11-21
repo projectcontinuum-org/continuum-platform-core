@@ -40,7 +40,7 @@ class CredentialTypeController(
 Adds a version of a credential type: the JSON Schema (draft 4) that credential `data` of this type must satisfy, and
 the JSONForms UI schema the management UI renders the form from. Types are immutable: there is no update or delete.
 The same type with an identical schema and UI schema cannot be registered under a second version. Any caller can
-register types (TODO: restrict to operators?). $NOT_USER_SCOPED"""
+register types. $NOT_USER_SCOPED"""
   )
   @OpenApiRequestBody(
     description = "The type version.",

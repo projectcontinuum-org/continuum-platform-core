@@ -29,6 +29,7 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnBooleanProp
 import org.springframework.boot.info.BuildProperties
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
+import org.springframework.http.HttpStatus
 
 /**
  * OpenAPI metadata, the `public` group and the shared error contract of the credentials server. Conventions:
@@ -123,7 +124,7 @@ class OpenApiConfig(
     }
   }
 
-  /** Adds `500` to every operation and `400` (malformed request) to operations with parameters or a body. */
+  /** Adds `406` and `500` to every operation and `400` (malformed request) to operations with parameters or a body. */
   @Bean
   fun sharedErrorResponses() = GlobalOperationCustomizer { operation, _ ->
     val responses = operation.responses ?: ApiResponses().also { operation.responses = it }
@@ -137,7 +138,8 @@ class OpenApiConfig(
         )
       )
     }
-    if (!takesInput(operation) && responses.keys.none { status -> status.startsWith("4") }) {
+    // Every operation declares the media type it produces, so an unsupported `Accept` is a real 406 (problem+json).
+    if (!responses.containsKey("406")) {
       responses.addApiResponse(
         "406",
         problemResponse(
@@ -166,11 +168,7 @@ class OpenApiConfig(
   private fun problemResponse(status: Int, description: String, exampleDetail: String): ApiResponse {
     val example = mapOf(
       "type" to "about:blank",
-      "title" to when (status) {
-        500 -> "Internal Server Error"
-        406 -> "Not Acceptable"
-        else -> "Bad Request"
-      },
+      "title" to HttpStatus.valueOf(status).reasonPhrase,
       "status" to status,
       "detail" to exampleDetail,
       "instance" to "/api/v1/credentials",

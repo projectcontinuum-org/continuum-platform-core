@@ -13,6 +13,7 @@ import org.springframework.http.MediaType
 import org.springframework.test.context.bean.override.mockito.MockitoBean
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get
+import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.content
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath
@@ -110,5 +111,41 @@ class ProblemDetailContractTest {
     mockMvc.perform(post("/api/v1/credentials").contentType(MediaType.APPLICATION_JSON).content("garbage"))
       .andExpect(status().isBadRequest)
       .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
+  }
+
+  // Errors raised before a controller method is chosen: the advice must not be scoped by package, or these would get
+  // Boot's default {timestamp, status, error, path} body.
+
+  @Test
+  fun `an unsupported method is a 405 problem with the legacy error text`() {
+    mockMvc.perform(patch("/api/v1/credentials/aws-prod"))
+      .andExpect(status().isMethodNotAllowed)
+      .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
+      .andExpect(jsonPath("$.status").value(405))
+      .andExpect(jsonPath("$.error").exists())
+  }
+
+  @Test
+  fun `an unsupported content type is a 415 problem`() {
+    mockMvc.perform(post("/api/v1/credentials").contentType(MediaType.TEXT_PLAIN).content("name=aws-prod"))
+      .andExpect(status().isUnsupportedMediaType)
+      .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
+      .andExpect(jsonPath("$.status").value(415))
+  }
+
+  @Test
+  fun `an Accept the operation cannot produce is a 406 problem`() {
+    mockMvc.perform(get("/api/v1/credentials").header("x-continuum-user-id", "alice").accept(MediaType.TEXT_PLAIN))
+      .andExpect(status().isNotAcceptable)
+      .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
+      .andExpect(jsonPath("$.status").value(406))
+  }
+
+  @Test
+  fun `an unknown path is a 404 problem`() {
+    mockMvc.perform(get("/api/v1/no-such-endpoint"))
+      .andExpect(status().isNotFound)
+      .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
+      .andExpect(jsonPath("$.status").value(404))
   }
 }

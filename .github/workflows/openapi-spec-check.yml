@@ -62,23 +62,20 @@ jobs:
           restore-keys: |
             gradle-${{ runner.os }}-
 
-      - name: Check the generated specs against the committed ones
+      # One Gradle run: -PupdateOpenApiSpec makes each OpenApiSpecTest write the generated spec into docs/api/ (its other
+      # assertions still run), the other tests check docs-off, forwarded headers and the error contract. Any difference
+      # to the committed specs is then an unreviewed API change.
+      - name: Regenerate the specs and run the OpenAPI tests
         run: |
           chmod +x ./gradlew
           ./gradlew \
-            :continuum-api-server:test --tests '*OpenApiSpecTest*' --tests '*OpenApiDisabledTest*' \
-            :continuum-cluster-manager:test --tests '*OpenApiSpecTest*' --tests '*ForwardedHeadersTest*' \
-            :continuum-credentials-server:test --tests '*OpenApiSpecTest*' --tests '*OpenApiDisabledTest*' \
-            --no-daemon --stacktrace
+            :continuum-api-server:test --tests '*OpenApiSpecTest*' --tests '*OpenApiDisabledTest*' --tests '*ProblemDetailContractTest*' \
+            :continuum-cluster-manager:test --tests '*OpenApiSpecTest*' --tests '*ForwardedHeadersTest*' --tests '*PreHandlerProblemDetailTest*' \
+            :continuum-credentials-server:test --tests '*OpenApiSpecTest*' --tests '*OpenApiDisabledTest*' --tests '*ProblemDetailContractTest*' \
+            -PupdateOpenApiSpec --no-daemon --stacktrace
 
-      # Belt and braces: regenerate into the working tree and fail on any unreviewed difference, showing it.
       - name: Fail on an unreviewed spec diff
         run: |
-          ./gradlew \
-            :continuum-api-server:test --tests '*OpenApiSpecTest*' \
-            :continuum-cluster-manager:test --tests '*OpenApiSpecTest*' \
-            :continuum-credentials-server:test --tests '*OpenApiSpecTest*' \
-            -PupdateOpenApiSpec --no-daemon --quiet
           if ! git diff --exit-code -- docs/api/; then
             echo "::error title=OpenAPI drift::The committed specs in docs/api/ are out of date. Run ./gradlew :<module>:test --tests '*OpenApiSpecTest*' -PupdateOpenApiSpec and commit the result."
             exit 1

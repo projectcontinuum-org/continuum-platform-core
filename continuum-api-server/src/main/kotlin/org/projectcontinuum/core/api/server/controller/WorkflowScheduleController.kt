@@ -54,7 +54,7 @@ call creates a new schedule."""
   @ApiResponse(responseCode = "201", description = "Schedule created.")
   @ApiResponse(
     responseCode = "400",
-    description = "The workflow is invalid (`errors` lists every problem), Temporal rejected the cron expression or time zone, or the body is malformed.",
+    description = "The workflow is invalid (`errors` lists every problem, including a workflow `name` that is not a valid URI path), Temporal rejected the cron expression or time zone, or the body is malformed.",
     content = [Content(mediaType = OpenApiConfig.PROBLEM_JSON, schema = Schema(ref = OpenApiConfig.WORKFLOW_VALIDATION_PROBLEM_SCHEMA), examples = [ExampleObject(value = ApiExamples.INVALID_WORKFLOW_PROBLEM)])]
   )
   fun createSchedule(
@@ -79,7 +79,7 @@ exact `name`. Read-only."""
   )
   @ApiResponse(
     responseCode = "500",
-    description = "A stored schedule no longer exists in Temporal (TODO: one stale schedule fails the whole list), or Temporal failed.",
+    description = "A stored schedule no longer exists in Temporal (the whole list fails), or Temporal failed.",
     content = [Content(mediaType = OpenApiConfig.PROBLEM_JSON, schema = Schema(ref = OpenApiConfig.PROBLEM_DETAIL_SCHEMA))]
   )
   fun listSchedules(
@@ -129,7 +129,7 @@ Lists the caller's schedules that match an RSQL filter over `name`, `cronExpress
   @ApiResponse(responseCode = "200", description = "The schedule.")
   @ApiResponse(
     responseCode = "404",
-    description = "No schedule with this id is owned by the caller.",
+    description = "No schedule with this id is owned by the caller, or it no longer exists in Temporal.",
     content = [Content(mediaType = OpenApiConfig.PROBLEM_JSON, schema = Schema(ref = OpenApiConfig.PROBLEM_DETAIL_SCHEMA), examples = [ExampleObject(value = ApiExamples.SCHEDULE_NOT_FOUND_PROBLEM)])]
   )
   fun getSchedule(
@@ -150,7 +150,7 @@ Lists the caller's schedules that match an RSQL filter over `name`, `cronExpress
   @ApiResponse(responseCode = "204", description = "Paused.")
   @ApiResponse(
     responseCode = "404",
-    description = "No schedule with this id is owned by the caller.",
+    description = "No schedule with this id is owned by the caller, or it no longer exists in Temporal.",
     content = [Content(mediaType = OpenApiConfig.PROBLEM_JSON, schema = Schema(ref = OpenApiConfig.PROBLEM_DETAIL_SCHEMA), examples = [ExampleObject(value = ApiExamples.SCHEDULE_NOT_FOUND_PROBLEM)])]
   )
   fun pauseSchedule(
@@ -174,7 +174,7 @@ Lists the caller's schedules that match an RSQL filter over `name`, `cronExpress
   @ApiResponse(responseCode = "204", description = "Unpaused.")
   @ApiResponse(
     responseCode = "404",
-    description = "No schedule with this id is owned by the caller.",
+    description = "No schedule with this id is owned by the caller, or it no longer exists in Temporal.",
     content = [Content(mediaType = OpenApiConfig.PROBLEM_JSON, schema = Schema(ref = OpenApiConfig.PROBLEM_DETAIL_SCHEMA), examples = [ExampleObject(value = ApiExamples.SCHEDULE_NOT_FOUND_PROBLEM)])]
   )
   fun unpauseSchedule(
@@ -195,13 +195,13 @@ Lists the caller's schedules that match an RSQL filter over `name`, `cronExpress
     summary = "Run a schedule's workflow now",
     description = """
 Starts one run of the schedule's workflow immediately, outside the cron, even while paused. Not idempotent. The run's
-workflow id is the schedule id, so Temporal's overlap policy decides what happens while an earlier run of the schedule
-is still going (TODO: not handled explicitly)."""
+workflow id is the schedule id, so Temporal's default overlap policy decides what happens while an earlier run of the
+schedule is still going."""
   )
   @ApiResponse(responseCode = "204", description = "Run requested.")
   @ApiResponse(
     responseCode = "404",
-    description = "No schedule with this id is owned by the caller.",
+    description = "No schedule with this id is owned by the caller, or it no longer exists in Temporal.",
     content = [Content(mediaType = OpenApiConfig.PROBLEM_JSON, schema = Schema(ref = OpenApiConfig.PROBLEM_DETAIL_SCHEMA), examples = [ExampleObject(value = ApiExamples.SCHEDULE_NOT_FOUND_PROBLEM)])]
   )
   fun triggerNow(
@@ -225,7 +225,7 @@ becomes null. A second delete is a 404."""
   @ApiResponse(responseCode = "204", description = "Deleted.")
   @ApiResponse(
     responseCode = "404",
-    description = "No schedule with this id is owned by the caller.",
+    description = "No schedule with this id is owned by the caller, or it no longer exists in Temporal.",
     content = [Content(mediaType = OpenApiConfig.PROBLEM_JSON, schema = Schema(ref = OpenApiConfig.PROBLEM_DETAIL_SCHEMA), examples = [ExampleObject(value = ApiExamples.SCHEDULE_NOT_FOUND_PROBLEM)])]
   )
   fun deleteSchedule(

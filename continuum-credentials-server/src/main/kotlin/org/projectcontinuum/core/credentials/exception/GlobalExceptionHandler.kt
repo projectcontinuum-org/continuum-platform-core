@@ -22,8 +22,11 @@ import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExcep
  *
  * Exception messages are returned only for the service's own, expected exceptions; anything unexpected (including
  * encryption failures) gets a generic detail, never the exception's message.
+ *
+ * Not scoped by `basePackages` on purpose: Spring only applies a scoped advice when a controller method was resolved,
+ * so 404 (unknown path), 405, 406 and 415 would fall back to Boot's default error body.
  */
-@RestControllerAdvice(basePackages = ["org.projectcontinuum.core.credentials.controller"])
+@RestControllerAdvice
 class GlobalExceptionHandler : ResponseEntityExceptionHandler() {
 
   private val log = LoggerFactory.getLogger(GlobalExceptionHandler::class.java)

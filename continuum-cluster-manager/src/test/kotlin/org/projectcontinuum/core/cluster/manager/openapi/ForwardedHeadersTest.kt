@@ -63,6 +63,19 @@ class ForwardedHeadersTest {
   }
 
   @Test
+  fun `authorize answers whatever Accept the browser sent through ForwardAuth`() {
+    // Traefik ForwardAuth forwards the original request's headers, so a page load arrives with Accept: text/html.
+    whenever(workbenchService.authorizeAccess(eq("alice"), eq("wb-1.continuum.example.com"))).thenReturn(true)
+
+    mockMvc.perform(
+      get("/api/v1/workbench/authorize")
+        .header("x-continuum-user-id", "alice")
+        .header("X-Forwarded-Host", "wb-1.continuum.example.com")
+        .accept(MediaType.TEXT_HTML)
+    ).andExpect(status().isOk)
+  }
+
+  @Test
   fun `authorize denies another user with 403`() {
     whenever(workbenchService.authorizeAccess(eq("mallory"), eq("wb-1.continuum.example.com"))).thenReturn(false)
 

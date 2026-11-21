@@ -114,11 +114,26 @@ class OpenApiSpecTest : FullContextWithoutExternalSystems() {
   @Test
   fun `internal endpoints are absent from the public and the ungrouped spec`() {
     for (specPath in listOf("/v3/api-docs/public", "/v3/api-docs")) {
-      val leaked = operationKeys(fetchJson(specPath)).filter { isInternal(it) }
+      val spec = fetchJson(specPath)
+      val leaked = operationKeys(spec).filter { isInternal(it) }
       assertTrue(leaked.isEmpty(), "Internal endpoints in $specPath: $leaked")
+      // Neither may their schemas, tags or security schemes hint at them.
+      val internalSchemas = spec.path("components").path("schemas").propertyNames().filter { it.startsWith("ScheduleValidation") }
+      assertTrue(internalSchemas.isEmpty(), "Internal schemas in $specPath: $internalSchemas")
+      val tagNames = spec.path("tags").map { tag -> tag.path("name").asString("") }
+      assertFalse("Administration" in tagNames, "Administration tag in $specPath")
+      assertTrue(spec.path("components").path("securitySchemes").path("continuumUserGroups").isMissingNode, "Groups scheme in $specPath")
     }
     val internalOnly = operationKeys(fetchJson("/v3/api-docs/internal"))
     assertTrue(internalOnly.isNotEmpty() && internalOnly.all { isInternal(it) }, "Internal group: $internalOnly")
+  }
+
+  @Test
+  fun `no TODO reaches a published spec`() {
+    for (specPath in listOf("/v3/api-docs/public", "/v3/api-docs/internal")) {
+      val body = mockMvc.perform(get(specPath)).andExpect(status().isOk).andReturn().response.contentAsString
+      assertFalse(body.contains("TODO"), "$specPath contains a TODO; open questions belong in docs/api/ENDPOINT_INVENTORY.md")
+    }
   }
 
   @Test

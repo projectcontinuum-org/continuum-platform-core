@@ -20,6 +20,7 @@ import org.projectcontinuum.core.cluster.manager.service.DockerHubTag
 import org.projectcontinuum.core.cluster.manager.service.OverlayService
 import org.projectcontinuum.core.cluster.manager.service.WorkbenchService
 import org.springframework.http.HttpStatus
+import org.springframework.http.MediaType
 import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.*
 import io.swagger.v3.oas.annotations.parameters.RequestBody as OpenApiRequestBody
@@ -90,7 +91,9 @@ when overlays are disabled. Not user-scoped. Read-only."""
     return ResponseEntity.ok(variants)
   }
 
-  @GetMapping("/authorize")
+  // Any Accept: Traefik ForwardAuth forwards the browser's own headers (a page load sends Accept: text/html), and the
+  // answer has no body. The class-level produces = application/json would turn every such check into a 406.
+  @GetMapping("/authorize", produces = [MediaType.ALL_VALUE])
   @Tag(name = OpenApiConfig.TAG_ACCESS_CONTROL)
   @Operation(
     operationId = "authorizeWorkbenchAccess",

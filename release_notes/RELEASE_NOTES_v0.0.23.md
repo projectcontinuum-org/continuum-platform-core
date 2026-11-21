@@ -1,6 +1,6 @@
 # continuum-platform-core 0.0.23 (proposed)
 
-Changes on `CONTNM-161` since [0.0.22](https://github.com/projectcontinuum-org/continuum-platform-core/releases/tag/release%2F0.0.22) (`release/0.0.22`).
+Changes on `main` (CONTNM-161 through CONTNM-175) since [0.0.22](https://github.com/projectcontinuum-org/continuum-platform-core/releases/tag/release%2F0.0.22) (`release/0.0.22`).
 
 This release is a security and multi-tenancy hardening release. Every workflow, run, schedule and node-output endpoint now checks that the caller owns what it touches, and the places that build shell commands, SQL, Kubernetes manifests, URLs and HTTP headers from user input were fixed so a value can no longer change the meaning of the command. It also removes the `continuum-cloud-gateway` and `continuum-knime-scheduler` modules. `platformVersion` is bumped to `0.0.23`.
 
@@ -111,7 +111,7 @@ This release is a security and multi-tenancy hardening release. Every workflow, 
 
 ### OpenAPI documentation (CONTNM-175)
 
-Applies to `continuum-api-server`, `continuum-cluster-manager` and `continuum-credentials-server` unless noted. Endpoint behavior is unchanged except for the error bodies listed here; the source for every documented status and field is [`docs/api/ENDPOINT_INVENTORY.md`](../docs/api/ENDPOINT_INVENTORY.md).
+Applies to `continuum-api-server`, `continuum-cluster-manager` and `continuum-credentials-server` unless noted. Endpoint behavior is unchanged except for the error bodies listed here and the fixes in "Status code and behavior fixes" below; the source for every documented status and field is [`docs/api/ENDPOINT_INVENTORY.md`](../docs/api/ENDPOINT_INVENTORY.md).
 
 - **springdoc 3.0.3** replaces 2.8.6 (the Spring Boot 3 line) in all three services, from the new version catalog `gradle/libs.versions.toml`. springdoc still reads models with Jackson 2, so `com.fasterxml.jackson.module:jackson-module-kotlin` is on the api-server and credentials-server runtime classpath for Kotlin nullability (non-null = `required`). No Jackson version changed.
 - **New settings** (all three services; also in the Helm chart):
@@ -127,10 +127,10 @@ Applies to `continuum-api-server`, `continuum-cluster-manager` and `continuum-cr
 
 #### continuum-api-server: error bodies (client-visible)
 
-Status codes are unchanged. Bodies that were empty or Boot's default error JSON are now `application/problem+json`:
+Status codes are unchanged except for the fixes listed under "Status code and behavior fixes". Bodies that were empty or Boot's default error JSON are now `application/problem+json`:
 
 - **404** with a `ProblemDetail` body (was an empty body): `GET /api/v1/workflow/{id}/status`, `POST /api/v1/workflow/{id}/cancel` and `/terminate` (`detail` "Workflow not found"), `GET /api/v1/workflow-runs/{id}` ("Workflow run not found"), `GET /api/v1/workflow/schedule/{id}` and the schedule pause, unpause, trigger and delete ("Schedule not found"; the message no longer contains the owner), the node documentation endpoints ("No documentation for this node").
-- **400** with a `ProblemDetail` body (was an empty body): `POST /api/v1/workflow/schedule` when Temporal rejects the schedule (invalid cron or time zone).
+- **400** with a `ProblemDetail` body (was an empty body): `POST /api/v1/workflow/schedule` when Temporal rejects the schedule (invalid cron or time zone; gRPC `INVALID_ARGUMENT`). Any other Temporal failure on a schedule operation (unreachable, timeout) is a 500, never a 400.
 - Spring MVC errors (missing parameter, unparsable path or query value, malformed JSON, unsupported method or media type, unknown path) are a `ProblemDetail` instead of Boot's default `{timestamp, status, error, path}`.
 - An unexpected error is a 500 `ProblemDetail` with the generic `detail` "Internal server error" (was Boot's default error body).
 - The workbench reads `detail` first, so it shows these messages unchanged.
@@ -148,16 +148,16 @@ JSON field names are unchanged; only the documentation changed:
 
 #### continuum-cluster-manager: error bodies (client-visible)
 
-- Every error is a `ProblemDetail` (`application/problem+json`) instead of `{"error": "..."}` (`application/json`). Status codes and messages are unchanged.
+- Every error is a `ProblemDetail` (`application/problem+json`) instead of `{"error": "..."}` (`application/json`). Messages are unchanged; status codes too, except a duplicate workbench (400 → 409, see "Status code and behavior fixes").
 - The `error` property is kept with the same text as `detail` and is **deprecated**, so the management UI and clients that read `.error` keep working. Read `detail` in new code; `error` will be removed in a later release.
-- Spring MVC errors (malformed body, bad parameter) also get the `error` property. Their status codes are unchanged.
+- Spring MVC errors (malformed body, bad parameter, unknown path, unsupported method, `Accept` or content type) also get the `error` property. Their status codes are unchanged; their bodies were Boot's default `{timestamp, status, error, path}` before.
 
 #### continuum-credentials-server: error bodies (client-visible)
 
 - Every error is a `ProblemDetail` (`application/problem+json`) instead of `{"error": "..."}` (`application/json`). Status codes and messages are unchanged: 404 unknown credential or type, 409 duplicate name or type version and concurrent change, 400 validation and schema mismatch, 500 encryption ("Failed to process credential data") and anything unexpected ("Internal server error").
 - The `error` property is kept with the same text as `detail` and is **deprecated**. The embedded UI and the workbench's credential picker read `error`, so they keep working.
 - Bean-validation failures keep the joined `"field: message; ..."` text in `detail` and `error` and add `fieldErrors` (`[{field, message}]`).
-- Spring MVC errors (malformed body, unsupported method or media type) are a `ProblemDetail` with `error` too. A create with a missing `name` or a non-JSON body is now a 400 ("Failed to read request"); it was a 500.
+- Spring MVC errors (malformed body, unknown path, unsupported method, `Accept` or content type) are a `ProblemDetail` with `error` too. A create with a missing `name` or a non-JSON body is now a 400 ("Failed to read request"); it was a 500.
 - The spec documents the real statuses (201 on create, 204 on delete, 404, 409), marks the identity header as a security scheme, and documents that credential types are not user-scoped and that every read updates `lastAccessedAt`.
 - The schemas are named `Credential`, `CredentialType`, `CredentialCreateRequest`, `CredentialUpdateRequest` and `CredentialTypeCreateRequest`. Kotlin-defaulted fields (`description`, and `schema`, `uiSchema`, `version` of a type) are optional.
 
@@ -173,6 +173,8 @@ HTTP semantics. All are `application/problem+json`.
 | api-server | `GET /api/v1/data/{runId}/nodes/{nodeId}/outputs/{outputId}` for an owned run without that stored output | 500 | 404 `Node output not found` |
 | api-server | `GET /api/v1/workflow/{id}/status` for an owned run whose Temporal execution is gone (retention) | 500 | 404 |
 | api-server | `POST /api/v1/workflow` with a `name` that is blank or not a valid URI path (e.g. `My Workflow.cwf`) | 500 | 400 `Invalid workflow`; `/validate` reports it as an error |
+| api-server | `POST /api/v1/workflow/schedule` with a workflow `name` that is not a valid URI path (e.g. a KNIME schedule named `Nightly run`) | 201, then every run listing of the owner failed with 500 | 400 `Invalid workflow`, like a start |
+| api-server | schedule get, pause, unpause, trigger, delete for a schedule that exists in the database but no longer in Temporal | 500 | 404 `Schedule not found` |
 | api-server | `POST /api/v1/workflow/schedule` success | 200 | **201** |
 | cluster-manager | `POST /api/v1/workbench` with a name the caller already uses | 400 | **409** (same `error` text) |
 | cluster-manager | `POST /api/v1/workbench` with a partial `resources` object | 500 | accepted: omitted fields take their defaults |
@@ -188,13 +190,20 @@ HTTP semantics. All are `application/problem+json`.
   had to repeat every value).
 - **cluster-manager: Kotlin JSON.** The HTTP JSON mapper (Jackson 3) now has the Kotlin module; the `KotlinModule`
   bean was the Jackson 2 one, which Spring Boot 4 never registered. That is what made partial bodies fail.
+- **api-server: unreadable run rows.** Runs of schedules created before the name check may have stored a
+  `workflow_uri` that `java.net.URI` rejects. They are now read with the illegal characters percent-encoded
+  (`Nightly%20run`), instead of failing the owner's `GET /api/v1/workflow-runs` with a 500.
+- **api-server: admin endpoint stays undiscoverable.** A caller in no admin group gets exactly the unknown-path 404 for
+  any method, `Accept` or content type on `/api/v1/admin/**` (before: 405 for GET and 406 for an unsupported `Accept`
+  told it apart). Its 404 body is now the unknown-path one (`detail` "No static resource ..."), not "Not found".
 - **api-server: node output cache.** A failed download no longer leaves an empty cache file that later requests would
   try to read.
 - **Workbench** (`continuum-workbench`, separate change): the Workflow Runs tree reads the paging numbers from the
   page's nested `page` object (`src/common/RunsPage.ts`). It read a top-level `totalPages`, which the server never
   sends, so "Load more" never appeared for workflows with more runs than one page.
 - **Clients to check:** anything that treats only `200` as a successful schedule create, or a `400` as "workbench
-  already exists". The workbench and the KNIME scheduler accept any 2xx; the management UI shows the error text for any
+  already exists". The KNIME scheduler must percent-encode (or otherwise sanitize) the schedule name it sends as the
+  workflow `name`: a name with spaces is now rejected with 400. The workbench and the KNIME scheduler accept any 2xx; the management UI shows the error text for any
   status. `continuum-system-tests` expects the new codes and checks the fixed cases (they were known gaps).
 
 ### Removed modules
@@ -238,4 +247,4 @@ HTTP semantics. All are `application/problem+json`.
   - It only reports. Nothing is paused, changed or deleted. Fix each reported schedule (delete it and create it again with valid properties), or pause it with `POST /api/v1/workflow/schedule/{id}/pause`.
   - The response lists `invalid` schedules (every run fails), `unregisteredOnly` schedules, and `failedToCheck` ids. `unregisteredOnly` means the only problem is a node type that is not registered: its worker may not be up yet, or the node type was removed. `failedToCheck` means the registry could not be read; call again.
 
-**Full Changelog**: https://github.com/projectcontinuum-org/continuum-platform-core/compare/release/0.0.22...CONTNM-161
+**Full Changelog**: https://github.com/projectcontinuum-org/continuum-platform-core/compare/release/0.0.22...main

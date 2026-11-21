@@ -1,16 +1,19 @@
 package org.projectcontinuum.core.api.server.service
 
 import com.google.protobuf.ByteString
+import io.grpc.Status
 import io.temporal.api.common.v1.Payload
 import io.temporal.client.WorkflowOptions
 import io.temporal.client.schedules.Schedule
 import io.temporal.client.schedules.ScheduleActionStartWorkflow
 import io.temporal.client.schedules.ScheduleClient
 import io.temporal.client.schedules.ScheduleDescription
+import io.temporal.client.schedules.ScheduleException
 import io.temporal.client.schedules.ScheduleOptions
 import io.temporal.client.schedules.ScheduleSpec
 import io.temporal.common.interceptors.Header
 import org.projectcontinuum.core.api.server.entity.jpa.WorkflowScheduleEntity
+import org.projectcontinuum.core.api.server.exception.TemporalErrors
 import org.projectcontinuum.core.api.server.exception.WorkflowValidationException
 import org.projectcontinuum.core.api.server.exception.WorkflowScheduleNotFoundException
 import org.projectcontinuum.core.api.server.model.CreateWorkflowScheduleRequest
@@ -19,10 +22,6 @@ import org.projectcontinuum.core.api.server.repository.jpa.WorkflowScheduleRepos
 import org.projectcontinuum.core.commons.constant.TaskQueues
 import org.projectcontinuum.core.commons.context.ContinuumOwnerContext
 import org.projectcontinuum.core.commons.context.ContinuumScheduleContext
-import org.projectcontinuum.core.commons.validation.GraphEdge
-import org.projectcontinuum.core.commons.validation.GraphNode
-import org.projectcontinuum.core.commons.validation.ValidationMode
-import org.projectcontinuum.core.commons.validation.WorkflowValidator
 import org.projectcontinuum.core.commons.workflow.IContinuumWorkflow
 import io.github.perplexhub.rsql.RSQLJPASupport
 import org.springframework.data.jpa.domain.Specification
@@ -36,19 +35,25 @@ class WorkflowScheduleService(
   nodeExplorerService: NodeExplorerService
 ) {
 
-  private val workflowValidator = WorkflowValidator { nodeModel -> nodeExplorerService.getNodeMetadata(nodeModel) }
+  private val workflowRunValidator = WorkflowRunValidator(nodeExplorerService)
+
+  /**
+   * Runs [action] against the Temporal schedule [scheduleId]. A schedule that exists in the database but no longer in
+   * Temporal (deleted there directly) is the same 404 as an unknown one; every other failure propagates.
+   */
+  private fun <T> onTemporalSchedule(scheduleId: UUID, action: () -> T): T =
+    try {
+      action()
+    } catch (e: ScheduleException) {
+      if (TemporalErrors.grpcStatusCode(e) == Status.Code.NOT_FOUND) {
+        throw WorkflowScheduleNotFoundException("Schedule $scheduleId not found in Temporal")
+      }
+      throw e
+    }
 
   fun createSchedule(request: CreateWorkflowScheduleRequest, ownedBy: String): WorkflowScheduleResponse {
-    val workflow = request.continuumWorkflowModel
-    val validation = workflowValidator.validate(
-      nodes = workflow.nodes.map { node ->
-        GraphNode(key = node.id, nodeId = node.data.nodeModel, properties = node.data.properties, embedded = node.data)
-      },
-      edges = workflow.edges.map { edge ->
-        GraphEdge(from = edge.source, fromPort = edge.sourceHandle, to = edge.target, toPort = edge.targetHandle)
-      },
-      mode = ValidationMode.RUN
-    )
+    // The same checks as a start (graph, registered node properties, workflow name), before Temporal or the database.
+    val validation = workflowRunValidator.validate(request.continuumWorkflowModel)
     if (!validation.valid) {
       throw WorkflowValidationException(errors = validation.errors, warnings = validation.warnings)
     }
@@ -131,29 +136,30 @@ class WorkflowScheduleService(
 
   fun getSchedule(ownedBy: String, scheduleId: UUID): WorkflowScheduleResponse? {
     val entity = findOwnedEntity(ownedBy, scheduleId) ?: return null
-    return toResponse(entity, scheduleClient.getHandle(scheduleId.toString()).describe())
+    val description = onTemporalSchedule(scheduleId) { scheduleClient.getHandle(scheduleId.toString()).describe() }
+    return toResponse(entity, description)
   }
 
   fun pauseSchedule(ownedBy: String, scheduleId: UUID, note: String?) {
     requireOwned(ownedBy, scheduleId)
     val handle = scheduleClient.getHandle(scheduleId.toString())
-    if (note != null) handle.pause(note) else handle.pause()
+    onTemporalSchedule(scheduleId) { if (note != null) handle.pause(note) else handle.pause() }
   }
 
   fun unpauseSchedule(ownedBy: String, scheduleId: UUID, note: String?) {
     requireOwned(ownedBy, scheduleId)
     val handle = scheduleClient.getHandle(scheduleId.toString())
-    if (note != null) handle.unpause(note) else handle.unpause()
+    onTemporalSchedule(scheduleId) { if (note != null) handle.unpause(note) else handle.unpause() }
   }
 
   fun triggerNow(ownedBy: String, scheduleId: UUID) {
     requireOwned(ownedBy, scheduleId)
-    scheduleClient.getHandle(scheduleId.toString()).trigger()
+    onTemporalSchedule(scheduleId) { scheduleClient.getHandle(scheduleId.toString()).trigger() }
   }
 
   fun deleteSchedule(ownedBy: String, scheduleId: UUID) {
     requireOwned(ownedBy, scheduleId)
-    scheduleClient.getHandle(scheduleId.toString()).delete()
+    onTemporalSchedule(scheduleId) { scheduleClient.getHandle(scheduleId.toString()).delete() }
     workflowScheduleRepository.deleteById(scheduleId)
   }
 
