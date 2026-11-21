@@ -105,16 +105,21 @@ class WorkflowStatusReporter(
   /**
    * Calculates the overall workflow progress percentage.
    *
-   * This method computes progress based on the number of completed nodes
-   * (both successful and failed) relative to the total number of nodes in the workflow.
+   * Progress is the share of nodes that are done: succeeded, failed or skipped. Skipped nodes
+   * count because they will never run, so a run with skipped nodes still ends at 100%.
    *
    * @return Progress percentage as an integer between 0 and 100
    */
   fun calculateProgressPercentage(): Int {
-    val totalNodes = currentRunningWorkflow()?.nodes?.size ?: 0
-    if (totalNodes == 0) return 100
-    val completedNodes = nodeToOutputsMap.size + nodeErrorsMap.size
-    return (completedNodes * 100) / totalNodes
+    val nodes = currentRunningWorkflow()?.nodes ?: emptyList()
+    if (nodes.isEmpty()) return 100
+    val skippedNodeCount = nodes.count { node ->
+      node.data.status == ContinuumWorkflowModel.NodeStatus.SKIPPED &&
+          !nodeToOutputsMap.containsKey(node.id) &&
+          !nodeErrorsMap.containsKey(node.id)
+    }
+    val doneNodeCount = nodeToOutputsMap.size + nodeErrorsMap.size + skippedNodeCount
+    return (doneNodeCount * 100) / nodes.size
   }
 
   /**
@@ -136,21 +141,36 @@ class WorkflowStatusReporter(
     currentRunningWorkflow()?.edges
       ?.filter { it.target == node.id }
       ?.forEach {
-        it.animated = nodeStatus == ContinuumWorkflowModel.NodeStatus.BUSY
+        it.animated = nodeStatus == ContinuumWorkflowModel.NodeStatus.BUSY ||
+          nodeStatus == ContinuumWorkflowModel.NodeStatus.SCHEDULED
       }
   }
 
   /**
-   * Marks all nodes currently in BUSY status with the given status.
+   * Sets an edge's runtime status, published in `edge.data.status`. Animation is left to
+   * [setNodeAnimationAndStatus]: a DELIVERED edge stays animated while its target runs.
+   */
+  fun setEdgeStatus(
+    edge: ContinuumWorkflowModel.Edge,
+    edgeStatus: ContinuumWorkflowModel.EdgeStatus
+  ) {
+    edge.data = (edge.data ?: ContinuumWorkflowModel.EdgeData()).copy(status = edgeStatus)
+  }
+
+  /**
+   * Marks all in-flight nodes (SCHEDULED or BUSY) with the given status.
    *
    * This is used during workflow failure, cancellation, or termination to
    * update any in-progress nodes so the UI reflects their final state.
    *
-   * @param status The status to assign to busy nodes (e.g., FAILED, CANCELLED)
+   * @param status The status to assign to in-flight nodes (e.g., FAILED, CANCELLED)
    */
-  fun markBusyNodesAs(status: ContinuumWorkflowModel.NodeStatus) {
+  fun markInFlightNodesAs(status: ContinuumWorkflowModel.NodeStatus) {
     currentRunningWorkflow()?.nodes
-      ?.filter { it.data.status == ContinuumWorkflowModel.NodeStatus.BUSY }
-      ?.forEach { setNodeAnimationAndStatus(it, status) }
+      ?.filter {
+        it.data.status == ContinuumWorkflowModel.NodeStatus.BUSY ||
+          it.data.status == ContinuumWorkflowModel.NodeStatus.SCHEDULED
+      }
+      ?.forEach { node -> setNodeAnimationAndStatus(node = node, nodeStatus = status) }
   }
 }

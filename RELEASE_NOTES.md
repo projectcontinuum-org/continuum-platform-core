@@ -22,6 +22,8 @@ This release is a security and multi-tenancy hardening release. Every workflow, 
 - CONTNM-161: Create an index on `workflow_runs` by owner
 - CONTNM-161: Remove `continuum-cloud-gateway` from the repository
 - CONTNM-161: Remove `continuum-knime-scheduler` (it lives in `continuum-feature-knime`)
+- CONTNM-169: Explicit `SKIPPED` state for nodes that can never run, and a side-effect-free readiness check
+- CONTNM-170: New `SCHEDULED` node status; the worker reports `BUSY` when the activity starts (**breaks workers older than 0.0.23**, see Upgrade notes)
 
 ## Details
 
@@ -73,6 +75,9 @@ This release is a security and multi-tenancy hardening release. Every workflow, 
 
 - `WorkflowStatusReporter` publishes the Temporal run id (`Workflow.getInfo().runId`) on every event.
 - **Cancel-right-after-start fix.** The api-server signals `notifyCancelling` straight after starting a workflow, sometimes while it is still resolving task queues. `publishUpdate` then threw a `NullPointerException` (`currentRunningWorkflow()!!`), which fails the workflow *task*. Temporal retries that task forever, so the run stayed `RUNNING` with no status. It now skips the update when the workflow model is not stored yet; the pinned terminal status is carried by the next update.
+- **Nodes that can never run are marked `SKIPPED`.** A node is skipped when it has an unconnected declared input, or an incoming edge that will never carry data: its source is `FAILED` or `SKIPPED`, or finished without producing the connected port. Skipping spreads to all descendants, in workflow node order. Before, these nodes kept status `null`, so the UI could not tell them from pending nodes. Skipped nodes are not errors: they are not in `nodeErrors`, and they do not fail the workflow by themselves. A workflow with a failed node still ends `FAILED`, and independent branches still run. Skipped nodes count as done in `progressPercentage`, so a finished run reaches 100%.
+- **Edge status.** Every edge whose source has finished gets `data.status` (new `ContinuumWorkflowModel.EdgeData` / `EdgeStatus`): `DELIVERED` when the source produced the connected port, `BROKEN` when it never will (the source failed or was skipped, or finished without producing the port). No status means the source has not finished. The workbench draws a `BROKEN` edge as a red dashed wire with a cross at the midpoint. The workbench's `NodeStatus` and `EdgeStatus` enums (`@continuum/core`) mirror the Kotlin enums value for value.
+- **New node status `SCHEDULED`.** When the orchestrator dispatches a node it now marks it `SCHEDULED`, not `BUSY`. The worker sends a `BUSY` signal (`ContinuumNodeActivitySignal.nodeStatus`) as soon as the activity starts, before inputs are downloaded. Only `SCHEDULED` → `BUSY` is applied, so a late or retried signal cannot overwrite a finished node. On cancel or failure, `SCHEDULED` nodes are marked `CANCELLED`/`FAILED` like `BUSY` ones.
 
 ### continuum-message-bridge
 
@@ -105,6 +110,9 @@ This release is a security and multi-tenancy hardening release. Every workflow, 
 
 ## Upgrade notes
 
+- **Breaking: workers built against platform 0.0.22 or older fail every node.** The orchestrator passes the node to the activity with `status = SCHEDULED`. An older `continuum-commons` does not have that enum value, so the worker cannot read the activity input and the node fails after its retries. Rebuild every feature worker (`continuum-feature-base`, `-ai`, `-cheminformatics`, `-knime`, and any of your own) against `continuumPlatformVersion=0.0.23`, and **deploy the workers before the orchestration service**. A 0.0.23 worker also runs against an older orchestrator; that orchestrator just ignores its `BUSY` signal.
+- **Node statuses.** Clients that read node status must accept `SCHEDULED` and `SKIPPED`. Runs recorded before this release have `null`, not `SKIPPED`, for nodes that never ran, and no edge `data`; treat `null` and `SKIPPED` the same when showing old runs. The workbench shows both from its CONTNM-170 change.
+- **Edges.** `ContinuumWorkflowModel.Edge` has a new optional `data` field. Anything that deserializes workflow models or `WorkflowUpdate` events strictly must accept it.
 - **Node output URL.** Clients must address `/api/v1/data/...` by the Temporal run id taken from the stored output path. The workbench already does. Anything that passed the workflow id there now gets a 404.
 - **Ownership is enforced.** A client that cancels, terminates or lists workflows must send the same `x-continuum-user-id` it started them with. Unknown ids and other users' ids are now 404 where they were 204 or readable before. Behind a proxy that does not inject the header, every caller is `anonymous`.
 - **Workbench image allow-list.** Create and update requests naming an image outside `projectcontinuum/continuum-workbench` are now rejected with 400. Set `WORKBENCH_ALLOWED_IMAGE_PREFIXES` to allow other repositories (an empty value allows any valid image). With the Helm chart, set `continuum.clusterManager.workbench.allowedImagePrefixes` (needs the matching `continuum-charts` change).

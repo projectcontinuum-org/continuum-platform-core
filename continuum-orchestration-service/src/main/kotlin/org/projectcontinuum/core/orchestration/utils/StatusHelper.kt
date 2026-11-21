@@ -89,6 +89,11 @@ class StatusHelper(
         LOGGER.warn("StreamBridge is null. Cannot send message to Kafka.")
       }
     }
+
+    /** Clears the static StreamBridge. For tests that install their own via [postConstruct]. */
+    internal fun reset() {
+      streamBridge = null
+    }
   }
 
   /**

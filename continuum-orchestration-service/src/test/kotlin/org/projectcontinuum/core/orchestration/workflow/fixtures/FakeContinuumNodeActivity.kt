@@ -7,6 +7,10 @@ import org.projectcontinuum.core.commons.model.ContinuumWorkflowModel
 import org.projectcontinuum.core.commons.model.PortData
 import org.projectcontinuum.core.commons.model.PortDataStatus
 import org.projectcontinuum.core.commons.utils.ValidationHelper
+import io.temporal.activity.Activity
+import org.projectcontinuum.core.commons.protocol.progress.ContinuumNodeActivitySignal
+import org.projectcontinuum.core.commons.protocol.progress.NodeProgress
+import org.projectcontinuum.core.commons.workflow.IContinuumWorkflow
 import java.util.Collections
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.CountDownLatch
@@ -57,6 +61,19 @@ class FakeContinuumNodeActivity : IContinuumNodeActivity {
     inputs: Map<String, PortData>
   ): NodeActivityOutput {
     invokedNodeIds.add(node.id)
+    // Mirror the real worker: report BUSY as soon as the activity starts
+    Activity.getExecutionContext().workflowClient
+      .newWorkflowStub(
+        IContinuumWorkflow::class.java,
+        Activity.getExecutionContext().info.workflowId
+      )
+      .updateNodeProgressSignal(
+        ContinuumNodeActivitySignal(
+          nodeId = node.id,
+          nodeProgress = NodeProgress(progressPercentage = 0),
+          nodeStatus = ContinuumWorkflowModel.NodeStatus.BUSY
+        )
+      )
     attemptCount.computeIfAbsent(node.id) { AtomicInteger(0) }.incrementAndGet()
 
     registeredSchemas[node.data.nodeModel]?.let { schema ->

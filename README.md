@@ -178,7 +178,12 @@ A click turned outcome.
 > Included configurations: **ApiServer**, **MessageBridge**
 
 1. Open the project in IntelliJ IDEA
-2. Start infrastructure:
+2. Pull Git LFS binaries (DuckDB extensions are tracked with LFS):
+   ```bash
+   git lfs install
+   git lfs pull
+   ```
+3. Start infrastructure:
    ```bash
    cd docker && docker compose up -d
    ```
@@ -193,6 +198,10 @@ A click turned outcome.
 # Clone the repo
 git clone https://github.com/projectcontinuum-org/continuum-platform-core.git
 cd Continuum
+
+# Pull Git LFS binaries (DuckDB extensions are tracked with LFS)
+git lfs install
+git lfs pull
 
 # Spin up infrastructure (Temporal, Kafka, MinIO, Mosquitto)
 cd docker

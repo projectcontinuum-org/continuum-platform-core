@@ -53,9 +53,15 @@ class WorkflowDagExecutor(
 
     do {
       // Find nodes ready to execute (all parents have completed)
-      val nodesToExecute = getNextNodesToExecute(
-        continuumWorkflow,
-        nodeToOutputsMap
+      markUnrunnableNodesSkipped(
+        continuumWorkflow = continuumWorkflow,
+        nodeToOutputsMap = nodeToOutputsMap,
+        nodeErrorsMap = nodeErrorsMap
+      )
+      val nodesToExecute = NodeReadiness.getReadyNodes(
+        continuumWorkflow = continuumWorkflow,
+        nodeOutputMap = nodeToOutputsMap,
+        nodeErrorsMap = nodeErrorsMap
       )
       LOGGER.info("Nodes to execute: ${nodesToExecute.map { it.id }}")
 
@@ -63,8 +69,8 @@ class WorkflowDagExecutor(
       val morePromises = nodesToExecute.map { node ->
         // Gather inputs from parent nodes' outputs
         val nodeInputs = getNodeInputs(continuumWorkflow, node, nodeToOutputsMap)
-        // Mark node as running and animate incoming edges
-        statusReporter.setNodeAnimationAndStatus(node, ContinuumWorkflowModel.NodeStatus.BUSY)
+        // Mark node as scheduled and animate incoming edges; the activity reports BUSY once it starts
+        statusReporter.setNodeAnimationAndStatus(node = node, nodeStatus = ContinuumWorkflowModel.NodeStatus.SCHEDULED)
         // Start the activity asynchronously, catching ActivityFailure to treat it as a node error
         Pair(node, Async.function {
           try {
@@ -107,11 +113,11 @@ class WorkflowDagExecutor(
         // Check if node succeeded or failed based on error output port
         if (!nodeOutput.outputs.containsKey(IContinuumNodeActivity.NodeOutputSystemPort.ERROR.key)) {
           // Success: update status and store outputs
-          statusReporter.setNodeAnimationAndStatus(completedNode, ContinuumWorkflowModel.NodeStatus.SUCCESS)
+          statusReporter.setNodeAnimationAndStatus(node = completedNode, nodeStatus = ContinuumWorkflowModel.NodeStatus.SUCCESS)
           nodeToOutputsMap[nodeOutput.nodeId] = nodeOutput.outputs
         } else {
           // Failure: update status and store error info
-          statusReporter.setNodeAnimationAndStatus(completedNode, ContinuumWorkflowModel.NodeStatus.FAILED)
+          statusReporter.setNodeAnimationAndStatus(node = completedNode, nodeStatus = ContinuumWorkflowModel.NodeStatus.FAILED)
           nodeErrorsMap[nodeOutput.nodeId] = nodeOutput.outputs
         }
 
@@ -119,11 +125,17 @@ class WorkflowDagExecutor(
         nodeExecutionPromises.removeAll { it.first.id == nodeOutput.nodeId }
       }
       LOGGER.info("NodeExecutionPromises size: ${nodeExecutionPromises.size}")
-    } while (getNextNodesToExecute(
-        continuumWorkflow,
-        nodeToOutputsMap
-      ).isNotEmpty() || nodeExecutionPromises.isNotEmpty()
-    )
+      markUnrunnableNodesSkipped(
+        continuumWorkflow = continuumWorkflow,
+        nodeToOutputsMap = nodeToOutputsMap,
+        nodeErrorsMap = nodeErrorsMap
+      )
+      val hasReadyNodes = NodeReadiness.getReadyNodes(
+        continuumWorkflow = continuumWorkflow,
+        nodeOutputMap = nodeToOutputsMap,
+        nodeErrorsMap = nodeErrorsMap
+      ).isNotEmpty()
+    } while (hasReadyNodes || nodeExecutionPromises.isNotEmpty())
     LOGGER.info("All nodes executed----------------------------------")
   }
 
@@ -153,66 +165,29 @@ class WorkflowDagExecutor(
   }
 
   /**
-   * Determines which nodes are ready to execute.
-   *
-   * A node is ready to execute when:
-   * 1. All parent nodes have completed successfully
-   * 2. All required input ports have data available
-   * 3. The node hasn't been executed yet
-   * 4. The node doesn't have a status (not currently running)
-   *
-   * @param continuumWorkflow The workflow model containing node and edge definitions
-   * @param nodeOutputMap Map of completed node IDs to their outputs
-   * @return List of nodes ready for execution
+   * Marks every node that can never run as SKIPPED, then publishes each finished edge's status:
+   * DELIVERED, or BROKEN so the workbench can draw a broken wire. The caller publishes the update.
    */
-  private fun getNextNodesToExecute(
+  private fun markUnrunnableNodesSkipped(
     continuumWorkflow: ContinuumWorkflowModel,
-    nodeOutputMap: Map<String, Map<String, PortData>>
-  ): List<ContinuumWorkflowModel.Node> {
-    val nodesToExecute = mutableListOf<ContinuumWorkflowModel.Node>()
-
-    for (node in continuumWorkflow.nodes) {
-      // Get parent nodes and connecting edges
-      val nodeParents = continuumWorkflow.getParentNodes(node)
-      val nodeParentEdges = continuumWorkflow.getParentEdges(node)
-
-      // Check if all parent nodes have produced the required outputs
-      val allParentsProducedOutput = nodeParents.all { parent ->
-        val connectingEdgesToParent = nodeParentEdges.filter { it.source == parent.id }
-        // Parent must have outputs AND all connected output ports must have data
-        nodeOutputMap.containsKey(parent.id) &&
-            connectingEdgesToParent.all { edge ->
-              nodeOutputMap[parent.id]?.containsKey(edge.sourceHandle) ?: false
-            }
-      }
-
-      // Check if all input ports are connected to a parent node's output port
-      val allInputPortsConnected = node.data.inputs?.all { inputPort ->
-          nodeParentEdges.any { edge -> edge.targetHandle == inputPort.key }
-      } ?: true
-
-      if(!allInputPortsConnected) {
-        node.data.status = ContinuumWorkflowModel.NodeStatus.SKIPPED
-      }
-
-      LOGGER.debug(
-        "Node: {} allParentsProducedOutput: {} allInputPortsConnected: {} executed: {} status: {}",
-        node.id,
-        allParentsProducedOutput,
-        allInputPortsConnected,
-        nodeOutputMap.containsKey(node.id),
-        node.data.status
-      )
-
-      // Node is ready if: parents done, not yet executed, and not currently running
-      if (allParentsProducedOutput &&
-        allInputPortsConnected &&
-        !nodeOutputMap.containsKey(node.id) &&
-        node.data.status == null
-      ) {
-        nodesToExecute.add(node)
-      }
+    nodeToOutputsMap: Map<String, Map<String, PortData>>,
+    nodeErrorsMap: Map<String, Map<String, PortData>>
+  ) {
+    val nodesToSkip = NodeReadiness.getNodesToSkip(
+      continuumWorkflow = continuumWorkflow,
+      nodeOutputMap = nodeToOutputsMap,
+      nodeErrorsMap = nodeErrorsMap
+    )
+    nodesToSkip.forEach { node ->
+      LOGGER.info("Skipping node {}", node.id)
+      statusReporter.setNodeAnimationAndStatus(node = node, nodeStatus = ContinuumWorkflowModel.NodeStatus.SKIPPED)
     }
-    return nodesToExecute
+    NodeReadiness.getEdgeStatuses(
+      continuumWorkflow = continuumWorkflow,
+      nodeOutputMap = nodeToOutputsMap,
+      nodeErrorsMap = nodeErrorsMap
+    ).forEach { (edge, edgeStatus) ->
+      statusReporter.setEdgeStatus(edge = edge, edgeStatus = edgeStatus)
+    }
   }
 }
