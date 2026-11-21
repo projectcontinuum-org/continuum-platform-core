@@ -7,6 +7,7 @@ import org.mockito.kotlin.any
 import org.mockito.kotlin.eq
 import org.mockito.kotlin.verify
 import org.mockito.kotlin.whenever
+import org.projectcontinuum.core.cluster.manager.exception.WorkbenchAlreadyExistsException
 import org.projectcontinuum.core.cluster.manager.exception.WorkbenchNotFoundException
 import org.projectcontinuum.core.cluster.manager.model.ResourceSpec
 import org.projectcontinuum.core.cluster.manager.model.WorkbenchLivenessResponse
@@ -95,9 +96,9 @@ class WorkbenchControllerTest {
   }
 
   @Test
-  fun `POST returns 400 when workbench already exists`() {
+  fun `POST returns 409 when workbench already exists`() {
     whenever(workbenchService.createWorkbench(eq("user-1"), any()))
-      .thenThrow(IllegalArgumentException("Workbench 'my-workbench' already exists for user 'user-1'"))
+      .thenThrow(WorkbenchAlreadyExistsException("Workbench 'my-workbench' already exists for user 'user-1'"))
 
     mockMvc.perform(
       post("/api/v1/workbench")
@@ -105,7 +106,7 @@ class WorkbenchControllerTest {
         .contentType(MediaType.APPLICATION_JSON)
         .content("""{"instanceName": "my-workbench"}""")
     )
-      .andExpect(status().isBadRequest)
+      .andExpect(status().isConflict)
       .andExpect(jsonPath("$.error").value("Workbench 'my-workbench' already exists for user 'user-1'"))
   }
 

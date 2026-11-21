@@ -1,0 +1,112 @@
+name: OpenAPI Spec Check
+
+# The OpenAPI specs of the platform services are committed in docs/api/<module>.openapi.yaml and reviewed like code.
+# This job regenerates them from the code (each service's OpenApiSpecTest fails when the generated spec differs from
+# the committed one) and lints the committed specs. To update a spec after an intended API change:
+#   ./gradlew :<module>:test --tests '*OpenApiSpecTest*' -PupdateOpenApiSpec
+# then review and commit the diff in docs/api/.
+on:
+  pull_request:
+    paths:
+      - 'continuum-api-server/**'
+      - 'continuum-cluster-manager/**'
+      - 'continuum-credentials-server/**'
+      - 'continuum-commons/**'
+      - 'docs/api/**'
+      - 'redocly.yaml'
+      - 'gradle/**'
+      - 'settings.gradle.kts'
+      - 'build.gradle.kts'
+      - 'gradle.properties'
+      - '.github/workflows/openapi-spec-check.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'docs/api/**'
+      - 'continuum-api-server/**'
+      - 'continuum-cluster-manager/**'
+      - 'continuum-credentials-server/**'
+      - 'continuum-commons/**'
+
+concurrency:
+  group: openapi-spec-check-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  drift:
+    name: Generated specs match docs/api
+    runs-on: ubuntu-latest
+    steps:
+      # LFS: the API server refuses to start when its bundled DuckDB httpfs extension is an LFS pointer file.
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          lfs: true
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '21'
+
+      - name: Cache Gradle dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: gradle-${{ runner.os }}-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties', 'gradle/libs.versions.toml') }}
+          restore-keys: |
+            gradle-${{ runner.os }}-
+
+      # One Gradle run: -PupdateOpenApiSpec makes each OpenApiSpecTest write the generated spec into docs/api/ (its other
+      # assertions still run), the other tests check docs-off, forwarded headers and the error contract. Any difference
+      # to the committed specs is then an unreviewed API change.
+      - name: Regenerate the specs and run the OpenAPI tests
+        run: |
+          chmod +x ./gradlew
+          ./gradlew \
+            :continuum-api-server:test --tests '*OpenApiSpecTest*' --tests '*OpenApiDisabledTest*' --tests '*ProblemDetailContractTest*' \
+            :continuum-cluster-manager:test --tests '*OpenApiSpecTest*' --tests '*ForwardedHeadersTest*' --tests '*PreHandlerProblemDetailTest*' \
+            :continuum-credentials-server:test --tests '*OpenApiSpecTest*' --tests '*OpenApiDisabledTest*' --tests '*ProblemDetailContractTest*' \
+            -PupdateOpenApiSpec --no-daemon --stacktrace
+
+      - name: Fail on an unreviewed spec diff
+        run: |
+          if ! git diff --exit-code -- docs/api/; then
+            echo "::error title=OpenAPI drift::The committed specs in docs/api/ are out of date. Run ./gradlew :<module>:test --tests '*OpenApiSpecTest*' -PupdateOpenApiSpec and commit the result."
+            exit 1
+          fi
+          untracked=$(git ls-files --others --exclude-standard -- docs/api/)
+          if [ -n "${untracked}" ]; then
+            echo "::error title=OpenAPI drift::New spec files are not committed: ${untracked}"
+            exit 1
+          fi
+
+      - name: Upload test reports
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: openapi-spec-check-reports
+          path: |
+            */build/reports/tests/
+          if-no-files-found: ignore
+          retention-days: 14
+
+  lint:
+    name: Lint committed specs (Redocly)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Lint
+        run: npx --yes @redocly/cli@2 lint docs/api/*.openapi.yaml --config redocly.yaml

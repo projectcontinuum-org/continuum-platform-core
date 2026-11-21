@@ -1,0 +1,21 @@
+# Lint rules for the committed OpenAPI specs in docs/api/*.openapi.yaml.
+# Run: npx --yes @redocly/cli@2 lint docs/api/*.openapi.yaml --config redocly.yaml
+extends:
+  - recommended
+rules:
+  # Every operation must have an id, a summary, a tag and at least one 4xx/5xx response (drift tests check the same).
+  operation-operationId: error
+  operation-operationId-unique: error
+  operation-summary: error
+  operation-tag-defined: error
+  operation-4xx-response: error
+  # The identity headers are documented as securitySchemes, but they are optional for local development, so
+  # operations that are not user-scoped have no security requirement on purpose.
+  security-defined: off
+  info-license-strict: error
+  no-server-example.com: error
+  # /api/v1/workflow/schedule/{scheduleId} and /api/v1/workflow/{workflowId}/cancel (status, terminate) overlap by
+  # shape. Spring resolves them deterministically (literal segments win) and the URLs are a published contract, so
+  # this is accepted rather than fixed.
+  no-ambiguous-paths: off
+  no-empty-servers: error

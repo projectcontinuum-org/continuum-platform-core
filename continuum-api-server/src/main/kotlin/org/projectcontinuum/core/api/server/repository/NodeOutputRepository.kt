@@ -1,6 +1,7 @@
 package org.projectcontinuum.core.api.server.repository
 
 import org.projectcontinuum.core.api.server.exception.InvalidRequestException
+import org.projectcontinuum.core.api.server.exception.ResourceNotFoundException
 import org.projectcontinuum.core.api.server.model.CellDto
 import org.projectcontinuum.core.api.server.model.Page
 import org.duckdb.DuckDBArray
@@ -11,9 +12,12 @@ import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.stereotype.Repository
 import software.amazon.awssdk.services.s3.model.GetObjectRequest
+import software.amazon.awssdk.services.s3.model.NoSuchKeyException
+import software.amazon.awssdk.services.s3.model.S3Exception
 import software.amazon.awssdk.transfer.s3.S3TransferManager
 import software.amazon.awssdk.transfer.s3.model.DownloadFileRequest
 import java.io.File
+import java.util.concurrent.CompletionException
 
 @Repository
 class NodeOutputRepository(
@@ -50,6 +54,12 @@ class NodeOutputRepository(
         throw InvalidRequestException("Invalid $name: must match ${ID_PATTERN.pattern} and must not contain '..'")
       }
     }
+
+    /** True when the download failed because the object does not exist (S3 `NoSuchKey` or a plain 404). */
+    fun isMissingObject(failure: Throwable): Boolean =
+      generateSequence(failure) { it.cause }.any { cause ->
+        cause is NoSuchKeyException || (cause is S3Exception && cause.statusCode() == 404)
+      }
 
     fun validatePaging(page: Int, pageSize: Int) {
       if (page < 0) {
@@ -168,20 +178,29 @@ class NodeOutputRepository(
       }
 
       LOGGER.debug("Downloading file from S3: {} to {}", bucketKey, localCacheFile)
-      s3TransferManager
-        .downloadFile(
-          DownloadFileRequest.builder()
-            .getObjectRequest(
-              GetObjectRequest.builder()
-                .bucket(s3BucketName)
-                .key(bucketKey)
-                .build()
-            )
-            .destination(localCacheFile.toPath())
-            .build()
-        )
-        .completionFuture()
-        .join()
+      try {
+        s3TransferManager
+          .downloadFile(
+            DownloadFileRequest.builder()
+              .getObjectRequest(
+                GetObjectRequest.builder()
+                  .bucket(s3BucketName)
+                  .key(bucketKey)
+                  .build()
+              )
+              .destination(localCacheFile.toPath())
+              .build()
+          )
+          .completionFuture()
+          .join()
+      } catch (e: CompletionException) {
+        // A partial or empty file must not be served as a cached output on the next request.
+        localCacheFile.delete()
+        if (isMissingObject(e)) {
+          throw ResourceNotFoundException("Node output not found")
+        }
+        throw e
+      }
     }
 
     LOGGER.debug("Using local cache file: {} for S3 object: {}", localCacheFile, bucketKey)

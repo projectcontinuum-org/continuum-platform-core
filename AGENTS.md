@@ -79,6 +79,36 @@ Default section order:
 When the user requests a durable behavior change, record it here or in the relevant child AGENTS.md
 
 - Kotlin must read descriptively. Use named parameters at call sites (constructors, data classes, functions with 2+ arguments), in tests too, and prefer descriptive names and explanatory locals over dense one-liners
+- Every API change ships with a consistent OpenAPI spec, in the same change: an agent never adds or modifies an HTTP endpoint, request/response model or status code without updating its annotations, the endpoint inventory and the committed spec as described in "API Documentation Contract" below
+
+## API Documentation Contract
+
+Every Spring Boot service with `@RestController` endpoints follows [docs/api/CONVENTIONS.md](docs/api/CONVENTIONS.md); a new or changed endpoint is not done until its OpenAPI docs are.
+
+### Rule for AI agents: every API change updates the OpenAPI spec
+
+Applies to any change that adds, removes or modifies an endpoint (path, method, parameter, header, request body, response body, status code, error body), a request/response model or one of its fields, a validation rule a client can hit, or a shared commons model that appears in a payload. Do all of the following in the same change, before reporting the task as done:
+
+1. **Inventory first.** Add or update the endpoint's section in [docs/api/ENDPOINT_INVENTORY.md](docs/api/ENDPOINT_INVENTORY.md) from the code (callers, identity, params with constraints, every success and error status with its body, side effects, idempotency). Unknown intent is a `TODO:` there, never a guess in the spec.
+2. **Annotate** to [docs/api/CONVENTIONS.md](docs/api/CONVENTIONS.md):
+   - `@Tag` on the controller.
+   - `@Operation` with a new, unique lowerCamelCase `operationId` (never rename an existing one without a release note), a summary under 80 characters and a description with side effects.
+   - `@Parameter` with a description and an example; identity headers stay `@Parameter(hidden = true)` with `@SecurityRequirement` on user-scoped operations.
+   - `@RequestBody` with a realistic example.
+   - `@ApiResponse` for every real status, including 201/204/404/409 and errors as `ProblemDetail` with an example.
+   - `@Schema(description, example)` on every new or changed field. Fields with Kotlin defaults get `requiredMode = NOT_REQUIRED`. Nested types get a unique `@Schema(name)`. Enums and string statuses list their values.
+   - Internal endpoints go in the `internal` group only.
+3. **Regenerate and review** the committed spec: `./gradlew :<module>:test --tests '*OpenApiSpecTest*' -PupdateOpenApiSpec`, then read the diff of `docs/api/<module>.openapi.yaml` and check that it shows exactly the intended change. A changed commons model can change several specs; regenerate every affected module.
+4. **Verify:** `./gradlew :<module>:test` passes (including `OpenApiSpecTest`), and `npx --yes @redocly/cli@2 lint docs/api/*.openapi.yaml --config redocly.yaml` reports no errors and no warnings. Fix findings in the annotations, never by editing the YAML by hand.
+5. **Record client-visible changes** (status codes, error bodies, renamed or removed fields, operationIds, schema names) in `release_notes/RELEASE_NOTES_v<platformVersion>.md`, and update `continuum-system-tests` checks that assert them.
+6. **A new service** with `@RestController` endpoints gets the full setup from CONVENTIONS.md: an `OpenApiConfig`, the docs flag in `application.yml`, an `OpenApiSpecTest`, a committed spec, and an entry in `.github/workflows/openapi-spec-check.yml`.
+
+If any step cannot be done (for example the lint cannot run), say so in the report and do not claim the API change is complete.
+
+### Reference
+- Errors are RFC 9457 `ProblemDetail` (`application/problem+json`). Identity headers are documented as security schemes, never as parameters. Internal endpoints (operator, ForwardAuth) belong to the `internal` spec group only.
+- `springdoc` comes from `gradle/libs.versions.toml` and tracks the Spring Boot line (springdoc 3.0.x for Boot 4.0.x); upgrade both together.
+- Each documented service (api-server, cluster-manager, credentials-server) has `OpenApiSpecTest`, which fails when the generated spec differs from the committed `docs/api/<module>.openapi.yaml`. CI (`.github/workflows/openapi-spec-check.yml`) repeats that check, fails on an unreviewed spec diff, and lints the specs with Redocly (`redocly.yaml`).
 
 ## Project Reference
 
@@ -116,6 +146,8 @@ When the user requests a durable behavior change, record it here or in the relev
 ```
 
 IntelliJ run configs in `.run/` cover: ApiServer, MessageBridge, OrchestrationService, CredentialServer.
+
+**Git LFS:** run `git lfs install && git lfs pull` after cloning. The api-server bundles DuckDB `httpfs` extensions under LFS and refuses to start on pointer files; every CI checkout that builds modules uses `lfs: true`.
 
 **Start infrastructure (required before running any service):**
 ```bash
@@ -261,6 +293,10 @@ Libraries (`continuum-commons`, `continuum-avro-schemas`, `continuum-worker-spri
 Container images build with Jib (no Docker daemon) and push to **Docker Hub** at `docker.io/projectcontinuum/{module-name}:{version}`. Requires `DOCKER_REPO_USERNAME`, `DOCKER_REPO_PASSWORD`. CI builds each image natively on amd64 and arm64 runners (`-Djib.from.platforms=linux/<arch>`) and merges the per-arch digests from each module's `build/jib-image.json` into one multi-arch tag (`.github/workflows/generic-module-builder.yml`). Bundled native binaries (e.g. `continuum-api-server` DuckDB extensions) need a `linux_arm64` build as well.
 
 CI runs `.github/workflows/generic-module-builder.yml`, triggered manually via `.github/workflows/build-module.yml` (tick one or more modules, or "All modules", plus whether to publish to Maven and/or Docker Hub; each ticked module runs as its own matrix leg) and on every published GitHub release via `.github/workflows/on-release.yml` (all libraries and services).
+
+Release notes live in `release_notes/`, one file per version: `RELEASE_NOTES_v<platformVersion>.md` (same layout as `continuum-workbench`). Add changes to the file of the version being prepared; start a new file when `platformVersion` is bumped.
+
+PRs that touch the documented services, `continuum-commons`, `docs/api/` or the shared build files run `.github/workflows/openapi-spec-check.yml`: the `OpenApiSpecTest` drift tests plus a regenerate-and-`git diff` check of `docs/api/*.openapi.yaml`, and a Redocly lint of the committed specs.
 
 PRs that touch any `continuum-*` module or shared build files (`settings.gradle.kts`, root `build.gradle.kts`, `gradle.properties`, `gradle/`) run `.github/workflows/pr-maven-central-check.yml`. All modules share `platformVersion`, so the workflow stages the Maven-published modules locally and runs the same `check-maven-central.js` with `MAVEN_CENTRAL_CHECK_MODE=warn`: an already-published version is a warning annotation and a step-summary note, never a failure. A PR does not need to bump `platformVersion`; bump it when preparing a release, since the release-time run of the script (fail mode) rejects a published version.
 

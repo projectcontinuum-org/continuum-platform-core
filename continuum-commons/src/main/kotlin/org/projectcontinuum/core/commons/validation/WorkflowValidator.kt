@@ -1,6 +1,7 @@
 package org.projectcontinuum.core.commons.validation
 
 import com.fasterxml.jackson.annotation.JsonInclude
+import io.swagger.v3.oas.annotations.media.Schema
 import org.projectcontinuum.core.commons.model.ContinuumWorkflowModel
 import org.projectcontinuum.core.commons.utils.ValidationHelper
 
@@ -33,10 +34,15 @@ data class GraphEdge(val from: String?, val fromPort: String?, val to: String?, 
 
 /** One problem found by [WorkflowValidator]. node, edge and property say where it is, when that applies. */
 @JsonInclude(JsonInclude.Include.NON_NULL)
+@Schema(name = "WorkflowIssue", description = "One problem found by the workflow validator. `node`, `edge` and `property` say where it is, when that applies; absent ones are omitted.")
 data class WorkflowIssue(
+  @field:Schema(description = "Human-readable description of the issue.", example = "Node 'normalize': property 'inputCol' is required.")
   val message: String,
+  @field:Schema(description = "Id of the node concerned (`nodes[].id`).", requiredMode = Schema.RequiredMode.NOT_REQUIRED, example = "normalize")
   val node: String? = null,
+  @field:Schema(description = "Id of the edge concerned (`edges[].id`).", requiredMode = Schema.RequiredMode.NOT_REQUIRED, example = "reactflow__edge-createdata-normalizedata")
   val edge: String? = null,
+  @field:Schema(description = "Top-level node property concerned.", requiredMode = Schema.RequiredMode.NOT_REQUIRED, example = "inputCol")
   val property: String? = null
 )
 

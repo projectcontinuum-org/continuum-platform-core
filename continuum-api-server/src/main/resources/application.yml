@@ -50,6 +50,27 @@ continuum.core:
         secret-key: ${CONTINUUM_MINIO_PASSWORD:minioadmin}
 
 springdoc:
+  # OpenAPI spec (/v3/api-docs) and Swagger UI. On by default for local/dev; the Helm chart turns both off
+  # (CONTINUUM_API_DOCS_ENABLED=false). Continuum has no auth layer of its own, so the docs are never gated by one.
+  api-docs:
+    enabled: ${CONTINUUM_API_DOCS_ENABLED:true}
   swagger-ui:
-    config-url: ../v3/api-docs/swagger-config
-    url: ../v3/api-docs
+    enabled: ${CONTINUUM_API_DOCS_ENABLED:true}
+    urls-primary-name: public
+  default-produces-media-type: application/json
+  default-consumes-media-type: application/json
+  writer-with-order-by-keys: true
+  # Every operation is documented explicitly; springdoc must not add a generic 200 or the advice's responses.
+  override-with-generic-response: false
+
+server:
+  # Honour X-Forwarded-Prefix/Host/Proto from the proxy (Traefik stripPrefix /api-server, nginx), so Swagger UI
+  # redirects and the generated server URL keep the external prefix.
+  forward-headers-strategy: framework
+
+continuum.core.api-docs:
+  # Adds the "internal" group (admin endpoints) to /v3/api-docs/internal and Swagger UI. Needs the docs enabled.
+  internal-group-enabled: ${CONTINUUM_API_DOCS_INTERNAL_ENABLED:false}
+  # Fixed absolute server URL for the spec (e.g. https://continuum.example.com/api-server). Empty: derived from
+  # the request, including X-Forwarded-Prefix.
+  server-url: ${CONTINUUM_API_DOCS_SERVER_URL:}

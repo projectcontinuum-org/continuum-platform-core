@@ -7,6 +7,7 @@ import io.fabric8.kubernetes.api.model.HasMetadata
 import io.fabric8.kubernetes.client.KubernetesClient
 import org.projectcontinuum.core.cluster.manager.config.WorkbenchProperties
 import org.projectcontinuum.core.cluster.manager.entity.WorkbenchInstanceEntity
+import org.projectcontinuum.core.cluster.manager.exception.WorkbenchAlreadyExistsException
 import org.projectcontinuum.core.cluster.manager.exception.WorkbenchNotFoundException
 import org.projectcontinuum.core.cluster.manager.model.*
 import org.projectcontinuum.core.cluster.manager.repository.WorkbenchInstanceRepository
@@ -95,7 +96,7 @@ class WorkbenchService(
         status = "FAILED",
         details = mapOf("reason" to "Workbench already exists")
       )
-      throw IllegalArgumentException("Workbench '${request.instanceName}' already exists for user '$userId'")
+      throw WorkbenchAlreadyExistsException("Workbench '${request.instanceName}' already exists for user '$userId'")
     }
 
     val instanceId = UUID.randomUUID()
@@ -507,6 +508,23 @@ class WorkbenchService(
       request.resources?.storageSize?.let { if (it != entity.storageSize) put("storageSize", mapOf("from" to entity.storageSize, "to" to it)) }
     }
 
+    // A suspended workbench has no Deployment, Service or Ingress: applying them would start it again while the record
+    // stays SUSPENDED. Store the new settings only; resume applies them.
+    if (entity.status == WorkbenchStatus.SUSPENDED.name) {
+      val savedSuspendedEntity = transactionTemplate.execute {
+        repository.save(updatedEntity)
+      }!!
+      logAudit(
+        operation = AuditOperation.UPDATE,
+        userId = userId,
+        instanceId = entity.instanceId,
+        instanceName = instanceName,
+        status = "SUCCESS",
+        details = mapOf("appliedOnResume" to true) + (if (changes.isNotEmpty()) mapOf("changes" to changes) else emptyMap())
+      )
+      return toResponse(savedSuspendedEntity)
+    }
+
     val templateModel = buildTemplateModel(updatedEntity)
     val variant = updatedEntity.overlayVariant
 
@@ -588,6 +606,11 @@ class WorkbenchService(
   }
 
   private fun refreshStatusFromK8s(entity: WorkbenchInstanceEntity): WorkbenchInstanceEntity {
+    // A suspended workbench has no Deployment on purpose; reading it must not turn SUSPENDED into UNKNOWN, after
+    // which it could no longer be resumed.
+    if (entity.status == WorkbenchStatus.SUSPENDED.name) {
+      return entity
+    }
     return try {
       val deployment = kubernetesClient.apps().deployments()
         .inNamespace(entity.namespace)

@@ -13,9 +13,15 @@ import org.mockito.kotlin.mock
 import org.mockito.kotlin.never
 import org.mockito.kotlin.verify
 import org.mockito.kotlin.verifyNoInteractions
+import org.mockito.kotlin.whenever
 import org.projectcontinuum.core.api.server.exception.InvalidRequestException
+import org.projectcontinuum.core.api.server.exception.ResourceNotFoundException
 import org.projectcontinuum.core.commons.utils.NodeOutputWriter
+import software.amazon.awssdk.services.s3.model.NoSuchKeyException
+import software.amazon.awssdk.services.s3.model.S3Exception
 import software.amazon.awssdk.transfer.s3.S3TransferManager
+import software.amazon.awssdk.transfer.s3.model.FileDownload
+import java.util.concurrent.CompletableFuture
 import java.io.File
 import java.nio.file.Path
 import java.sql.DriverManager
@@ -153,5 +159,40 @@ class NodeOutputRepositoryTest {
 
     assertEquals(0, page.data.size)
     assertEquals(2, page.totalElements)
+  }
+
+  /** Makes the S3 download of any output fail with [failure], as the transfer manager does (inside the future). */
+  private fun stubDownloadFailure(failure: Throwable) {
+    val download: FileDownload = mock()
+    whenever(download.completionFuture()).thenReturn(CompletableFuture.failedFuture(failure))
+    whenever(s3TransferManager.downloadFile(any<software.amazon.awssdk.transfer.s3.model.DownloadFileRequest>())).thenReturn(download)
+  }
+
+  @Test
+  fun `an output that is not in S3 is not found and leaves no cache file`() {
+    stubDownloadFailure(NoSuchKeyException.builder().message("The specified key does not exist.").build())
+
+    assertThrows<ResourceNotFoundException> {
+      repository.getOutput(runId = "run-1", nodeId = "node-1", outputId = "no-such-port", page = 0, pageSize = 10)
+    }
+    assertTrue(!cacheDir.resolve("run-1").resolve("node-1").resolve("output.no-such-port.parquet").toFile().exists())
+  }
+
+  @Test
+  fun `a 404 from an S3-compatible store is not found too`() {
+    stubDownloadFailure(S3Exception.builder().statusCode(404).message("Not Found").build())
+
+    assertThrows<ResourceNotFoundException> {
+      repository.getOutput(runId = "run-1", nodeId = "node-1", outputId = "data", page = 0, pageSize = 10)
+    }
+  }
+
+  @Test
+  fun `other storage failures are not hidden as not found`() {
+    stubDownloadFailure(S3Exception.builder().statusCode(503).message("Slow Down").build())
+
+    assertThrows<java.util.concurrent.CompletionException> {
+      repository.getOutput(runId = "run-1", nodeId = "node-1", outputId = "data", page = 0, pageSize = 10)
+    }
   }
 }

@@ -1,0 +1,1210 @@
+openapi: 3.1.0
+info:
+  contact:
+    name: Project Continuum
+    url: https://github.com/projectcontinuum-org/continuum-platform-core
+  description: |-
+    Manages the per-user Continuum workbenches (the browser IDE where workflows are authored) on Kubernetes.
+    Each workbench is a PersistentVolumeClaim (the user's home and workspace), a Deployment, a Service and an
+    Ingress in the workbench namespace, created from templates and optional overlay variants. Suspending a
+    workbench removes everything but its volume; resuming recreates it.
+
+    **Identity.** Continuum has no built-in authentication. The caller is the `x-continuum-user-id` header,
+    set by the trusted reverse proxy; every workbench operation only sees the caller's own workbenches.
+    Without the header the caller is `anonymous` (local development).
+
+    **Errors** are RFC 9457 problem details (`application/problem+json`). They also carry the message in a
+    deprecated `error` property for clients of the former `{"error": "..."}` bodies.
+  license:
+    name: Apache 2.0
+    url: https://www.apache.org/licenses/LICENSE-2.0
+  title: Continuum Cluster Manager
+  version: 0.0.23
+externalDocs:
+  description: Continuum documentation
+  url: https://docs.projectcontinuum.org
+servers:
+- description: Continuum Cluster Manager
+  url: /
+tags:
+- description: "Create, inspect, suspend, resume, update and delete the caller's workbenches."
+  name: Workbenches
+- description: Images and overlay variants a workbench can be created with. Not user-scoped.
+  name: Workbench catalog
+paths:
+  /api/v1/workbench:
+    get:
+      description: "Returns the caller's workbenches that are not deleted, with their\
+        \ stored status (not refreshed from Kubernetes). Read-only."
+      operationId: listWorkbenches
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Workbench"
+          description: The workbenches.
+        "400":
+          content:
+            application/problem+json:
+              examples:
+                error:
+                  value:
+                    detail: "Invalid user id: must be 1-255 characters without control\
+                      \ characters, quotes or backslashes"
+                    error: "Invalid user id: must be 1-255 characters without control\
+                      \ characters, quotes or backslashes"
+                    instance: /api/v1/workbench
+                    status: 400
+                    title: Bad Request
+                    type: about:blank
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+          description: "Malformed request: an invalid `x-continuum-user-id`, a missing\
+            \ or unparsable parameter, or a body that is not valid JSON."
+        "406":
+          content:
+            application/problem+json:
+              examples:
+                error:
+                  value:
+                    detail: "Acceptable representations: [application/json]."
+                    error: "Acceptable representations: [application/json]."
+                    instance: /api/v1/workbench
+                    status: 406
+                    title: Not Acceptable
+                    type: about:blank
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+          description: The `Accept` header asks for a media type this operation does
+            not produce.
+        "500":
+          content:
+            application/problem+json:
+              examples:
+                error:
+                  value:
+                    detail: "Kubernetes operation failed: connection refused"
+                    error: "Kubernetes operation failed: connection refused"
+                    instance: /api/v1/workbench
+                    status: 500
+                    title: Internal Server Error
+                    type: about:blank
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+          description: "Kubernetes or the database failed, or an unexpected error\
+            \ occurred."
+      security:
+      - continuumUserId: []
+      summary: List the caller's workbenches
+      tags:
+      - Workbenches
+    post:
+      description: |2-
+
+        Creates the caller's workbench: a PersistentVolumeClaim, a Deployment, a Service and an Ingress named
+        `wb-<instanceId>-*` in the workbench namespace, rendered from the templates and the optional overlay variant. Every
+        value is validated before anything is created; if a Kubernetes step fails, the resources created so far are removed
+        again. The record is stored only after all resources exist. Returns when Kubernetes accepted the resources; poll
+        `liveness` until the pod is ready. A partial `resources` object is fine: omitted fields take their defaults. Not
+        idempotent: a second create with the same name is a 409.
+      operationId: createWorkbench
+      requestBody:
+        content:
+          application/json:
+            examples:
+              defaults:
+                description: defaults
+                summary: Default image and resources
+                value:
+                  instanceName: analysis
+              gpu:
+                description: gpu
+                summary: GPU variant with more memory
+                value:
+                  instanceName: analysis
+                  image: projectcontinuum/continuum-workbench:0.0.14
+                  variant: GPU
+                  resources:
+                    cpuRequest: 500m
+                    cpuLimit: "2"
+                    memoryRequest: 512Mi
+                    memoryLimit: 2Gi
+                    storageSize: 10Gi
+                    storageClassName: null
+            schema:
+              $ref: "#/components/schemas/WorkbenchCreateRequest"
+        description: The workbench to create.
+        required: true
+      responses:
+        "201":
+          content:
+            application/json:
+              example:
+                instanceId: 4c2e8a61-0b9f-4f0e-9a52-6d3f1e7b2c90
+                instanceName: analysis
+                namespace: continuum-workbench
+                userId: alice
+                status: RUNNING
+                image: projectcontinuum/continuum-workbench:0.0.14
+                resources:
+                  cpuRequest: 500m
+                  cpuLimit: "2"
+                  memoryRequest: 512Mi
+                  memoryLimit: 2Gi
+                  storageSize: 10Gi
+                  storageClassName: null
+                overlayVariant: GPU
+                serviceEndpoint: wb-4c2e8a61-0b9f-4f0e-9a52-6d3f1e7b2c90-svc.continuum-workbench.svc.cluster.local:8080
+                ingressUrl: https://wb-4c2e8a61.continuum.example.com
+                createdAt: 2026-11-21T09:00:00Z
+                updatedAt: 2026-11-21T09:05:00Z
+              schema:
+                $ref: "#/components/schemas/Workbench"
+          description: Workbench created.
+        "400":
+          content:
+            application/problem+json:
+              example:
+                type: about:blank
+                title: Bad Request
+                status: 400
+                detail: "Invalid memoryLimit '1Gi?---?kind: Secret': must be a Kubernetes\
+                  \ quantity of at most 32 characters"
+                instance: /api/v1/workbench
+                error: "Invalid memoryLimit '1Gi?---?kind: Secret': must be a Kubernetes\
+                  \ quantity of at most 32 characters"
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+          description: "A value is invalid (user id, quantity, image or variant),\
+            \ the image is not allowed, `instanceName` is missing, or the body is\
+            \ not JSON."
+        "406":
+          content:
+            application/problem+json:
+              examples:
+                error:
+                  value:
+                    detail: "Acceptable representations: [application/json]."
+                    error: "Acceptable representations: [application/json]."
+                    instance: /api/v1/workbench
+                    status: 406
+                    title: Not Acceptable
+                    type: about:blank
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+          description: The `Accept` header asks for a media type this operation does
+            not produce.
+        "409":
+          content:
+            application/problem+json:
+              example:
+                type: about:blank
+                title: Conflict
+                status: 409
+                detail: Workbench 'analysis' already exists for user 'alice'
+                instance: /api/v1/workbench
+                error: Workbench 'analysis' already exists for user 'alice'
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+          description: The caller already has an active (running or suspended) workbench
+            with this name.
+        "500":
+          content:
+            application/problem+json:
+              examples:
+                error:
+                  value:
+                    detail: "Kubernetes operation failed: connection refused"
+                    error: "Kubernetes operation failed: connection refused"
+                    instance: /api/v1/workbench
+                    status: 500
+                    title: Internal Server Error
+                    type: about:blank
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+          description: "Kubernetes or the database failed, or an unexpected error\
+            \ occurred."
+      security:
+      - continuumUserId: []
+      summary: Create a workbench for the caller
+      tags:
+      - Workbenches
+  /api/v1/workbench/tags:
+    get:
+      description: |2-
+
+        Returns up to 100 tags of the configured workbench image repository (`WORKBENCH_IMAGE_REPOSITORY`) from Docker Hub,
+        most recently updated first, for the image picker of the management UI. Cached for 5 minutes; when Docker Hub fails
+        the last cached list is returned. Not user-scoped. Read-only.
+      operationId: listWorkbenchImageTags
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/WorkbenchImageTag"
+          description: The tags.
+        "406":
+          content:
+            application/problem+json:
+              examples:
+                error:
+                  value:
+                    detail: "Acceptable representations: [application/json]."
+                    error: "Acceptable representations: [application/json]."
+                    instance: /api/v1/workbench
+                    status: 406
+                    title: Not Acceptable
+                    type: about:blank
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+          description: The `Accept` header asks for a media type this operation does
+            not produce.
+        "500":
+          content:
+            application/problem+json:
+              examples:
+                error:
+                  value:
+                    detail: "Kubernetes operation failed: connection refused"
+                    error: "Kubernetes operation failed: connection refused"
+                    instance: /api/v1/workbench
+                    status: 500
+                    title: Internal Server Error
+                    type: about:blank
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+          description: "Kubernetes or the database failed, or an unexpected error\
+            \ occurred."
+        "502":
+          content:
+            application/problem+json:
+              example:
+                type: about:blank
+                title: Bad Gateway
+                status: 502
+                detail: Failed to fetch data from external service
+                instance: /api/v1/workbench/tags
+                error: Failed to fetch data from external service
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+          description: Docker Hub could not be reached and nothing is cached.
+      summary: List the available workbench image tags
+      tags:
+      - Workbench catalog
+  /api/v1/workbench/variants:
+    get:
+      description: |2-
+
+        Returns the names of the configured overlay variants (sets of manifest overlays, e.g. a GPU node pool), sorted. Empty
+        when overlays are disabled. Not user-scoped. Read-only.
+      operationId: listWorkbenchVariants
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: string
+                  example: GPU
+          description: Variant names.
+        "406":
+          content:
+            application/problem+json:
+              examples:
+                error:
+                  value:
+                    detail: "Acceptable representations: [application/json]."
+                    error: "Acceptable representations: [application/json]."
+                    instance: /api/v1/workbench
+                    status: 406
+                    title: Not Acceptable
+                    type: about:blank
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+          description: The `Accept` header asks for a media type this operation does
+            not produce.
+        "500":
+          content:
+            application/problem+json:
+              examples:
+                error:
+                  value:
+                    detail: "Kubernetes operation failed: connection refused"
+                    error: "Kubernetes operation failed: connection refused"
+                    instance: /api/v1/workbench
+                    status: 500
+                    title: Internal Server Error
+                    type: about:blank
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+          description: "Kubernetes or the database failed, or an unexpected error\
+            \ occurred."
+      summary: List the overlay variants a workbench can be created with
+      tags:
+      - Workbench catalog
+  /api/v1/workbench/{instanceName}:
+    delete:
+      description: |2-
+
+        Deletes the workbench's Deployment, Service, Ingress **and PersistentVolumeClaim** (the user's files are lost), then
+        marks it DELETED. If Kubernetes fails, nothing is marked. A second delete is a 404.
+      operationId: deleteWorkbench
+      parameters:
+      - description: Name of one of the caller's workbenches.
+        example: analysis
+        in: path
+        name: instanceName
+        required: true
+        schema:
+          type: string
+      responses:
+        "204":
+          description: Deleted.
+        "400":
+          content:
+            application/problem+json:
+              examples:
+                error:
+                  value:
+                    detail: "Invalid user id: must be 1-255 characters without control\
+                      \ characters, quotes or backslashes"
+                    error: "Invalid user id: must be 1-255 characters without control\
+                      \ characters, quotes or backslashes"
+                    instance: /api/v1/workbench
+                    status: 400
+                    title: Bad Request
+                    type: about:blank
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+          description: "Malformed request: an invalid `x-continuum-user-id`, a missing\
+            \ or unparsable parameter, or a body that is not valid JSON."
+        "404":
+          content:
+            application/problem+json:
+              example:
+                type: about:blank
+                title: Not Found
+                status: 404
+                detail: Workbench 'analysis' not found for user 'alice'
+                instance: /api/v1/workbench/analysis
+                error: Workbench 'analysis' not found for user 'alice'
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+          description: The caller has no active workbench with this name.
+        "406":
+          content:
+            application/problem+json:
+              examples:
+                error:
+                  value:
+                    detail: "Acceptable representations: [application/json]."
+                    error: "Acceptable representations: [application/json]."
+                    instance: /api/v1/workbench
+                    status: 406
+                    title: Not Acceptable
+                    type: about:blank
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+          description: The `Accept` header asks for a media type this operation does
+            not produce.
+        "500":
+          content:
+            application/problem+json:
+              examples:
+                error:
+                  value:
+                    detail: "Kubernetes operation failed: connection refused"
+                    error: "Kubernetes operation failed: connection refused"
+                    instance: /api/v1/workbench
+                    status: 500
+                    title: Internal Server Error
+                    type: about:blank
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+          description: "Kubernetes or the database failed, or an unexpected error\
+            \ occurred."
+      security:
+      - continuumUserId: []
+      summary: Delete a workbench and its volume
+      tags:
+      - Workbenches
+    get:
+      description: |2-
+
+        Returns the workbench after refreshing its status from its Deployment (RUNNING when a replica is ready, PENDING when
+        not, UNKNOWN when the Deployment is missing) and storing the change. A SUSPENDED workbench has no Deployment on
+        purpose and keeps its status.
+      operationId: getWorkbench
+      parameters:
+      - description: Name of one of the caller's workbenches.
+        example: analysis
+        in: path
+        name: instanceName
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              example:
+                instanceId: 4c2e8a61-0b9f-4f0e-9a52-6d3f1e7b2c90
+                instanceName: analysis
+                namespace: continuum-workbench
+                userId: alice
+                status: RUNNING
+                image: projectcontinuum/continuum-workbench:0.0.14
+                resources:
+                  cpuRequest: 500m
+                  cpuLimit: "2"
+                  memoryRequest: 512Mi
+                  memoryLimit: 2Gi
+                  storageSize: 10Gi
+                  storageClassName: null
+                overlayVariant: GPU
+                serviceEndpoint: wb-4c2e8a61-0b9f-4f0e-9a52-6d3f1e7b2c90-svc.continuum-workbench.svc.cluster.local:8080
+                ingressUrl: https://wb-4c2e8a61.continuum.example.com
+                createdAt: 2026-11-21T09:00:00Z
+                updatedAt: 2026-11-21T09:05:00Z
+              schema:
+                $ref: "#/components/schemas/Workbench"
+          description: The workbench.
+        "400":
+          content:
+            application/problem+json:
+              examples:
+                error:
+                  value:
+                    detail: "Invalid user id: must be 1-255 characters without control\
+                      \ characters, quotes or backslashes"
+                    error: "Invalid user id: must be 1-255 characters without control\
+                      \ characters, quotes or backslashes"
+                    instance: /api/v1/workbench
+                    status: 400
+                    title: Bad Request
+                    type: about:blank
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+          description: "Malformed request: an invalid `x-continuum-user-id`, a missing\
+            \ or unparsable parameter, or a body that is not valid JSON."
+        "404":
+          content:
+            application/problem+json:
+              example:
+                type: about:blank
+                title: Not Found
+                status: 404
+                detail: Workbench 'analysis' not found for user 'alice'
+                instance: /api/v1/workbench/analysis
+                error: Workbench 'analysis' not found for user 'alice'
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+          description: The caller has no active workbench with this name.
+        "406":
+          content:
+            application/problem+json:
+              examples:
+                error:
+                  value:
+                    detail: "Acceptable representations: [application/json]."
+                    error: "Acceptable representations: [application/json]."
+                    instance: /api/v1/workbench
+                    status: 406
+                    title: Not Acceptable
+                    type: about:blank
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+          description: The `Accept` header asks for a media type this operation does
+            not produce.
+        "500":
+          content:
+            application/problem+json:
+              examples:
+                error:
+                  value:
+                    detail: "Kubernetes operation failed: connection refused"
+                    error: "Kubernetes operation failed: connection refused"
+                    instance: /api/v1/workbench
+                    status: 500
+                    title: Internal Server Error
+                    type: about:blank
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+          description: "Kubernetes or the database failed, or an unexpected error\
+            \ occurred."
+      security:
+      - continuumUserId: []
+      summary: Get one of the caller's workbenches with a fresh status
+      tags:
+      - Workbenches
+    put:
+      description: |2-
+
+        Re-applies the workbench's Deployment, Service and Ingress with the given image and/or resources; omitted fields keep
+        their value. If a step fails, the previous manifests are applied again. Kubernetes restarts the pod for the change.
+        A SUSPENDED workbench only stores the change and stays suspended; it is applied on resume.
+      operationId: updateWorkbench
+      parameters:
+      - description: Name of one of the caller's workbenches.
+        example: analysis
+        in: path
+        name: instanceName
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            examples:
+              newImage:
+                description: newImage
+                summary: Upgrade the image
+                value:
+                  image: projectcontinuum/continuum-workbench:0.0.15
+            schema:
+              $ref: "#/components/schemas/WorkbenchUpdateRequest"
+        description: The changes.
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Workbench"
+          description: Updated.
+        "400":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+          description: "The image is invalid or not allowed, or a quantity is invalid."
+        "404":
+          content:
+            application/problem+json:
+              example:
+                type: about:blank
+                title: Not Found
+                status: 404
+                detail: Workbench 'analysis' not found for user 'alice'
+                instance: /api/v1/workbench/analysis
+                error: Workbench 'analysis' not found for user 'alice'
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+          description: The caller has no active workbench with this name.
+        "406":
+          content:
+            application/problem+json:
+              examples:
+                error:
+                  value:
+                    detail: "Acceptable representations: [application/json]."
+                    error: "Acceptable representations: [application/json]."
+                    instance: /api/v1/workbench
+                    status: 406
+                    title: Not Acceptable
+                    type: about:blank
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+          description: The `Accept` header asks for a media type this operation does
+            not produce.
+        "500":
+          content:
+            application/problem+json:
+              examples:
+                error:
+                  value:
+                    detail: "Kubernetes operation failed: connection refused"
+                    error: "Kubernetes operation failed: connection refused"
+                    instance: /api/v1/workbench
+                    status: 500
+                    title: Internal Server Error
+                    type: about:blank
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+          description: "Kubernetes or the database failed, or an unexpected error\
+            \ occurred."
+      security:
+      - continuumUserId: []
+      summary: Change a workbench's image or resources
+      tags:
+      - Workbenches
+  /api/v1/workbench/{instanceName}/liveness:
+    get:
+      description: |2-
+
+        True only when the workbench is RUNNING and its pod reports a ready replica. The management UI polls this after a
+        create or resume. Unlike `GET /{instanceName}` it never changes the stored status. Read-only.
+      operationId: getWorkbenchLiveness
+      parameters:
+      - description: Name of one of the caller's workbenches.
+        example: analysis
+        in: path
+        name: instanceName
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              example:
+                ready: true
+                status: RUNNING
+              schema:
+                $ref: "#/components/schemas/WorkbenchLiveness"
+          description: Readiness.
+        "400":
+          content:
+            application/problem+json:
+              examples:
+                error:
+                  value:
+                    detail: "Invalid user id: must be 1-255 characters without control\
+                      \ characters, quotes or backslashes"
+                    error: "Invalid user id: must be 1-255 characters without control\
+                      \ characters, quotes or backslashes"
+                    instance: /api/v1/workbench
+                    status: 400
+                    title: Bad Request
+                    type: about:blank
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+          description: "Malformed request: an invalid `x-continuum-user-id`, a missing\
+            \ or unparsable parameter, or a body that is not valid JSON."
+        "404":
+          content:
+            application/problem+json:
+              example:
+                type: about:blank
+                title: Not Found
+                status: 404
+                detail: Workbench 'analysis' not found for user 'alice'
+                instance: /api/v1/workbench/analysis
+                error: Workbench 'analysis' not found for user 'alice'
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+          description: The caller has no active workbench with this name.
+        "406":
+          content:
+            application/problem+json:
+              examples:
+                error:
+                  value:
+                    detail: "Acceptable representations: [application/json]."
+                    error: "Acceptable representations: [application/json]."
+                    instance: /api/v1/workbench
+                    status: 406
+                    title: Not Acceptable
+                    type: about:blank
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+          description: The `Accept` header asks for a media type this operation does
+            not produce.
+        "500":
+          content:
+            application/problem+json:
+              examples:
+                error:
+                  value:
+                    detail: "Kubernetes operation failed: connection refused"
+                    error: "Kubernetes operation failed: connection refused"
+                    instance: /api/v1/workbench
+                    status: 500
+                    title: Internal Server Error
+                    type: about:blank
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+          description: "Kubernetes or the database failed, or an unexpected error\
+            \ occurred."
+      security:
+      - continuumUserId: []
+      summary: Check whether a workbench is ready to open
+      tags:
+      - Workbenches
+  /api/v1/workbench/{instanceName}/resume:
+    put:
+      description: |2-
+
+        Recreates the Deployment, Service and Ingress of a suspended workbench from its stored settings, on its existing
+        volume. If a step fails, the partly created resources are removed again. Resuming a workbench that is not suspended
+        is a 400.
+      operationId: resumeWorkbench
+      parameters:
+      - description: Name of one of the caller's workbenches.
+        example: analysis
+        in: path
+        name: instanceName
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Workbench"
+          description: Resumed (RUNNING).
+        "400":
+          content:
+            application/problem+json:
+              example:
+                type: about:blank
+                title: Bad Request
+                status: 400
+                detail: Workbench 'analysis' is not suspended
+                instance: /api/v1/workbench/analysis/resume
+                error: Workbench 'analysis' is not suspended
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+          description: The workbench is not suspended.
+        "404":
+          content:
+            application/problem+json:
+              example:
+                type: about:blank
+                title: Not Found
+                status: 404
+                detail: Workbench 'analysis' not found for user 'alice'
+                instance: /api/v1/workbench/analysis
+                error: Workbench 'analysis' not found for user 'alice'
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+          description: The caller has no active workbench with this name.
+        "406":
+          content:
+            application/problem+json:
+              examples:
+                error:
+                  value:
+                    detail: "Acceptable representations: [application/json]."
+                    error: "Acceptable representations: [application/json]."
+                    instance: /api/v1/workbench
+                    status: 406
+                    title: Not Acceptable
+                    type: about:blank
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+          description: The `Accept` header asks for a media type this operation does
+            not produce.
+        "500":
+          content:
+            application/problem+json:
+              examples:
+                error:
+                  value:
+                    detail: "Kubernetes operation failed: connection refused"
+                    error: "Kubernetes operation failed: connection refused"
+                    instance: /api/v1/workbench
+                    status: 500
+                    title: Internal Server Error
+                    type: about:blank
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+          description: "Kubernetes or the database failed, or an unexpected error\
+            \ occurred."
+      security:
+      - continuumUserId: []
+      summary: Resume a suspended workbench
+      tags:
+      - Workbenches
+  /api/v1/workbench/{instanceName}/suspend:
+    put:
+      description: |2-
+
+        Deletes the workbench's Deployment, Service and Ingress but keeps its PersistentVolumeClaim, so it stops using compute
+        while the user's files stay. Resume it to get it back. Suspending a suspended workbench is a 400.
+      operationId: suspendWorkbench
+      parameters:
+      - description: Name of one of the caller's workbenches.
+        example: analysis
+        in: path
+        name: instanceName
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Workbench"
+          description: Suspended.
+        "400":
+          content:
+            application/problem+json:
+              example:
+                type: about:blank
+                title: Bad Request
+                status: 400
+                detail: Workbench 'analysis' is already suspended
+                instance: /api/v1/workbench/analysis/suspend
+                error: Workbench 'analysis' is already suspended
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+          description: The workbench is already suspended.
+        "404":
+          content:
+            application/problem+json:
+              example:
+                type: about:blank
+                title: Not Found
+                status: 404
+                detail: Workbench 'analysis' not found for user 'alice'
+                instance: /api/v1/workbench/analysis
+                error: Workbench 'analysis' not found for user 'alice'
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+          description: The caller has no active workbench with this name.
+        "406":
+          content:
+            application/problem+json:
+              examples:
+                error:
+                  value:
+                    detail: "Acceptable representations: [application/json]."
+                    error: "Acceptable representations: [application/json]."
+                    instance: /api/v1/workbench
+                    status: 406
+                    title: Not Acceptable
+                    type: about:blank
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+          description: The `Accept` header asks for a media type this operation does
+            not produce.
+        "500":
+          content:
+            application/problem+json:
+              examples:
+                error:
+                  value:
+                    detail: "Kubernetes operation failed: connection refused"
+                    error: "Kubernetes operation failed: connection refused"
+                    instance: /api/v1/workbench
+                    status: 500
+                    title: Internal Server Error
+                    type: about:blank
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+          description: "Kubernetes or the database failed, or an unexpected error\
+            \ occurred."
+      security:
+      - continuumUserId: []
+      summary: "Suspend a workbench, keeping its volume"
+      tags:
+      - Workbenches
+components:
+  schemas:
+    ProblemDetail:
+      type: object
+      description: "RFC 9457 problem detail, the error body of every Continuum service\
+        \ (`application/problem+json`)."
+      properties:
+        detail:
+          type: string
+          description: Human-readable explanation of this occurrence.
+          example: Workbench 'analysis' not found for user 'alice'
+        error:
+          type: string
+          deprecated: true
+          description: "Deprecated: the same text as `detail`, for clients of the\
+            \ former `{\"error\": \"...\"}` bodies."
+          example: Workbench 'analysis' not found for user 'alice'
+        instance:
+          type: string
+          format: uri-reference
+          description: Path of the request that produced the problem.
+          example: /api/v1/workbench/analysis
+        status:
+          type: integer
+          format: int32
+          description: HTTP status code of this response.
+          example: 404
+        title:
+          type: string
+          description: Short summary of the problem type (the HTTP reason phrase by
+            default).
+          example: Not Found
+        type:
+          type: string
+          format: uri-reference
+          description: URI identifying the problem type; `about:blank` when only the
+            status code matters.
+          example: about:blank
+      required:
+      - detail
+      - error
+      - status
+      - title
+      - type
+    Workbench:
+      type: object
+      description: One of the caller's workbenches.
+      properties:
+        createdAt:
+          type: string
+          format: date-time
+          description: "When it was created (ISO-8601, UTC)."
+          example: 2026-11-21T09:00:00Z
+        image:
+          type: string
+          description: Container image.
+          example: projectcontinuum/continuum-workbench:0.0.14
+        ingressUrl:
+          type:
+          - string
+          - "null"
+          description: External URL (`https://` + the rendered Ingress host); null
+            when the Ingress has no host or the workbench is suspended.
+          example: https://wb-4c2e8a61.continuum.example.com
+        instanceId:
+          type: string
+          format: uuid
+          description: Server-generated id; the Kubernetes resources are named `wb-<instanceId>-*`.
+          example: 4c2e8a61-0b9f-4f0e-9a52-6d3f1e7b2c90
+        instanceName:
+          type: string
+          description: Name chosen by the user.
+          example: analysis
+        namespace:
+          type: string
+          description: Kubernetes namespace of the workbench resources.
+          example: continuum-workbench
+        overlayVariant:
+          type:
+          - string
+          - "null"
+          description: Overlay variant it was created with; null for the base manifests.
+          example: GPU
+        resources:
+          $ref: "#/components/schemas/WorkbenchResources"
+          description: Compute and storage.
+        serviceEndpoint:
+          type:
+          - string
+          - "null"
+          description: In-cluster address of the workbench Service.
+          example: wb-4c2e8a61-0b9f-4f0e-9a52-6d3f1e7b2c90-svc.continuum-workbench.svc.cluster.local:8080
+        status:
+          type: string
+          description: "`PENDING`: created, pod not ready yet. `RUNNING`: pod ready.\
+            \ `SUSPENDED`: only the volume is kept. `UNKNOWN`: the Deployment was\
+            \ not found when the status was refreshed. `FAILED`, `TERMINATING`, `DELETED`:\
+            \ lifecycle end states (deleted workbenches are not listed)."
+          enum:
+          - PENDING
+          - RUNNING
+          - FAILED
+          - SUSPENDED
+          - UNKNOWN
+          - TERMINATING
+          - DELETED
+          example: RUNNING
+        updatedAt:
+          type: string
+          format: date-time
+          description: "When it last changed (ISO-8601, UTC)."
+          example: 2026-11-21T09:05:00Z
+        userId:
+          type: string
+          description: Owner (the `x-continuum-user-id` that created it).
+          example: alice
+      required:
+      - createdAt
+      - image
+      - instanceId
+      - instanceName
+      - namespace
+      - resources
+      - status
+      - updatedAt
+      - userId
+    WorkbenchCreateRequest:
+      type: object
+      description: A new workbench for the caller.
+      properties:
+        image:
+          type:
+          - string
+          - "null"
+          description: "Container image (a valid image reference that starts with\
+            \ one of the allowed image prefixes, `WORKBENCH_ALLOWED_IMAGE_PREFIXES`).\
+            \ Default `projectcontinuum/continuum-workbench:0.0.5`."
+          example: projectcontinuum/continuum-workbench:0.0.14
+        instanceName:
+          type: string
+          description: "Name of the workbench, unique among the caller's active (running\
+            \ or suspended) workbenches."
+          example: analysis
+        resources:
+          oneOf:
+          - $ref: "#/components/schemas/WorkbenchResources"
+          - type: "null"
+        variant:
+          type:
+          - string
+          - "null"
+          description: "Overlay variant (see `GET /api/v1/workbench/variants`); null\
+            \ for the base manifests. Must match `^[A-Za-z0-9][A-Za-z0-9._-]{0,62}$`\
+            \ without `--`."
+          example: GPU
+      required:
+      - instanceName
+    WorkbenchImageTag:
+      type: object
+      description: A tag of the workbench image repository on Docker Hub.
+      properties:
+        fullSize:
+          type:
+          - integer
+          - "null"
+          format: int64
+          description: "Compressed image size, in bytes."
+          example: 812345678
+        lastUpdated:
+          type:
+          - string
+          - "null"
+          description: "When Docker Hub last updated the tag (ISO-8601, as Docker\
+            \ Hub returns it)."
+          example: 2026-11-18T10:12:44.123456Z
+        name:
+          type: string
+          description: Image tag.
+          example: 0.0.14
+      required:
+      - name
+    WorkbenchLiveness:
+      type: object
+      description: Whether the workbench can be opened.
+      properties:
+        ready:
+          type: boolean
+          description: True when the workbench is RUNNING and its pod reports ready.
+          example: true
+        status:
+          type: string
+          description: Stored workbench status.
+          enum:
+          - PENDING
+          - RUNNING
+          - FAILED
+          - SUSPENDED
+          - UNKNOWN
+          - TERMINATING
+          - DELETED
+          example: RUNNING
+      required:
+      - ready
+      - status
+    WorkbenchResources:
+      type: object
+      description: "Compute and storage of a workbench. Values are Kubernetes quantities\
+        \ (`500m`, `2`, `512Mi`, `5Gi`; at most 32 characters). In a create request,\
+        \ omitted fields take their defaults; in an update, they keep their value."
+      properties:
+        cpuLimit:
+          type: string
+          default: "2"
+          description: CPU limit (Kubernetes quantity).
+          example: "2"
+        cpuRequest:
+          type: string
+          default: 500m
+          description: "CPU request (Kubernetes quantity, cores or millicores)."
+          example: 500m
+        memoryLimit:
+          type: string
+          default: 1Gi
+          description: Memory limit (Kubernetes quantity).
+          example: 2Gi
+        memoryRequest:
+          type: string
+          default: 512Mi
+          description: "Memory request (Kubernetes quantity, bytes with binary suffix)."
+          example: 512Mi
+        storageClassName:
+          type:
+          - string
+          - "null"
+          description: Storage class of the volume (DNS-1123 subdomain); null for
+            the cluster default.
+          example: gp3
+        storageSize:
+          type: string
+          default: 5Gi
+          description: Size of the persistent volume holding the user's home and workspace
+            (Kubernetes quantity).
+          example: 10Gi
+    WorkbenchResourcesUpdate:
+      type: object
+      description: Resource changes; omitted fields keep their current value. Values
+        are Kubernetes quantities.
+      properties:
+        cpuLimit:
+          type:
+          - string
+          - "null"
+          description: New CPU limit.
+          example: "4"
+        cpuRequest:
+          type:
+          - string
+          - "null"
+          description: New CPU request.
+          example: "1"
+        memoryLimit:
+          type:
+          - string
+          - "null"
+          description: New memory limit.
+          example: 4Gi
+        memoryRequest:
+          type:
+          - string
+          - "null"
+          description: New memory request.
+          example: 1Gi
+        storageClassName:
+          type:
+          - string
+          - "null"
+          description: New storage class (DNS-1123 subdomain).
+          example: gp3
+        storageSize:
+          type:
+          - string
+          - "null"
+          description: "New volume size. Kubernetes can usually only grow a volume,\
+            \ and only with an expandable storage class."
+          example: 20Gi
+    WorkbenchUpdateRequest:
+      type: object
+      description: Changes to a workbench; omitted fields keep their value.
+      properties:
+        image:
+          type:
+          - string
+          - "null"
+          description: New container image (must start with an allowed image prefix).
+          example: projectcontinuum/continuum-workbench:0.0.15
+        resources:
+          oneOf:
+          - $ref: "#/components/schemas/WorkbenchResourcesUpdate"
+          - type: "null"
+  securitySchemes:
+    continuumUserId:
+      description: "Caller identity (owner of workbenches). Continuum has no built-in\
+        \ authentication: this header is set by the trusted reverse proxy in front\
+        \ of the service from the authenticated user, and the proxy must strip any\
+        \ value sent by the client. Without it the caller is `anonymous` (local development\
+        \ only). 1-255 characters without control characters, quotes or backslashes."
+      in: header
+      name: x-continuum-user-id
+      type: apiKey

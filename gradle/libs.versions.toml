@@ -1,0 +1,11 @@
+# Central versions shared by the platform modules. Gradle picks this file up automatically as the `libs` catalog.
+# springdoc must stay on the line that matches the Spring Boot plugin version in each service:
+# springdoc 3.0.x = Spring Boot 4.0.x, 3.1.x = Boot 4.1.x, 2.x = Boot 3.x.
+[versions]
+springdoc = "3.0.3"
+# swagger-core version that springdoc above is built against (springdoc-openapi parent POM `swagger-api.version`)
+swagger = "2.2.47"
+
+[libraries]
+springdoc-openapi-starter-webmvc-ui = { module = "org.springdoc:springdoc-openapi-starter-webmvc-ui", version.ref = "springdoc" }
+swagger-annotations = { module = "io.swagger.core.v3:swagger-annotations-jakarta", version.ref = "swagger" }
