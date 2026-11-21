@@ -96,4 +96,32 @@ class WorkflowControllerValidationTest {
   fun `start with invalid node properties and an empty client schema is still 400`() {
     assertRejected(workflowJson("\"wide\"", "{}"))
   }
+
+  private fun workflowNamed(name: String) = workflowJson("10", "{}").replace("\"/systest/wf.cwf\"", "\"$name\"")
+
+  @Test
+  fun `start with a workflow name that is not a URI is 400 and nothing reaches Temporal or the database`() {
+    mockMvc.perform(post("/api/v1/workflow").contentType(MediaType.APPLICATION_JSON).content(workflowNamed("My Workflow.cwf")))
+      .andExpect(status().isBadRequest)
+      .andExpect(jsonPath("$.title").value("Invalid workflow"))
+      .andExpect(jsonPath("$.errors[0].message", containsString("is not a valid URI path")))
+
+    verifyNoInteractions(workflowClient)
+    verify(workflowRunRepository, never()).save(any<WorkflowRunEntity>())
+  }
+
+  @Test
+  fun `validate reports a workflow name that is not a URI as an error`() {
+    mockMvc.perform(post("/api/v1/workflow/validate").contentType(MediaType.APPLICATION_JSON).content(workflowNamed("My Workflow.cwf")))
+      .andExpect(status().isOk)
+      .andExpect(jsonPath("$.valid").value(false))
+      .andExpect(jsonPath("$.errors[0].message", containsString("is not a valid URI path")))
+  }
+
+  @Test
+  fun `a percent-encoded workflow name is accepted by validate`() {
+    mockMvc.perform(post("/api/v1/workflow/validate").contentType(MediaType.APPLICATION_JSON).content(workflowNamed("examples/My%20Workflow.cwf")))
+      .andExpect(status().isOk)
+      .andExpect(jsonPath("$.valid").value(true))
+  }
 }

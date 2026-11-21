@@ -60,6 +60,10 @@ dependencies {
     // JSON schema validation
     implementation("com.networknt:json-schema-validator:3.0.0")
 
+    // OpenAPI schema annotations on the API-facing models (ContinuumWorkflowModel, PortData, ...). compileOnly:
+    // annotations missing at runtime are ignored, so consumers of this library do not get swagger on their classpath.
+    compileOnly(libs.swagger.annotations)
+
     // Spring dependencies — provided by the consuming application
     compileOnly("org.springframework:spring-context")
     compileOnly("org.springframework:spring-beans")

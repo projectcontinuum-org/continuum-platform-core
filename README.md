@@ -227,6 +227,42 @@ docker compose up -d
 
 > 💡 Full setup guide coming soon. For now — explore, break things, open issues.
 
+### Git LFS is required
+
+The API server bundles DuckDB's `httpfs` extension for every platform under
+`continuum-api-server/src/main/resources/duckdb-extensions/`, tracked with [Git LFS](https://git-lfs.com).
+Without LFS those files are small text pointers, and the API server **refuses to start**
+("Bundled DuckDB extension ... is almost certainly a Git LFS pointer file"). After cloning, run once:
+
+```bash
+git lfs install
+git lfs pull
+```
+
+CI checkouts that build modules use `actions/checkout` with `lfs: true` for the same reason.
+
+### API documentation (OpenAPI)
+
+Every platform HTTP service publishes an OpenAPI 3.1 spec and Swagger UI while running locally:
+
+| Service | Swagger UI | Spec | Committed spec |
+|---------|------------|------|----------------|
+| `continuum-api-server` | `/swagger-ui/index.html` | `/v3/api-docs/public` | [`docs/api/continuum-api-server.openapi.yaml`](docs/api/continuum-api-server.openapi.yaml) |
+| `continuum-cluster-manager` | `/swagger-ui/index.html` | `/v3/api-docs/public` | [`docs/api/continuum-cluster-manager.openapi.yaml`](docs/api/continuum-cluster-manager.openapi.yaml) |
+| `continuum-credentials-server` | `/swagger-ui/index.html` | `/v3/api-docs/public` | [`docs/api/continuum-credentials-server.openapi.yaml`](docs/api/continuum-credentials-server.openapi.yaml) |
+
+- `CONTINUUM_API_DOCS_ENABLED` (default `true`) turns the spec and Swagger UI on or off; the Helm chart sets it to
+  `false` (override with `--set continuum.apiDocs.enabled=true`). Continuum has no authentication of its own, so the
+  docs are not behind a login.
+- `CONTINUUM_API_DOCS_INTERNAL_ENABLED` (default `false`) also serves the `internal` group (operator and ForwardAuth
+  endpoints) at `/v3/api-docs/internal`.
+- `CONTINUUM_API_DOCS_SERVER_URL` pins the spec's server URL (e.g. for client generation); by default it is derived
+  from the request, including the proxy's `X-Forwarded-Prefix`.
+- Generate a client from a committed spec, e.g.
+  `npx @openapitools/openapi-generator-cli generate -i docs/api/continuum-api-server.openapi.yaml -g typescript-fetch -o out/`.
+- Endpoint behavior, callers and open questions: [`docs/api/ENDPOINT_INVENTORY.md`](docs/api/ENDPOINT_INVENTORY.md).
+  Annotation conventions: [`docs/api/CONVENTIONS.md`](docs/api/CONVENTIONS.md).
+
 ---
 
 ## 🧩 Architecture Philosophy: Workers, Not Monoliths

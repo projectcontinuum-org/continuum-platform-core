@@ -23,7 +23,7 @@ class WorkbenchUpdateRequestTest {
 
   @Test
   fun `resources only update`() {
-    val resources = ResourceSpec(cpuRequest = "4")
+    val resources = ResourceUpdate(cpuRequest = "4")
     val request = WorkbenchUpdateRequest(resources = resources)
 
     assertNull(request.image)
@@ -34,7 +34,7 @@ class WorkbenchUpdateRequestTest {
   fun `both image and resources update`() {
     val request = WorkbenchUpdateRequest(
       image = "theiaide/theia:v3",
-      resources = ResourceSpec(memoryLimit = "16Gi")
+      resources = ResourceUpdate(memoryLimit = "16Gi")
     )
 
     assertEquals("theiaide/theia:v3", request.image)

@@ -30,8 +30,11 @@ dependencies {
   implementation("org.springframework.boot:spring-boot-starter-actuator")
   implementation("org.springframework.boot:spring-boot-starter-validation")
 
-  // Swagger-UI Dependencies
-  implementation("org.springdoc:springdoc-openapi-starter-webmvc-ui:2.8.6")
+  // Swagger-UI Dependencies (springdoc 3.0.x = Spring Boot 4.0.x; version in gradle/libs.versions.toml)
+  implementation(libs.springdoc.openapi.starter.webmvc.ui)
+  // springdoc/swagger-core read models with Jackson 2. Its Kotlin module makes non-null Kotlin fields `required`
+  // in the spec (version from the Spring Boot BOM; the app itself serializes with Jackson 3, tools.jackson).
+  runtimeOnly("com.fasterxml.jackson.module:jackson-module-kotlin")
 
   // JSON
   implementation("org.springframework.boot:spring-boot-starter-json")
@@ -53,14 +56,36 @@ dependencies {
   testRuntimeOnly("org.junit.platform:junit-platform-launcher")
 }
 
+// META-INF/build-info.properties: the OpenAPI `info.version` is the build's platformVersion.
+// No timestamp, so the generated spec (docs/api/continuum-credentials-server.openapi.yaml) is reproducible.
+springBoot {
+  buildInfo {
+    excludes.set(setOf("time"))
+  }
+}
+
 kotlin {
   compilerOptions {
     freeCompilerArgs.addAll("-Xjsr305=strict")
   }
 }
 
+// The committed OpenAPI spec that OpenApiSpecTest compares the generated one with.
+// Regenerate after an intended API change: ./gradlew :continuum-credentials-server:test --tests '*OpenApiSpecTest*' -PupdateOpenApiSpec
+val committedOpenApiSpec = rootProject.file("docs/api/${project.name}.openapi.yaml")
+
 tasks.withType<Test> {
   useJUnitPlatform()
+  systemProperty("continuum.openapi.spec-file", committedOpenApiSpec.absolutePath)
+  systemProperty("continuum.openapi.update-spec", project.hasProperty("updateOpenApiSpec").toString())
+  // Optional: -PdumpOpenApiSpecs=<dir> writes every fetched spec as JSON, for inspection while editing annotations.
+  findProperty("dumpOpenApiSpecs")?.let { dumpDir -> systemProperty("continuum.openapi.dump-dir", dumpDir.toString()) }
+  // A changed committed spec re-runs the tests (on the first generation the file does not exist yet).
+  inputs.files(fileTree(committedOpenApiSpec.parentFile) { include(committedOpenApiSpec.name) })
+    .withPropertyName("committedOpenApiSpec")
+  if (project.hasProperty("updateOpenApiSpec")) {
+    outputs.upToDateWhen { false }
+  }
 }
 
 // ============================================================================

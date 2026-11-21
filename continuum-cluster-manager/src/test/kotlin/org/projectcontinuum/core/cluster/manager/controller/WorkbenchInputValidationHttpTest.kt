@@ -12,6 +12,7 @@ import org.springframework.http.MediaType
 import org.springframework.test.context.ActiveProfiles
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post
+import org.springframework.test.web.servlet.result.MockMvcResultMatchers.content
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.status
 
@@ -36,10 +37,7 @@ class WorkbenchInputValidationHttpTest {
     repository.deleteAll()
   }
 
-  /**
-   * Full resources object: a partial one currently fails Jackson deserialization (500) before
-   * reaching the service — a separate, pre-existing issue unrelated to these checks.
-   */
+  /** A full resources object, so each test changes exactly one field. */
   private fun resources(
     cpuRequest: String = "500m",
     memoryLimit: String = "1Gi",
@@ -100,5 +98,28 @@ class WorkbenchInputValidationHttpTest {
     postCreate("""{"instanceName":"wb","variant":"../../etc/passwd"}""")
       .andExpect(status().isBadRequest)
     assertTrue(repository.findAll().none())
+  }
+
+  @Test
+  fun `POST with a partial resources object reaches validation, the other fields take their defaults`() {
+    postCreate("""{"instanceName":"wb","resources":{"memoryLimit":"1Gi\n---\nkind: Secret"}}""")
+      .andExpect(status().isBadRequest)
+      .andExpect(jsonPath("$.error").value(org.hamcrest.Matchers.containsString("memoryLimit")))
+    assertTrue(repository.findAll().none())
+  }
+
+  @Test
+  fun `POST with a missing instanceName is a 400 problem`() {
+    postCreate("""{"image":"projectcontinuum/continuum-workbench:0.0.14"}""")
+      .andExpect(status().isBadRequest)
+      .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
+    assertTrue(repository.findAll().none())
+  }
+
+  @Test
+  fun `POST with a non-JSON body is a 400 problem`() {
+    postCreate("garbage")
+      .andExpect(status().isBadRequest)
+      .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
   }
 }

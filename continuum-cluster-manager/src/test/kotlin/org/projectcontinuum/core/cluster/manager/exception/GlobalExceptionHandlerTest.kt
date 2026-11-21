@@ -2,14 +2,22 @@ package org.projectcontinuum.core.cluster.manager.exception
 
 import io.fabric8.kubernetes.client.KubernetesClientException
 import org.junit.jupiter.api.Assertions.assertEquals
-import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 import org.springframework.http.HttpStatus
-import org.springframework.web.bind.MissingRequestHeaderException
+import org.springframework.http.ProblemDetail
+import org.springframework.http.ResponseEntity
 
 class GlobalExceptionHandlerTest {
 
   private val handler = GlobalExceptionHandler()
+
+  /** The legacy `error` property and `detail` carry the same text. */
+  private fun ResponseEntity<ProblemDetail>.errorText(): String {
+    val problem = body!!
+    val legacyError = problem.properties!![GlobalExceptionHandler.LEGACY_ERROR_PROPERTY] as String
+    assertEquals(problem.detail, legacyError)
+    return legacyError
+  }
 
   @Test
   fun `handleNotFound returns 404 with error message`() {
@@ -17,7 +25,8 @@ class GlobalExceptionHandlerTest {
     val response = handler.handleNotFound(ex)
 
     assertEquals(HttpStatus.NOT_FOUND, response.statusCode)
-    assertEquals("Workbench 'test' not found for user 'user-1'", response.body!!["error"])
+    assertEquals(404, response.body!!.status)
+    assertEquals("Workbench 'test' not found for user 'user-1'", response.errorText())
   }
 
   @Test
@@ -26,7 +35,7 @@ class GlobalExceptionHandlerTest {
     val response = handler.handleKubernetesError(ex)
 
     assertEquals(HttpStatus.INTERNAL_SERVER_ERROR, response.statusCode)
-    assertEquals("Kubernetes operation failed: connection refused", response.body!!["error"])
+    assertEquals("Kubernetes operation failed: connection refused", response.errorText())
   }
 
   @Test
@@ -35,7 +44,7 @@ class GlobalExceptionHandlerTest {
     val response = handler.handleBadRequest(ex)
 
     assertEquals(HttpStatus.BAD_REQUEST, response.statusCode)
-    assertEquals("Workbench 'wb' already exists for user 'user-1'", response.body!!["error"])
+    assertEquals("Workbench 'wb' already exists for user 'user-1'", response.errorText())
   }
 
   @Test
@@ -44,18 +53,7 @@ class GlobalExceptionHandlerTest {
     val response = handler.handleBadRequest(ex)
 
     assertEquals(HttpStatus.BAD_REQUEST, response.statusCode)
-    assertEquals("Bad request", response.body!!["error"])
-  }
-
-  @Test
-  fun `handleMissingHeader returns 400 with header name`() {
-    val method = String::class.java.getMethod("toString")
-    val coreParam = org.springframework.core.MethodParameter(method, -1)
-    val ex = MissingRequestHeaderException("x-continuum-user-id", coreParam)
-    val response = handler.handleMissingHeader(ex)
-
-    assertEquals(HttpStatus.BAD_REQUEST, response.statusCode)
-    assertTrue(response.body!!["error"]!!.contains("x-continuum-user-id"))
+    assertEquals("Bad request", response.errorText())
   }
 
   @Test
@@ -64,7 +62,7 @@ class GlobalExceptionHandlerTest {
     val response = handler.handleGenericError(ex)
 
     assertEquals(HttpStatus.INTERNAL_SERVER_ERROR, response.statusCode)
-    assertEquals("Internal server error", response.body!!["error"])
+    assertEquals("Internal server error", response.errorText())
   }
 
   @Test
@@ -74,6 +72,6 @@ class GlobalExceptionHandlerTest {
 
     assertEquals(HttpStatus.INTERNAL_SERVER_ERROR, response.statusCode)
     // Should NOT contain the sensitive message
-    assertEquals("Internal server error", response.body!!["error"])
+    assertEquals("Internal server error", response.errorText())
   }
 }

@@ -2,7 +2,12 @@ package org.projectcontinuum.core.commons.model
 
 import io.temporal.api.enums.v1.EventType.*
 import io.temporal.api.history.v1.HistoryEvent
+import io.swagger.v3.oas.annotations.media.Schema
 
+@Schema(
+  name = "ExecutionStatus",
+  description = "The last `EVENT_TYPE_WORKFLOW_EXECUTION_*` event of a run's Temporal history, without the `EVENT_TYPE_` prefix; `UNKNOWN` when none matched."
+)
 enum class ExecutionStatus(val value: Long) {
   UNKNOWN(EVENT_TYPE_UNSPECIFIED_VALUE.toLong()),
   WORKFLOW_EXECUTION_STARTED(EVENT_TYPE_WORKFLOW_EXECUTION_STARTED_VALUE.toLong()),

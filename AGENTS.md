@@ -80,6 +80,16 @@ When the user requests a durable behavior change, record it here or in the relev
 
 - Kotlin must read descriptively. Use named parameters at call sites (constructors, data classes, functions with 2+ arguments), in tests too, and prefer descriptive names and explanatory locals over dense one-liners
 
+## API Documentation Contract
+
+Every Spring Boot service with `@RestController` endpoints follows [docs/api/CONVENTIONS.md](docs/api/CONVENTIONS.md); a new or changed endpoint is not done until its OpenAPI docs are.
+
+- Write or update its section in [docs/api/ENDPOINT_INVENTORY.md](docs/api/ENDPOINT_INVENTORY.md) first (callers, identity, statuses, error bodies, side effects); annotations take their content from it. Unknown intent is a `TODO:` there, never a guess in the spec.
+- Errors are RFC 9457 `ProblemDetail` (`application/problem+json`). Identity headers are `@Parameter(hidden = true)` and documented as security schemes. Internal endpoints (operator, ForwardAuth) belong to the `internal` spec group only.
+- `springdoc` comes from `gradle/libs.versions.toml` and tracks the Spring Boot line (springdoc 3.0.x for Boot 4.0.x); upgrade both together.
+- Each documented service has `OpenApiSpecTest`, which fails when the generated spec differs from the committed `docs/api/<module>.openapi.yaml`. After an intended API change run `./gradlew :<module>:test --tests '*OpenApiSpecTest*' -PupdateOpenApiSpec`, review the diff and commit it. CI (`.github/workflows/openapi-spec-check.yml`) repeats the check and lints the specs with Redocly (`redocly.yaml`).
+- Client-visible API changes (status codes, error bodies, renamed fields, operationIds, schema names) are listed in the release notes of the upcoming version (`release_notes/RELEASE_NOTES_v<platformVersion>.md`).
+
 ## Project Reference
 
 ### Commands
@@ -116,6 +126,8 @@ When the user requests a durable behavior change, record it here or in the relev
 ```
 
 IntelliJ run configs in `.run/` cover: ApiServer, MessageBridge, OrchestrationService, CredentialServer.
+
+**Git LFS:** run `git lfs install && git lfs pull` after cloning. The api-server bundles DuckDB `httpfs` extensions under LFS and refuses to start on pointer files; every CI checkout that builds modules uses `lfs: true`.
 
 **Start infrastructure (required before running any service):**
 ```bash
@@ -261,6 +273,10 @@ Libraries (`continuum-commons`, `continuum-avro-schemas`, `continuum-worker-spri
 Container images build with Jib (no Docker daemon) and push to **Docker Hub** at `docker.io/projectcontinuum/{module-name}:{version}`. Requires `DOCKER_REPO_USERNAME`, `DOCKER_REPO_PASSWORD`. CI builds each image natively on amd64 and arm64 runners (`-Djib.from.platforms=linux/<arch>`) and merges the per-arch digests from each module's `build/jib-image.json` into one multi-arch tag (`.github/workflows/generic-module-builder.yml`). Bundled native binaries (e.g. `continuum-api-server` DuckDB extensions) need a `linux_arm64` build as well.
 
 CI runs `.github/workflows/generic-module-builder.yml`, triggered manually via `.github/workflows/build-module.yml` (tick one or more modules, or "All modules", plus whether to publish to Maven and/or Docker Hub; each ticked module runs as its own matrix leg) and on every published GitHub release via `.github/workflows/on-release.yml` (all libraries and services).
+
+Release notes live in `release_notes/`, one file per version: `RELEASE_NOTES_v<platformVersion>.md` (same layout as `continuum-workbench`). Add changes to the file of the version being prepared; start a new file when `platformVersion` is bumped.
+
+PRs that touch the documented services, `continuum-commons`, `docs/api/` or the shared build files run `.github/workflows/openapi-spec-check.yml`: the `OpenApiSpecTest` drift tests plus a regenerate-and-`git diff` check of `docs/api/*.openapi.yaml`, and a Redocly lint of the committed specs.
 
 PRs that touch any `continuum-*` module or shared build files (`settings.gradle.kts`, root `build.gradle.kts`, `gradle.properties`, `gradle/`) run `.github/workflows/pr-maven-central-check.yml`. All modules share `platformVersion`, so the workflow stages the Maven-published modules locally and runs the same `check-maven-central.js` with `MAVEN_CENTRAL_CHECK_MODE=warn`: an already-published version is a warning annotation and a step-summary note, never a failure. A PR does not need to bump `platformVersion`; bump it when preparing a release, since the release-time run of the script (fail mode) rejects a published version.
 

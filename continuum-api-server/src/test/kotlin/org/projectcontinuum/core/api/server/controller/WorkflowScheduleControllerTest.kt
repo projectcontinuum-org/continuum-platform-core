@@ -65,7 +65,7 @@ class WorkflowScheduleControllerTest {
   """.trimIndent()
 
   @Test
-  fun `POST schedule creates a schedule and passes owner header through`() {
+  fun `POST schedule creates a schedule with 201 and passes owner header through`() {
     val scheduleId = UUID.randomUUID()
     whenever(workflowScheduleService.createSchedule(any(), eq("alice"))).thenReturn(response(scheduleId, "alice"))
 
@@ -75,7 +75,7 @@ class WorkflowScheduleControllerTest {
         .contentType(MediaType.APPLICATION_JSON)
         .content(workflowJson)
     )
-      .andExpect(status().isOk)
+      .andExpect(status().isCreated)
       .andExpect(jsonPath("$.scheduleId").value(scheduleId.toString()))
       .andExpect(jsonPath("$.ownedBy").value("alice"))
   }
@@ -90,7 +90,7 @@ class WorkflowScheduleControllerTest {
         .contentType(MediaType.APPLICATION_JSON)
         .content(workflowJson)
     )
-      .andExpect(status().isOk)
+      .andExpect(status().isCreated)
       .andExpect(jsonPath("$.ownedBy").value("anonymous"))
   }
 

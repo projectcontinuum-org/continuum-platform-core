@@ -18,6 +18,7 @@ import org.junit.jupiter.api.io.TempDir
 import org.projectcontinuum.core.cluster.manager.config.OverlayProperties
 import org.projectcontinuum.core.cluster.manager.config.WorkbenchProperties
 import org.projectcontinuum.core.cluster.manager.entity.WorkbenchInstanceEntity
+import org.projectcontinuum.core.cluster.manager.exception.WorkbenchAlreadyExistsException
 import org.projectcontinuum.core.cluster.manager.exception.WorkbenchNotFoundException
 import org.projectcontinuum.core.cluster.manager.model.*
 import org.projectcontinuum.core.cluster.manager.repository.WorkbenchInstanceRepository
@@ -136,7 +137,7 @@ class WorkbenchServiceTest {
   fun `createWorkbench throws when workbench with same name already exists`() {
     service.createWorkbench("user-1", WorkbenchCreateRequest(instanceName = "dup-wb"))
 
-    val exception = assertThrows<IllegalArgumentException> {
+    val exception = assertThrows<WorkbenchAlreadyExistsException> {
       service.createWorkbench("user-1", WorkbenchCreateRequest(instanceName = "dup-wb"))
     }
     assertTrue(exception.message!!.contains("already exists"))
@@ -312,6 +313,17 @@ class WorkbenchServiceTest {
 
     val response = service.getWorkbenchStatus("user-1", "pending-wb")
     assertEquals(WorkbenchStatus.PENDING.name, response.status)
+  }
+
+  @Test
+  fun `getWorkbenchStatus keeps a suspended workbench SUSPENDED and resumable`() {
+    service.createWorkbench("user-1", WorkbenchCreateRequest(instanceName = "status-suspended-wb"))
+    service.suspendWorkbench("user-1", "status-suspended-wb")
+
+    val response = service.getWorkbenchStatus("user-1", "status-suspended-wb")
+
+    assertEquals(WorkbenchStatus.SUSPENDED.name, response.status)
+    assertEquals(WorkbenchStatus.RUNNING.name, service.resumeWorkbench("user-1", "status-suspended-wb").status)
   }
 
   @Test
@@ -622,7 +634,7 @@ class WorkbenchServiceTest {
 
     val updateRequest = WorkbenchUpdateRequest(
       image = "theiaide/theia:next",
-      resources = ResourceSpec(cpuRequest = "1", memoryRequest = "1Gi")
+      resources = ResourceUpdate(cpuRequest = "1", memoryRequest = "1Gi")
     )
     val updated = service.updateWorkbench("user-1", "update-wb", updateRequest)
 
@@ -676,7 +688,7 @@ class WorkbenchServiceTest {
 
     val updated = service.updateWorkbench(
       "user-1", "res-only-wb",
-      WorkbenchUpdateRequest(resources = ResourceSpec(cpuRequest = "4"))
+      WorkbenchUpdateRequest(resources = ResourceUpdate(cpuRequest = "4"))
     )
 
     assertEquals("theiaide/theia:original", updated.image)
@@ -709,7 +721,7 @@ class WorkbenchServiceTest {
 
     service.updateWorkbench(
       "user-1", "persist-wb",
-      WorkbenchUpdateRequest(image = "theiaide/theia:updated", resources = ResourceSpec(cpuRequest = "8"))
+      WorkbenchUpdateRequest(image = "theiaide/theia:updated", resources = ResourceUpdate(cpuRequest = "8"))
     )
 
     val entity = repository.findById(created.instanceId).get()
@@ -740,6 +752,33 @@ class WorkbenchServiceTest {
     val ingresses = client.network().v1().ingresses().inNamespace("default")
       .withLabel("instance-id", created.instanceId.toString()).list().items
     assertEquals(1, ingresses.size)
+  }
+
+  @Test
+  fun `updateWorkbench of a suspended workbench stores the change without recreating its pod`() {
+    val created = service.createWorkbench("user-1", WorkbenchCreateRequest(instanceName = "upd-suspended-wb"))
+    service.suspendWorkbench("user-1", "upd-suspended-wb")
+    val instanceId = created.instanceId.toString()
+
+    val response = service.updateWorkbench(
+      "user-1", "upd-suspended-wb",
+      WorkbenchUpdateRequest(image = "theiaide/theia:v2")
+    )
+
+    assertEquals(WorkbenchStatus.SUSPENDED.name, response.status)
+    assertEquals("theiaide/theia:v2", response.image)
+    assertEquals(0, client.apps().deployments().inNamespace("default")
+      .withLabel("instance-id", instanceId).list().items.size, "a suspended workbench must stay without a Deployment")
+    assertEquals(0, client.network().v1().ingresses().inNamespace("default")
+      .withLabel("instance-id", instanceId).list().items.size)
+
+    // The stored change is what resume applies.
+    val resumed = service.resumeWorkbench("user-1", "upd-suspended-wb")
+    assertEquals(WorkbenchStatus.RUNNING.name, resumed.status)
+    assertEquals("theiaide/theia:v2", resumed.image)
+    val deployment = client.apps().deployments().inNamespace("default")
+      .withLabel("instance-id", instanceId).list().items.single()
+    assertEquals("theiaide/theia:v2", deployment.spec.template.spec.containers.first().image)
   }
 
   // ── suspendWorkbench ────────────────────────────────────────────────
@@ -1190,7 +1229,7 @@ class WorkbenchServiceTest {
     val deploymentName = "wb-${created.instanceId}-deployment"
 
     assertThrows<IllegalArgumentException> {
-      service.updateWorkbench("user-1", "upd-inject", WorkbenchUpdateRequest(resources = ResourceSpec(memoryLimit = secretInjection)))
+      service.updateWorkbench("user-1", "upd-inject", WorkbenchUpdateRequest(resources = ResourceUpdate(memoryLimit = secretInjection)))
     }
     assertThrows<IllegalArgumentException> {
       service.updateWorkbench("user-1", "upd-inject", WorkbenchUpdateRequest(image = "theiaide/theia:x y"))

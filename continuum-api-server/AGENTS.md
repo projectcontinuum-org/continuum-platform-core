@@ -71,11 +71,25 @@ Core platform team. Container image: `projectcontinuum/continuum-api-server`. Ru
 ## Work Guidance
 
 - DDL is managed via `src/main/resources/schema.sql` (applied by `spring.sql.init.mode = always`). JPA `ddl-auto` is `none`.
-- Swagger UI available at `/swagger-ui.html` when running locally.
+- OpenAPI: follow `docs/api/CONVENTIONS.md`; the endpoint facts behind the annotations are in `docs/api/ENDPOINT_INVENTORY.md` (keep it current with any behavior change).
+  - Swagger UI at `/swagger-ui/index.html` (`/` redirects there only while the docs are enabled), spec at `/v3/api-docs/public`; `CONTINUUM_API_DOCS_ENABLED` (default `true`, Helm `false`), `CONTINUUM_API_DOCS_INTERNAL_ENABLED`, `CONTINUUM_API_DOCS_SERVER_URL`.
+  - `config.OpenApiConfig` owns the metadata (version from `BuildProperties`), the `public`/`internal` groups, the security schemes, the shared `ProblemDetail`/`WorkflowValidationProblem`/`WorkflowIssue` schemas and the `OperationCustomizer` that adds 400/500 to every operation. `/api/v1/admin/**` is internal: it must never appear in `/v3/api-docs` or `/v3/api-docs/public`.
+  - Tags come from `config.ApiTags`; request examples from `controller.ApiExamples`. New `operationId`s are lowerCamelCase verb + noun and never renamed without a release note.
+  - Responses are typed DTOs (`model.WorkflowRunResponses`), never JPA entities or `Map<String, Any>`. Nested classes need `@Schema(name = ...)`; Kotlin-defaulted fields need `requiredMode = NOT_REQUIRED`.
+- Errors: `exception.ApiExceptionHandler` (a `ResponseEntityExceptionHandler`) is the only error mapping. Controllers throw (`ResourceNotFoundException`, `WorkflowScheduleNotFoundException`, Temporal `WorkflowNotFoundException`, `InvalidRequestException`) instead of returning empty `ResponseEntity` 404/400s, so every error body is `application/problem+json`. Unexpected exceptions are a 500 with the generic detail "Internal server error". 404 details never echo the owner.
+  - Client mistakes are never 500s: RSQL parse, unknown-field and conversion failures (`RSQLParserException`, `RSQLException`) are 400 "Invalid filter"; a Temporal gRPC `INVALID_ARGUMENT` (a visibility query Temporal rejects) is 400 "Invalid visibility query"; other Temporal statuses stay 500.
+  - A node output missing from S3 (`NoSuchKey` or an S3 404, detected by `NodeOutputRepository.isMissingObject`) is a 404 "Node output not found", and the partial cache file is deleted. An owned run whose Temporal execution is gone is a 404 on `/status`.
+  - The workflow `name` becomes the run's `workflowUri`: `WorkflowService.runValidation` (shared by start and validate) adds an error for a blank name or one `java.net.URI` rejects. Schedule creation does not check it yet (existing schedule names with spaces).
+  - `POST /api/v1/workflow/schedule` answers 201.
 - The `x-continuum-user-id` HTTP header is the owner identity propagated through the system. Ensure it is forwarded when making internal service calls.
 
 ## Verification
 
 ```bash
 ./gradlew :continuum-api-server:test
+# after an intended API change: regenerate docs/api/continuum-api-server.openapi.yaml, review, commit
+./gradlew :continuum-api-server:test --tests '*OpenApiSpecTest*' -PupdateOpenApiSpec
 ```
+
+- `openapi.OpenApiSpecTest` / `OpenApiDisabledTest` boot the full context (`FullContextWithoutExternalSystems`: Temporal, S3 and DuckDB mocked, H2 in place of PostgreSQL, the main `application.yml` imported because the test one shadows it). `-PdumpOpenApiSpecs=<dir>` writes the fetched specs as JSON for inspection.
+- `exception.ProblemDetailContractTest` pins the error contract.

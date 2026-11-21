@@ -1,6 +1,9 @@
 spring.application.name: continuum-credentials-server
 server:
   port: 8080
+  # Honour X-Forwarded-Prefix/Host/Proto from the proxy (Traefik stripPrefix /credentials-manager), so Swagger UI and
+  # the / -> /ui/ redirect keep the external prefix.
+  forward-headers-strategy: framework
   error:
     include-message: always
     include-stacktrace: on_param
@@ -22,6 +25,18 @@ continuum.core:
 
 springdoc:
   packages-to-scan: org.projectcontinuum.core.credentials.controller
+  # OpenAPI spec (/v3/api-docs) and Swagger UI. On by default for local/dev; the Helm chart turns both off
+  # (CONTINUUM_API_DOCS_ENABLED=false). Continuum has no auth layer of its own, so the docs are never gated by one.
+  api-docs:
+    enabled: ${CONTINUUM_API_DOCS_ENABLED:true}
   swagger-ui:
-    config-url: ../v3/api-docs/swagger-config
-    url: ../v3/api-docs
+    enabled: ${CONTINUUM_API_DOCS_ENABLED:true}
+  default-produces-media-type: application/json
+  default-consumes-media-type: application/json
+  writer-with-order-by-keys: true
+  # Every operation is documented explicitly; springdoc must not attach the advice's responses to every one.
+  override-with-generic-response: false
+
+continuum.core.api-docs:
+  # Fixed absolute server URL for the spec. Empty: derived from the request, including X-Forwarded-Prefix.
+  server-url: ${CONTINUUM_API_DOCS_SERVER_URL:}

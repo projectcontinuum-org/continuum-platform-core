@@ -2,6 +2,7 @@ package org.projectcontinuum.core.cluster.manager.service
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties
 import com.fasterxml.jackson.annotation.JsonProperty
+import io.swagger.v3.oas.annotations.media.Schema
 import org.projectcontinuum.core.cluster.manager.config.WorkbenchProperties
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
@@ -100,8 +101,12 @@ class DockerHubService(
   )
 }
 
+@Schema(name = "WorkbenchImageTag", description = "A tag of the workbench image repository on Docker Hub.")
 data class DockerHubTag(
+  @field:Schema(description = "Image tag.", example = "0.0.14")
   val name: String,
+  @field:Schema(description = "When Docker Hub last updated the tag (ISO-8601, as Docker Hub returns it).", nullable = true, example = "2026-11-18T10:12:44.123456Z")
   val lastUpdated: String?,
+  @field:Schema(description = "Compressed image size, in bytes.", nullable = true, example = "812345678")
   val fullSize: Long?
 )

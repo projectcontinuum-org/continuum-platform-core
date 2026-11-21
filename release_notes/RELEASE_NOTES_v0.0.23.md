@@ -11,6 +11,8 @@ This release is a security and multi-tenancy hardening release. Every workflow, 
 - **Workflow starts and schedule creation now reject unregistered node types with HTTP 400.** Clients must wait for the worker to register its nodes before starting workflows or creating schedules that use them.
 - **A workflow can no longer stick in `RUNNING` when it is cancelled right after it starts.**
 - **`continuum-cloud-gateway` and `continuum-knime-scheduler` are removed** from this repository.
+- **First-class OpenAPI docs** for the api-server, the cluster-manager and the credentials server: typed schemas, real status codes, examples, stable `operationId`s, committed specs in `docs/api/` guarded by CI. Docs are **off in the Helm chart** (`CONTINUUM_API_DOCS_ENABLED=false`).
+- **One error contract:** every api-server, cluster-manager and credentials-server error is an RFC 9457 `application/problem+json` body (the cluster-manager and credentials server keep a deprecated `error` property).
 
 ## What's Changed
 
@@ -24,6 +26,14 @@ This release is a security and multi-tenancy hardening release. Every workflow, 
 - CONTNM-161: Remove `continuum-knime-scheduler` (it lives in `continuum-feature-knime`)
 - CONTNM-169: Explicit `SKIPPED` state for nodes that can never run, and a side-effect-free readiness check
 - CONTNM-170: New `SCHEDULED` node status; the worker reports `BUSY` when the activity starts (**breaks workers older than 0.0.23**, see Upgrade notes)
+- CONTNM-175: springdoc 3.0.3 (the Spring Boot 4 line), managed in `gradle/libs.versions.toml`
+- CONTNM-175: API docs switchable by `CONTINUUM_API_DOCS_ENABLED` (off in the Helm chart), forwarded headers honoured
+- CONTNM-175: Admin and ForwardAuth endpoints hidden from the public spec (`public` and `internal` groups)
+- CONTNM-175: ProblemDetail errors everywhere, documented status codes
+- CONTNM-175: Typed DTOs and schemas for runs, run counts, port data and node outputs
+- CONTNM-175: OpenAPI metadata, tags, operationIds, descriptions and examples for every public operation
+- CONTNM-175: OpenAPI drift tests, committed specs and the `OpenAPI Spec Check` CI workflow
+- CONTNM-175: Client errors that were 500 are now 400/404; schedule create is 201, a duplicate workbench is 409; suspended-workbench fixes
 
 ## Details
 
@@ -99,6 +109,94 @@ This release is a security and multi-tenancy hardening release. Every workflow, 
 
 - `CredentialFetcherService` builds the credential URL with `UriComponentsBuilder.pathSegment(...)`, so a name containing `/`, `?`, `#`, `%` or whitespace stays one path segment. A blank, `.` or `..` name is refused and no request is sent.
 
+### OpenAPI documentation (CONTNM-175)
+
+Applies to `continuum-api-server`, `continuum-cluster-manager` and `continuum-credentials-server` unless noted. Endpoint behavior is unchanged except for the error bodies listed here; the source for every documented status and field is [`docs/api/ENDPOINT_INVENTORY.md`](../docs/api/ENDPOINT_INVENTORY.md).
+
+- **springdoc 3.0.3** replaces 2.8.6 (the Spring Boot 3 line) in all three services, from the new version catalog `gradle/libs.versions.toml`. springdoc still reads models with Jackson 2, so `com.fasterxml.jackson.module:jackson-module-kotlin` is on the api-server and credentials-server runtime classpath for Kotlin nullability (non-null = `required`). No Jackson version changed.
+- **New settings** (all three services; also in the Helm chart):
+  - `CONTINUUM_API_DOCS_ENABLED` (default `true`): `/v3/api-docs/**` and `/swagger-ui/**`. **The Helm chart sets `false`**; enable with `--set continuum.apiDocs.enabled=true` where only trusted users reach the services. With docs off, the api-server's `/` no longer redirects to Swagger UI (404).
+  - `CONTINUUM_API_DOCS_INTERNAL_ENABLED` (default `false`): serves the `internal` group at `/v3/api-docs/internal` (api-server `/api/v1/admin/**`, cluster-manager `/api/v1/workbench/authorize`). These endpoints are never in `/v3/api-docs` or `/v3/api-docs/public`.
+  - `CONTINUUM_API_DOCS_SERVER_URL` (default empty): a fixed server URL for the spec (absolute, or `/`). Empty means it is derived from the request.
+- **Forwarded headers.** `X-Forwarded-Prefix`, `-Host` and `-Proto` are now honoured (`server.forward-headers-strategy: framework` in the api-server and credentials-server; an equivalent filter in the cluster-manager that skips `/api/v1/workbench/authorize`, which reads `X-Forwarded-Host` itself). Redirects and Swagger UI keep the proxy prefix (`/api-server`, `/credentials-manager`). The served spec's server URL is absolute (including the proxy prefix) instead of `../`; the committed specs in `docs/api/` use the relative `/`. Make sure the proxy in front of the services is the only source of these headers.
+- **Spec groups.** `/v3/api-docs/public` is the public API, which Swagger UI opens first. The ungrouped `/v3/api-docs` has the same public paths.
+- **Identity headers** are no longer listed as optional parameters with default `anonymous`. They are described once as security schemes `continuumUserId` (`x-continuum-user-id`) and `continuumUserGroups` (`x-continuum-user-groups`), set by the trusted proxy. The node explorer and the workbench tag and variant lists are documented as not user-scoped. The server behaves as before (the header is still optional, default `anonymous`).
+- **Committed specs**: `docs/api/continuum-api-server.openapi.yaml`, `docs/api/continuum-cluster-manager.openapi.yaml` and `docs/api/continuum-credentials-server.openapi.yaml`. Each service's `OpenApiSpecTest` fails when the generated spec differs from the committed one. Regenerate with `./gradlew :<module>:test --tests '*OpenApiSpecTest*' -PupdateOpenApiSpec`. CI (`.github/workflows/openapi-spec-check.yml`) also lints them with Redocly (`redocly.yaml`).
+- **operationIds** (client method names) are now stable and descriptive, for example `startWorkflow`, `listWorkflowRuns`, `getNodeOutputPage`, `createWorkbench`. Before, they were the Kotlin method names (`findAll`, `count`, `count_1`, ...), so clients generated from the old spec get new method names.
+- **Schema names** are unique: `WorkflowExecutionCountGroup` (was `Group`), `WorkflowTreeExecution` (was `Execution`), `ScheduleValidationProblem` (was `Problem`), `WorkflowNode`/`WorkflowEdge` (was `Node`/`Edge`), `TableCell` (was `CellDto`), and others.
+
+#### continuum-api-server: error bodies (client-visible)
+
+Status codes are unchanged. Bodies that were empty or Boot's default error JSON are now `application/problem+json`:
+
+- **404** with a `ProblemDetail` body (was an empty body): `GET /api/v1/workflow/{id}/status`, `POST /api/v1/workflow/{id}/cancel` and `/terminate` (`detail` "Workflow not found"), `GET /api/v1/workflow-runs/{id}` ("Workflow run not found"), `GET /api/v1/workflow/schedule/{id}` and the schedule pause, unpause, trigger and delete ("Schedule not found"; the message no longer contains the owner), the node documentation endpoints ("No documentation for this node").
+- **400** with a `ProblemDetail` body (was an empty body): `POST /api/v1/workflow/schedule` when Temporal rejects the schedule (invalid cron or time zone).
+- Spring MVC errors (missing parameter, unparsable path or query value, malformed JSON, unsupported method or media type, unknown path) are a `ProblemDetail` instead of Boot's default `{timestamp, status, error, path}`.
+- An unexpected error is a 500 `ProblemDetail` with the generic `detail` "Internal server error" (was Boot's default error body).
+- The workbench reads `detail` first, so it shows these messages unchanged.
+
+#### continuum-api-server: response schemas
+
+JSON field names are unchanged; only the documentation changed:
+
+- `GET /api/v1/workflow-runs` items are the `WorkflowRunSummary` DTO and `GET /api/v1/workflow-runs/{id}` is `WorkflowRun` (no longer JPA entities). Same fields. `WorkflowRun.runId` is now documented.
+- `GET /api/v1/workflow-runs/count` returns the typed `WorkflowRunCount` (same `{"count": n}`).
+- `data.nodeToOutputMap` is documented as node id → port id → `PortData`; run and node statuses as enums. `TableCell.value` is base64 (`format: byte`).
+- The tree field `workflow_snapshot` (snake_case) is documented and **deprecated**: use `data.workflowSnapshot` of `GET /api/v1/workflow-runs/{workflowId}`. It is still returned.
+- Kotlin-defaulted fields are optional in the spec (e.g. `ContinuumWorkflowModel.active`, `nodes`, `edges`; `NodeData.properties`, `propertiesSchema`, `propertiesUISchema`).
+- `continuum-commons` has `compileOnly` swagger annotations on the API models. No new runtime dependency for consumers of the library.
+
+#### continuum-cluster-manager: error bodies (client-visible)
+
+- Every error is a `ProblemDetail` (`application/problem+json`) instead of `{"error": "..."}` (`application/json`). Status codes and messages are unchanged.
+- The `error` property is kept with the same text as `detail` and is **deprecated**, so the management UI and clients that read `.error` keep working. Read `detail` in new code; `error` will be removed in a later release.
+- Spring MVC errors (malformed body, bad parameter) also get the `error` property. Their status codes are unchanged.
+
+#### continuum-credentials-server: error bodies (client-visible)
+
+- Every error is a `ProblemDetail` (`application/problem+json`) instead of `{"error": "..."}` (`application/json`). Status codes and messages are unchanged: 404 unknown credential or type, 409 duplicate name or type version and concurrent change, 400 validation and schema mismatch, 500 encryption ("Failed to process credential data") and anything unexpected ("Internal server error").
+- The `error` property is kept with the same text as `detail` and is **deprecated**. The embedded UI and the workbench's credential picker read `error`, so they keep working.
+- Bean-validation failures keep the joined `"field: message; ..."` text in `detail` and `error` and add `fieldErrors` (`[{field, message}]`).
+- Spring MVC errors (malformed body, unsupported method or media type) are a `ProblemDetail` with `error` too. A create with a missing `name` or a non-JSON body is now a 400 ("Failed to read request"); it was a 500.
+- The spec documents the real statuses (201 on create, 204 on delete, 404, 409), marks the identity header as a security scheme, and documents that credential types are not user-scoped and that every read updates `lastAccessedAt`.
+- The schemas are named `Credential`, `CredentialType`, `CredentialCreateRequest`, `CredentialUpdateRequest` and `CredentialTypeCreateRequest`. Kotlin-defaulted fields (`description`, and `schema`, `uiSchema`, `version` of a type) are optional.
+
+### Status code and behavior fixes (CONTNM-175, client-visible)
+
+Requests that failed with a 500 because of a client mistake now get the right status, and two status codes follow
+HTTP semantics. All are `application/problem+json`.
+
+| Service | Request | Before | Now |
+|---------|---------|--------|-----|
+| api-server | `filter` (or `sort`) that is not valid RSQL, names an unknown field or has a value of the wrong type, on `GET /api/v1/workflow-runs`, `/distinct-workflows`, `/count` and `GET /api/v1/workflow/schedule/filter` | 500 | 400 `Invalid filter` |
+| api-server | a visibility `query` Temporal rejects (e.g. an unknown search attribute) on `/workflow/list`, `/count`, `/tree` | 500 | 400 `Invalid visibility query: <Temporal's reason>` |
+| api-server | `GET /api/v1/data/{runId}/nodes/{nodeId}/outputs/{outputId}` for an owned run without that stored output | 500 | 404 `Node output not found` |
+| api-server | `GET /api/v1/workflow/{id}/status` for an owned run whose Temporal execution is gone (retention) | 500 | 404 |
+| api-server | `POST /api/v1/workflow` with a `name` that is blank or not a valid URI path (e.g. `My Workflow.cwf`) | 500 | 400 `Invalid workflow`; `/validate` reports it as an error |
+| api-server | `POST /api/v1/workflow/schedule` success | 200 | **201** |
+| cluster-manager | `POST /api/v1/workbench` with a name the caller already uses | 400 | **409** (same `error` text) |
+| cluster-manager | `POST /api/v1/workbench` with a partial `resources` object | 500 | accepted: omitted fields take their defaults |
+| cluster-manager | `POST /api/v1/workbench` with a missing `instanceName` or a non-JSON body | 500 | 400 |
+| credentials-server | `POST /api/v1/credentials` with a missing `name` or a non-JSON body | 500 | 400 |
+
+- **cluster-manager: suspended workbenches.** `GET /api/v1/workbench/{name}` no longer turns a SUSPENDED workbench into
+  UNKNOWN (after which it could not be resumed). `PUT /api/v1/workbench/{name}` on a SUSPENDED workbench now only stores
+  the change and keeps it suspended; before, it recreated its Deployment, Service and Ingress while the record stayed
+  SUSPENDED. Resume applies the stored change.
+- **cluster-manager: partial updates.** In `PUT /api/v1/workbench/{name}`, `resources` is now `WorkbenchResourcesUpdate`:
+  every field is optional and an omitted one keeps its current value (before, a partial object failed, and a full one
+  had to repeat every value).
+- **cluster-manager: Kotlin JSON.** The HTTP JSON mapper (Jackson 3) now has the Kotlin module; the `KotlinModule`
+  bean was the Jackson 2 one, which Spring Boot 4 never registered. That is what made partial bodies fail.
+- **api-server: node output cache.** A failed download no longer leaves an empty cache file that later requests would
+  try to read.
+- **Workbench** (`continuum-workbench`, separate change): the Workflow Runs tree reads the paging numbers from the
+  page's nested `page` object (`src/common/RunsPage.ts`). It read a top-level `totalPages`, which the server never
+  sends, so "Load more" never appeared for workflows with more runs than one page.
+- **Clients to check:** anything that treats only `200` as a successful schedule create, or a `400` as "workbench
+  already exists". The workbench and the KNIME scheduler accept any 2xx; the management UI shows the error text for any
+  status. `continuum-system-tests` expects the new codes and checks the fixed cases (they were known gaps).
+
 ### Removed modules
 
 - **`continuum-cloud-gateway`** is removed (module, IntelliJ run config, release matrix entry, manual build checkbox and docs). It only read `workbench_instances`, which the cluster-manager owns, so there is nothing to migrate. Workbenches are reached through their own Ingress, gated by `GET /api/v1/workbench/authorize`.
@@ -121,6 +219,11 @@ This release is a security and multi-tenancy hardening release. Every workflow, 
 - **`KnimeNodeModel` subclasses.** Prefer `prepareWorkflowInputOptions`; the string version is deprecated.
 - **`continuum-cloud-gateway` image.** No new version is published. The `/workbench/<name>/open` proxy path no longer exists in this repository.
 - **Not part of this release.** The Jackson dependency advisories are deferred to the Spring Boot upgrade.
+- **API docs are off in Kubernetes.** With the matching `continuum-charts` change, `/v3/api-docs` and `/swagger-ui` answer 404. Set `continuum.apiDocs.enabled=true` to get them back where that is acceptable.
+- **cluster-manager and credentials-server error bodies** are `application/problem+json` (still with `error`). A client that checks `Content-Type: application/json` on errors must accept `application/problem+json`.
+- **Regenerate API clients** from `docs/api/*.openapi.yaml`: operationIds and schema names changed (see above).
+- **Status codes:** schedule create is 201 and a duplicate workbench is 409 (see "Status code and behavior fixes").
+- **Proxies must own `X-Forwarded-*`.** The services now honour them, so the reverse proxy must set them and strip client-sent values, like the identity headers.
 - **Node properties are now validated for real.** Workflows whose saved properties do not match a node's `propertiesSchema` used to run anyway. They are now refused at start or schedule creation (400), and on the worker the node fails without retries. The rules are the workbench's (draft 7), so a node the dialog shows as valid passes. Properties written by hand or by another client can fail: for example, a number sent as a string (`"10"`) to an `integer` field, which `ClaudeAIAgentNodeModel` used to accept. None of the saved example workflows do this.
   - A node schema written for draft 4 that uses boolean `exclusiveMinimum`/`exclusiveMaximum` must declare `"$schema": "http://json-schema.org/draft-04/schema#"`, or switch to numeric values. No current node does.
 - **Wait for worker registration before starting workflows or creating schedules.** If a workflow references a `nodeModel` that is not yet in the API server's node registry, `POST /api/v1/workflow` and `POST /api/v1/workflow/schedule` now return HTTP 400 instead of accepting it and letting it fail later. Retry after the worker registers its nodes.
