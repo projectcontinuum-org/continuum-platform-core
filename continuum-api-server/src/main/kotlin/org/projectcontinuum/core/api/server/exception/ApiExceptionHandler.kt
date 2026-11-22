@@ -92,16 +92,14 @@ class ApiExceptionHandler : ResponseEntityExceptionHandler() {
   }
 
   /**
-   * A bare Temporal gRPC failure. `INVALID_ARGUMENT` means Temporal rejected what the client sent: 400. Every other
-   * Temporal status stays a 500.
+   * A bare Temporal gRPC failure (not wrapped in a [ScheduleException]). `INVALID_ARGUMENT` means Temporal rejected
+   * what the client sent: 400 with Temporal's reason. Every other Temporal status stays a 500.
    */
   @ExceptionHandler(StatusRuntimeException::class)
   fun handleTemporalStatus(e: StatusRuntimeException): ProblemDetail {
     if (e.status.code == Status.Code.INVALID_ARGUMENT) {
-      return ProblemDetail.forStatusAndDetail(
-        HttpStatus.BAD_REQUEST,
-        "Invalid visibility query: ${e.status.description ?: "rejected by Temporal"}"
-      )
+      val reason = e.status.description ?: "no reason given"
+      return ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, "Rejected by Temporal: $reason")
     }
     return handleUnexpected(e)
   }

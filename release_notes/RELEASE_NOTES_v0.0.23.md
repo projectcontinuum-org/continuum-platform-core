@@ -73,6 +73,7 @@ This release is a security and multi-tenancy hardening release. Every workflow, 
   - Checked against Ajv with JSONForms' own `createAjv`: the defaults of all 58 feature nodes, every node in the 44 saved `.cwf` and fixture workflows, and 17 edge cases. All 252 cases get the same verdict from both validators. Under draft 4, 14 differed.
 - `ProcessNodeModel.run`, `KnimeNodeModel.run` and now also `TriggerNodeModel.run` (which did not validate before) validate before `execute()`, against the node class's own schema (`metadata.propertiesSchema`), not the copy carried in the workflow. A failure is a `NodeRuntimeException` with `isRetriable = false`, so the worker records the node as failed (`$error` output) and Temporal does not retry it.
 - `WorkflowUpdate` has a new nullable field `runId` (default `null`, so events from an older orchestration service still deserialize).
+- **Removed from the public API:** `model.NodeRepoTreeItem` (only used by the removed worker endpoint) and `ExecutionStatus.fromHistoryEvents` (only used by the removed `/workflow/tree`). The `ExecutionStatus` enum and its values are unchanged.
 - `KnimeNodeModel` starts KNIME with `ProcessBuilder(buildKnimeCommand(...))`, an argument list with no `bash -c`, so a node id or path can no longer be run as a command. `resolveWorkflowDir` rejects a node id that resolves to the KNIME workflow root or outside it. The string-joined `prepareWorkflowInputs` is `@Deprecated` and kept for binary compatibility; use `prepareWorkflowInputOptions`.
 
 ### continuum-orchestration-service
@@ -101,6 +102,7 @@ This release is a security and multi-tenancy hardening release. Every workflow, 
 
 ### continuum-worker-springboot-starter
 
+- **Removed: the worker's `GET /api/v1/node-repo` endpoint** (`NodeRepositoryController`). Nothing called it; the workbench and every platform service read the node registry through the api-server. To check that a worker's nodes are registered, use the api-server's node explorer, e.g. `GET /api/v1/node-explorer/search?query=<node title>` (the create-new-nodes guide in `continuum-docs` says so).
 - `CredentialFetcherService` builds the credential URL with `UriComponentsBuilder.pathSegment(...)`, so a name containing `/`, `?`, `#`, `%` or whitespace stays one path segment. A blank, `.` or `..` name is refused and no request is sent.
 
 ### OpenAPI documentation (CONTNM-175)
@@ -212,8 +214,8 @@ These endpoints had no caller left in the workbench, the orchestration service, 
 | `GET /api/v1/node-explorer/nodes/documentation?nodeId=` | `getNodeDocumentationByQuery` | `GET /api/v1/node-explorer/nodes/{nodeId}/documentation` |
 
 - Schemas removed from the spec: `WorkflowExecutionStatus`, `WorkflowExecutionCount`, `WorkflowExecutionCountGroup`, `WorkflowTreeItem`, `WorkflowTreeExecution`, `WorkflowRunCount`.
-- With them go `TemporalVisibilityQuery` (no endpoint queries Temporal visibility any more), `TreeHelper` and `WorkflowRunRepository.findWorkflowIdsByOwnedBy`. The remaining endpoints behave exactly as before.
-- `continuum-system-tests` polls `GET /api/v1/workflow-runs/{workflowId}` for a run's final status instead of `/status`, and no longer checks the removed endpoints.
+- With them go `TemporalVisibilityQuery` (no endpoint queries Temporal visibility any more), `TreeHelper` and `WorkflowRunRepository.findWorkflowIdsByOwnedBy`. The remaining endpoints behave as before, with one wording change: a bare Temporal gRPC `INVALID_ARGUMENT` is still a 400, but its `detail` is now `Rejected by Temporal: <reason>` instead of `Invalid visibility query: <reason>` (that text described the removed query endpoints).
+- **`continuum-system-tests` must be updated together with this release**: its `main` still polls `/status` for a run's final state and checks `/list`, `/active`, `/tree`, `/count`, `/workflow-runs/count`, `/schedule/filter` and the query-parameter documentation. The matching change moves it to `GET /api/v1/workflow-runs/{workflowId}` (a successful run ends `FINISHED`) and drops those checks; run the suites against this release only with it.
 
 ### Removed modules
 
@@ -234,6 +236,7 @@ These endpoints had no caller left in the workbench, the orchestration service, 
 - **Workbench image allow-list.** Create and update requests naming an image outside `projectcontinuum/continuum-workbench` are now rejected with 400. Set `WORKBENCH_ALLOWED_IMAGE_PREFIXES` to allow other repositories (an empty value allows any valid image). With the Helm chart, set `continuum.clusterManager.workbench.allowedImagePrefixes` (needs the matching `continuum-charts` change).
 - **Database.** The api-server and message bridge add `workflow_runs.run_id` and two indexes on start, and backfill `run_id` for existing runs. No manual step. Rows that cannot be backfilled have no `run_id`, so their node output is not readable until a new event records one.
 - **Events.** Anything that deserializes `WorkflowUpdate` strictly must accept the new optional `runId`.
+- **Removed library API.** Code built against `continuum-commons` that uses `NodeRepoTreeItem` or `ExecutionStatus.fromHistoryEvents`, or that calls a worker's `/api/v1/node-repo`, must change; none of the Continuum repositories does.
 - **`KnimeNodeModel` subclasses.** Prefer `prepareWorkflowInputOptions`; the string version is deprecated.
 - **`continuum-cloud-gateway` image.** No new version is published. The `/workbench/<name>/open` proxy path no longer exists in this repository.
 - **Not part of this release.** The Jackson dependency advisories are deferred to the Spring Boot upgrade.

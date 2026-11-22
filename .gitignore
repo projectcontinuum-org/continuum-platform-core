@@ -60,3 +60,6 @@ unsloth-trainer/.venv/
 
 ### npm ###
 package-lock.json
+
+### macOS ###
+.DS_Store
