@@ -73,20 +73,13 @@ class ProblemDetailContractTest {
 
   @Test
   fun `an unexpected failure is a 500 problem with a generic detail`() {
-    whenever(workflowRunService.count(any(), anyOrNull())).thenThrow(IllegalStateException("database password is wrong"))
+    whenever(
+      workflowRunService.findAll(ownedBy = any(), filter = anyOrNull(), page = any(), size = any(), sort = anyOrNull())
+    ).thenThrow(IllegalStateException("database password is wrong"))
 
-    mockMvc.perform(get("/api/v1/workflow-runs/count"))
+    mockMvc.perform(get("/api/v1/workflow-runs"))
       .andExpect(status().isInternalServerError)
       .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
       .andExpect(jsonPath("$.detail").value("Internal server error"))
-  }
-
-  @Test
-  fun `run count is a typed object`() {
-    whenever(workflowRunService.count(eq("anonymous"), anyOrNull())).thenReturn(7L)
-
-    mockMvc.perform(get("/api/v1/workflow-runs/count").param("filter", "status==FAILED"))
-      .andExpect(status().isOk)
-      .andExpect(content().json("""{"count": 7}""", true))
   }
 }

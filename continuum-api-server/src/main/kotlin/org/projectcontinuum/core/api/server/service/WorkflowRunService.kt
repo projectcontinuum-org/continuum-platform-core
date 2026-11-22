@@ -50,14 +50,6 @@ class WorkflowRunService(
     return workflowRunRepository.findOne(spec).orElse(null)
   }
 
-  fun count(ownedBy: String, filter: String?): Long {
-    var spec: Specification<WorkflowRunSummaryEntity> = Specification.where(ownedBySpec(ownedBy))
-    if (!filter.isNullOrBlank()) {
-      spec = spec.and(RSQLJPASupport.toSpecification(filter))
-    }
-    return workflowRunSummaryRepository.count(spec)
-  }
-
   fun findDistinctWorkflows(ownedBy: String, filter: String?, page: Int, size: Int): Page<String> {
     val pageable = PageRequest.of(page, size)
 

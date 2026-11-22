@@ -134,9 +134,3 @@ data class WorkflowRunDataResponse(
 /** Documentation type only: node id → port id → [PortData]. Never instantiated. */
 @Schema(name = "NodeToOutputMap", description = "Outputs per node: node id → port id → output.")
 private abstract class NodeToOutputMapSchema : Map<String, Map<String, PortData>>
-
-@Schema(name = "WorkflowRunCount", description = "Number of runs that match the filter.")
-data class WorkflowRunCountResponse(
-  @field:Schema(description = "Number of the caller's runs that match the filter.", example = "42")
-  val count: Long
-)

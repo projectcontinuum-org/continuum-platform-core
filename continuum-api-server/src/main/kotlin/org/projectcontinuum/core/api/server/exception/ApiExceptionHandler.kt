@@ -92,9 +92,8 @@ class ApiExceptionHandler : ResponseEntityExceptionHandler() {
   }
 
   /**
-   * Temporal rejected a visibility query that passed [org.projectcontinuum.core.api.server.utils.TemporalVisibilityQuery]
-   * (for example an unknown search attribute or a type mismatch). That is a client error; every other Temporal status
-   * stays a 500.
+   * A bare Temporal gRPC failure. `INVALID_ARGUMENT` means Temporal rejected what the client sent: 400. Every other
+   * Temporal status stays a 500.
    */
   @ExceptionHandler(StatusRuntimeException::class)
   fun handleTemporalStatus(e: StatusRuntimeException): ProblemDetail {

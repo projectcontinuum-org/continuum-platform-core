@@ -157,7 +157,7 @@ paths:
                 error:
                   value:
                     detail: "Acceptable representations: [application/json]."
-                    instance: /api/v1/workflow/tree
+                    instance: /api/v1/workflow-runs
                     status: 406
                     title: Not Acceptable
                     type: about:blank
@@ -172,7 +172,7 @@ paths:
                 error:
                   value:
                     detail: Internal server error
-                    instance: /api/v1/workflow/tree
+                    instance: /api/v1/workflow-runs
                     status: 500
                     title: Internal Server Error
                     type: about:blank
@@ -221,7 +221,7 @@ paths:
                   value:
                     detail: Required request parameter 'baseDir' for method parameter
                       type String is not present
-                    instance: /api/v1/workflow/tree
+                    instance: /api/v1/workflow-runs
                     status: 400
                     title: Bad Request
                     type: about:blank
@@ -236,7 +236,7 @@ paths:
                 error:
                   value:
                     detail: "Acceptable representations: [application/json]."
-                    instance: /api/v1/workflow/tree
+                    instance: /api/v1/workflow-runs
                     status: 406
                     title: Not Acceptable
                     type: about:blank
@@ -251,7 +251,7 @@ paths:
                 error:
                   value:
                     detail: Internal server error
-                    instance: /api/v1/workflow/tree
+                    instance: /api/v1/workflow-runs
                     status: 500
                     title: Internal Server Error
                     type: about:blank
@@ -260,93 +260,6 @@ paths:
           description: "Unexpected server error, or a dependency (PostgreSQL, Temporal,\
             \ S3) failed."
       summary: List one level of the node palette
-      tags:
-      - Node explorer
-  /api/v1/node-explorer/nodes/documentation:
-    get:
-      description: |2-
-
-        Same as `GET /api/v1/node-explorer/nodes/{nodeId}/documentation`, for node ids that a proxy might alter in a path.
-        Not user-scoped: every caller sees the same registry. Read-only.
-      operationId: getNodeDocumentationByQuery
-      parameters:
-      - description: Node id (fully qualified class name of the node model).
-        example: org.projectcontinuum.feature.base.analytics.node.TextNormalizerNodeModel
-        in: query
-        name: nodeId
-        required: true
-        schema:
-          type: string
-      responses:
-        "200":
-          content:
-            text/markdown:
-              example: |-
-                # Text Normalizer
-
-                Trims, lowercases and removes non-alphanumeric characters from `inputCol` into `outputCol`.
-              schema:
-                type: string
-          description: The documentation.
-        "400":
-          content:
-            application/problem+json:
-              examples:
-                error:
-                  value:
-                    detail: Required request parameter 'baseDir' for method parameter
-                      type String is not present
-                    instance: /api/v1/workflow/tree
-                    status: 400
-                    title: Bad Request
-                    type: about:blank
-              schema:
-                $ref: "#/components/schemas/ProblemDetail"
-          description: "Malformed request: a missing or unparsable parameter, or a\
-            \ body that is not valid JSON for this operation."
-        "404":
-          content:
-            application/problem+json:
-              example:
-                type: about:blank
-                title: Not Found
-                status: 404
-                detail: No documentation for this node
-                instance: /api/v1/node-explorer/nodes/org.example.UnknownNodeModel/documentation
-              schema:
-                $ref: "#/components/schemas/ProblemDetail"
-          description: "The node is not registered, or has no documentation."
-        "406":
-          content:
-            application/problem+json:
-              examples:
-                error:
-                  value:
-                    detail: "Acceptable representations: [application/json]."
-                    instance: /api/v1/workflow/tree
-                    status: 406
-                    title: Not Acceptable
-                    type: about:blank
-              schema:
-                $ref: "#/components/schemas/ProblemDetail"
-          description: The `Accept` header asks for a media type this operation does
-            not produce.
-        "500":
-          content:
-            application/problem+json:
-              examples:
-                error:
-                  value:
-                    detail: Internal server error
-                    instance: /api/v1/workflow/tree
-                    status: 500
-                    title: Internal Server Error
-                    type: about:blank
-              schema:
-                $ref: "#/components/schemas/ProblemDetail"
-          description: "Unexpected server error, or a dependency (PostgreSQL, Temporal,\
-            \ S3) failed."
-      summary: Get a node's documentation (node id as a query parameter)
       tags:
       - Node explorer
   /api/v1/node-explorer/nodes/task-queues:
@@ -389,7 +302,7 @@ paths:
                   value:
                     detail: Required request parameter 'baseDir' for method parameter
                       type String is not present
-                    instance: /api/v1/workflow/tree
+                    instance: /api/v1/workflow-runs
                     status: 400
                     title: Bad Request
                     type: about:blank
@@ -404,7 +317,7 @@ paths:
                 error:
                   value:
                     detail: "Acceptable representations: [application/json]."
-                    instance: /api/v1/workflow/tree
+                    instance: /api/v1/workflow-runs
                     status: 406
                     title: Not Acceptable
                     type: about:blank
@@ -419,7 +332,7 @@ paths:
                 error:
                   value:
                     detail: Internal server error
-                    instance: /api/v1/workflow/tree
+                    instance: /api/v1/workflow-runs
                     status: 500
                     title: Internal Server Error
                     type: about:blank
@@ -464,7 +377,7 @@ paths:
                   value:
                     detail: Required request parameter 'baseDir' for method parameter
                       type String is not present
-                    instance: /api/v1/workflow/tree
+                    instance: /api/v1/workflow-runs
                     status: 400
                     title: Bad Request
                     type: about:blank
@@ -491,7 +404,7 @@ paths:
                 error:
                   value:
                     detail: "Acceptable representations: [application/json]."
-                    instance: /api/v1/workflow/tree
+                    instance: /api/v1/workflow-runs
                     status: 406
                     title: Not Acceptable
                     type: about:blank
@@ -506,7 +419,7 @@ paths:
                 error:
                   value:
                     detail: Internal server error
-                    instance: /api/v1/workflow/tree
+                    instance: /api/v1/workflow-runs
                     status: 500
                     title: Internal Server Error
                     type: about:blank
@@ -551,7 +464,7 @@ paths:
                   value:
                     detail: Required request parameter 'baseDir' for method parameter
                       type String is not present
-                    instance: /api/v1/workflow/tree
+                    instance: /api/v1/workflow-runs
                     status: 400
                     title: Bad Request
                     type: about:blank
@@ -566,7 +479,7 @@ paths:
                 error:
                   value:
                     detail: "Acceptable representations: [application/json]."
-                    instance: /api/v1/workflow/tree
+                    instance: /api/v1/workflow-runs
                     status: 406
                     title: Not Acceptable
                     type: about:blank
@@ -581,7 +494,7 @@ paths:
                 error:
                   value:
                     detail: Internal server error
-                    instance: /api/v1/workflow/tree
+                    instance: /api/v1/workflow-runs
                     status: 500
                     title: Internal Server Error
                     type: about:blank
@@ -715,7 +628,7 @@ paths:
                 error:
                   value:
                     detail: "Acceptable representations: [application/json]."
-                    instance: /api/v1/workflow/tree
+                    instance: /api/v1/workflow-runs
                     status: 406
                     title: Not Acceptable
                     type: about:blank
@@ -730,7 +643,7 @@ paths:
                 error:
                   value:
                     detail: Internal server error
-                    instance: /api/v1/workflow/tree
+                    instance: /api/v1/workflow-runs
                     status: 500
                     title: Internal Server Error
                     type: about:blank
@@ -820,7 +733,7 @@ paths:
                 error:
                   value:
                     detail: "Acceptable representations: [application/json]."
-                    instance: /api/v1/workflow/tree
+                    instance: /api/v1/workflow-runs
                     status: 406
                     title: Not Acceptable
                     type: about:blank
@@ -835,7 +748,7 @@ paths:
                 error:
                   value:
                     detail: Internal server error
-                    instance: /api/v1/workflow/tree
+                    instance: /api/v1/workflow-runs
                     status: 500
                     title: Internal Server Error
                     type: about:blank
@@ -846,78 +759,6 @@ paths:
       security:
       - continuumUserId: []
       summary: "List the caller's workflow runs, newest first"
-      tags:
-      - Workflow runs
-  /api/v1/workflow-runs/count:
-    get:
-      description: Counts the caller's runs in the database that match the optional
-        RSQL `filter`. Read-only.
-      operationId: countWorkflowRuns
-      parameters:
-      - description: "RSQL filter over the run fields `workflowId`, `workflowUri`,\
-          \ `status`, `scheduleId`, `progressPercentage`, `createdAt` and `updatedAt`\
-          \ (`;` = and, `,` = or; dates ISO-8601). Always narrowed to the caller's\
-          \ own runs."
-        example: status==FAILED
-        in: query
-        name: filter
-        required: false
-        schema:
-          type: string
-      responses:
-        "200":
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/WorkflowRunCount"
-          description: The count.
-        "400":
-          content:
-            application/problem+json:
-              example:
-                type: about:blank
-                title: Invalid filter
-                status: 400
-                detail: "Invalid filter: it names a field that cannot be filtered\
-                  \ on"
-                instance: /api/v1/workflow-runs
-              schema:
-                $ref: "#/components/schemas/ProblemDetail"
-          description: "The `filter` is not valid RSQL, names a field that cannot\
-            \ be filtered on, or has a value of the wrong type."
-        "406":
-          content:
-            application/problem+json:
-              examples:
-                error:
-                  value:
-                    detail: "Acceptable representations: [application/json]."
-                    instance: /api/v1/workflow/tree
-                    status: 406
-                    title: Not Acceptable
-                    type: about:blank
-              schema:
-                $ref: "#/components/schemas/ProblemDetail"
-          description: The `Accept` header asks for a media type this operation does
-            not produce.
-        "500":
-          content:
-            application/problem+json:
-              examples:
-                error:
-                  value:
-                    detail: Internal server error
-                    instance: /api/v1/workflow/tree
-                    status: 500
-                    title: Internal Server Error
-                    type: about:blank
-              schema:
-                $ref: "#/components/schemas/ProblemDetail"
-          description: "Unexpected server error, or a dependency (PostgreSQL, Temporal,\
-            \ S3) failed."
-      security:
-      - continuumUserId: []
-      summary: Count the caller's workflow runs
       tags:
       - Workflow runs
   /api/v1/workflow-runs/distinct-workflows:
@@ -987,7 +828,7 @@ paths:
                 error:
                   value:
                     detail: "Acceptable representations: [application/json]."
-                    instance: /api/v1/workflow/tree
+                    instance: /api/v1/workflow-runs
                     status: 406
                     title: Not Acceptable
                     type: about:blank
@@ -1002,7 +843,7 @@ paths:
                 error:
                   value:
                     detail: Internal server error
-                    instance: /api/v1/workflow/tree
+                    instance: /api/v1/workflow-runs
                     status: 500
                     title: Internal Server Error
                     type: about:blank
@@ -1047,7 +888,7 @@ paths:
                   value:
                     detail: Required request parameter 'baseDir' for method parameter
                       type String is not present
-                    instance: /api/v1/workflow/tree
+                    instance: /api/v1/workflow-runs
                     status: 400
                     title: Bad Request
                     type: about:blank
@@ -1075,7 +916,7 @@ paths:
                 error:
                   value:
                     detail: "Acceptable representations: [application/json]."
-                    instance: /api/v1/workflow/tree
+                    instance: /api/v1/workflow-runs
                     status: 406
                     title: Not Acceptable
                     type: about:blank
@@ -1090,7 +931,7 @@ paths:
                 error:
                   value:
                     detail: Internal server error
-                    instance: /api/v1/workflow/tree
+                    instance: /api/v1/workflow-runs
                     status: 500
                     title: Internal Server Error
                     type: about:blank
@@ -1103,214 +944,6 @@ paths:
       summary: Get one workflow run with its snapshot and node outputs
       tags:
       - Workflow runs
-  /api/v1/workflow/active:
-    get:
-      description: Asks Temporal for the caller's executions that are still running
-        and returns their workflow ids. Read-only.
-      operationId: listActiveWorkflowIds
-      responses:
-        "200":
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  type: string
-                  example: 6b1f0e4e-8f4a-4d8c-9d61-3c2b7f1a9e10
-          description: Workflow ids; empty when nothing runs.
-        "406":
-          content:
-            application/problem+json:
-              examples:
-                error:
-                  value:
-                    detail: "Acceptable representations: [application/json]."
-                    instance: /api/v1/workflow/tree
-                    status: 406
-                    title: Not Acceptable
-                    type: about:blank
-              schema:
-                $ref: "#/components/schemas/ProblemDetail"
-          description: The `Accept` header asks for a media type this operation does
-            not produce.
-        "500":
-          content:
-            application/problem+json:
-              examples:
-                error:
-                  value:
-                    detail: Internal server error
-                    instance: /api/v1/workflow/tree
-                    status: 500
-                    title: Internal Server Error
-                    type: about:blank
-              schema:
-                $ref: "#/components/schemas/ProblemDetail"
-          description: "Unexpected server error, or a dependency (PostgreSQL, Temporal,\
-            \ S3) failed."
-      security:
-      - continuumUserId: []
-      summary: List the ids of the caller's running workflows
-      tags:
-      - Workflows
-  /api/v1/workflow/count:
-    get:
-      description: |2-
-
-        Counts the caller's Temporal executions, optionally narrowed by a visibility query. A trailing
-        `GROUP BY ExecutionStatus` also returns one count per status in `groups`. Read-only.
-      operationId: countWorkflowExecutions
-      parameters:
-      - description: "Optional Temporal visibility filter (e.g. `ExecutionStatus =\
-          \ 'Running'`). It is AND-combined with the caller's own runs, so it can\
-          \ only narrow the result. Rejected (400) with unbalanced parentheses, unterminated\
-          \ quotes, `;`, comments (`--`, `/*`, `#`), backslashes or control characters.\
-          \ May end with `GROUP BY ExecutionStatus`."
-        example: WorkflowType = 'IContinuumWorkflow' GROUP BY ExecutionStatus
-        in: query
-        name: query
-        required: false
-        schema:
-          type: string
-          default: ""
-      responses:
-        "200":
-          content:
-            application/json:
-              example:
-                count: 12
-                groups:
-                - name: '"Completed"'
-                  count: 9
-                - name: '"Running"'
-                  count: 3
-              schema:
-                $ref: "#/components/schemas/WorkflowExecutionCount"
-          description: The count.
-        "400":
-          content:
-            application/problem+json:
-              example:
-                type: about:blank
-                title: Bad Request
-                status: 400
-                detail: "Invalid visibility query: unbalanced parentheses"
-                instance: /api/v1/workflow/list
-              schema:
-                $ref: "#/components/schemas/ProblemDetail"
-          description: "The `query` could escape the caller's filter, or Temporal\
-            \ rejected it (e.g. an unknown search attribute)."
-        "406":
-          content:
-            application/problem+json:
-              examples:
-                error:
-                  value:
-                    detail: "Acceptable representations: [application/json]."
-                    instance: /api/v1/workflow/tree
-                    status: 406
-                    title: Not Acceptable
-                    type: about:blank
-              schema:
-                $ref: "#/components/schemas/ProblemDetail"
-          description: The `Accept` header asks for a media type this operation does
-            not produce.
-        "500":
-          content:
-            application/problem+json:
-              examples:
-                error:
-                  value:
-                    detail: Internal server error
-                    instance: /api/v1/workflow/tree
-                    status: 500
-                    title: Internal Server Error
-                    type: about:blank
-              schema:
-                $ref: "#/components/schemas/ProblemDetail"
-          description: "Unexpected server error, or a dependency (PostgreSQL, Temporal,\
-            \ S3) failed."
-      security:
-      - continuumUserId: []
-      summary: Count the caller's workflow executions in Temporal
-      tags:
-      - Workflows
-  /api/v1/workflow/list:
-    get:
-      description: |2-
-
-        Lists every one of the caller's executions that Temporal still knows (all pages), optionally narrowed by a visibility
-        query. For the run history with snapshots use `GET /api/v1/workflow-runs`. Read-only.
-      operationId: listWorkflowExecutions
-      parameters:
-      - description: "Optional Temporal visibility filter (e.g. `ExecutionStatus =\
-          \ 'Running'`). It is AND-combined with the caller's own runs, so it can\
-          \ only narrow the result. Rejected (400) with unbalanced parentheses, unterminated\
-          \ quotes, `;`, comments (`--`, `/*`, `#`), backslashes or control characters."
-        example: ExecutionStatus = 'Running'
-        in: query
-        name: query
-        required: false
-        schema:
-          type: string
-          default: ""
-      responses:
-        "200":
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: "#/components/schemas/WorkflowExecutionStatus"
-          description: The executions.
-        "400":
-          content:
-            application/problem+json:
-              example:
-                type: about:blank
-                title: Bad Request
-                status: 400
-                detail: "Invalid visibility query: unbalanced parentheses"
-                instance: /api/v1/workflow/list
-              schema:
-                $ref: "#/components/schemas/ProblemDetail"
-          description: "The `query` could escape the caller's filter, or Temporal\
-            \ rejected it (e.g. an unknown search attribute)."
-        "406":
-          content:
-            application/problem+json:
-              examples:
-                error:
-                  value:
-                    detail: "Acceptable representations: [application/json]."
-                    instance: /api/v1/workflow/tree
-                    status: 406
-                    title: Not Acceptable
-                    type: about:blank
-              schema:
-                $ref: "#/components/schemas/ProblemDetail"
-          description: The `Accept` header asks for a media type this operation does
-            not produce.
-        "500":
-          content:
-            application/problem+json:
-              examples:
-                error:
-                  value:
-                    detail: Internal server error
-                    instance: /api/v1/workflow/tree
-                    status: 500
-                    title: Internal Server Error
-                    type: about:blank
-              schema:
-                $ref: "#/components/schemas/ProblemDetail"
-          description: "Unexpected server error, or a dependency (PostgreSQL, Temporal,\
-            \ S3) failed."
-      security:
-      - continuumUserId: []
-      summary: List the caller's workflow executions from Temporal
-      tags:
-      - Workflows
   /api/v1/workflow/schedule:
     get:
       description: |2-
@@ -1343,7 +976,7 @@ paths:
                   value:
                     detail: Required request parameter 'baseDir' for method parameter
                       type String is not present
-                    instance: /api/v1/workflow/tree
+                    instance: /api/v1/workflow-runs
                     status: 400
                     title: Bad Request
                     type: about:blank
@@ -1358,7 +991,7 @@ paths:
                 error:
                   value:
                     detail: "Acceptable representations: [application/json]."
-                    instance: /api/v1/workflow/tree
+                    instance: /api/v1/workflow-runs
                     status: 406
                     title: Not Acceptable
                     type: about:blank
@@ -1497,7 +1130,7 @@ paths:
                 error:
                   value:
                     detail: "Acceptable representations: [application/json]."
-                    instance: /api/v1/workflow/tree
+                    instance: /api/v1/workflow-runs
                     status: 406
                     title: Not Acceptable
                     type: about:blank
@@ -1512,7 +1145,7 @@ paths:
                 error:
                   value:
                     detail: Internal server error
-                    instance: /api/v1/workflow/tree
+                    instance: /api/v1/workflow-runs
                     status: 500
                     title: Internal Server Error
                     type: about:blank
@@ -1523,79 +1156,6 @@ paths:
       security:
       - continuumUserId: []
       summary: Create a cron schedule for a workflow
-      tags:
-      - Workflow schedules
-  /api/v1/workflow/schedule/filter:
-    get:
-      description: |2-
-
-        Lists the caller's schedules that match an RSQL filter over `name`, `cronExpression`, `timeZone`, `scheduleId`,
-        `createdAt` and `updatedAt` (e.g. `name=like=*nightly*`). Always narrowed to the caller's own schedules. Read-only.
-      operationId: filterWorkflowSchedules
-      parameters:
-      - description: RSQL filter; omit for all of the caller's schedules.
-        example: name=like=*nightly*
-        in: query
-        name: filter
-        required: false
-        schema:
-          type: string
-      responses:
-        "200":
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: "#/components/schemas/WorkflowSchedule"
-          description: The matching schedules.
-        "400":
-          content:
-            application/problem+json:
-              example:
-                type: about:blank
-                title: Invalid filter
-                status: 400
-                detail: "Invalid filter: it names a field that cannot be filtered\
-                  \ on"
-                instance: /api/v1/workflow/schedule/filter
-              schema:
-                $ref: "#/components/schemas/ProblemDetail"
-          description: "The `filter` is not valid RSQL, names a field that cannot\
-            \ be filtered on, or has a value of the wrong type."
-        "406":
-          content:
-            application/problem+json:
-              examples:
-                error:
-                  value:
-                    detail: "Acceptable representations: [application/json]."
-                    instance: /api/v1/workflow/tree
-                    status: 406
-                    title: Not Acceptable
-                    type: about:blank
-              schema:
-                $ref: "#/components/schemas/ProblemDetail"
-          description: The `Accept` header asks for a media type this operation does
-            not produce.
-        "500":
-          content:
-            application/problem+json:
-              examples:
-                error:
-                  value:
-                    detail: Internal server error
-                    instance: /api/v1/workflow/tree
-                    status: 500
-                    title: Internal Server Error
-                    type: about:blank
-              schema:
-                $ref: "#/components/schemas/ProblemDetail"
-          description: "Unexpected server error, or a dependency (PostgreSQL, Temporal,\
-            \ S3) failed."
-      security:
-      - continuumUserId: []
-      summary: List the caller's schedules matching an RSQL filter
       tags:
       - Workflow schedules
   /api/v1/workflow/schedule/{scheduleId}:
@@ -1625,7 +1185,7 @@ paths:
                   value:
                     detail: Required request parameter 'baseDir' for method parameter
                       type String is not present
-                    instance: /api/v1/workflow/tree
+                    instance: /api/v1/workflow-runs
                     status: 400
                     title: Bad Request
                     type: about:blank
@@ -1653,7 +1213,7 @@ paths:
                 error:
                   value:
                     detail: "Acceptable representations: [application/json]."
-                    instance: /api/v1/workflow/tree
+                    instance: /api/v1/workflow-runs
                     status: 406
                     title: Not Acceptable
                     type: about:blank
@@ -1668,7 +1228,7 @@ paths:
                 error:
                   value:
                     detail: Internal server error
-                    instance: /api/v1/workflow/tree
+                    instance: /api/v1/workflow-runs
                     status: 500
                     title: Internal Server Error
                     type: about:blank
@@ -1709,7 +1269,7 @@ paths:
                   value:
                     detail: Required request parameter 'baseDir' for method parameter
                       type String is not present
-                    instance: /api/v1/workflow/tree
+                    instance: /api/v1/workflow-runs
                     status: 400
                     title: Bad Request
                     type: about:blank
@@ -1737,7 +1297,7 @@ paths:
                 error:
                   value:
                     detail: "Acceptable representations: [application/json]."
-                    instance: /api/v1/workflow/tree
+                    instance: /api/v1/workflow-runs
                     status: 406
                     title: Not Acceptable
                     type: about:blank
@@ -1752,7 +1312,7 @@ paths:
                 error:
                   value:
                     detail: Internal server error
-                    instance: /api/v1/workflow/tree
+                    instance: /api/v1/workflow-runs
                     status: 500
                     title: Internal Server Error
                     type: about:blank
@@ -1797,7 +1357,7 @@ paths:
                   value:
                     detail: Required request parameter 'baseDir' for method parameter
                       type String is not present
-                    instance: /api/v1/workflow/tree
+                    instance: /api/v1/workflow-runs
                     status: 400
                     title: Bad Request
                     type: about:blank
@@ -1825,7 +1385,7 @@ paths:
                 error:
                   value:
                     detail: "Acceptable representations: [application/json]."
-                    instance: /api/v1/workflow/tree
+                    instance: /api/v1/workflow-runs
                     status: 406
                     title: Not Acceptable
                     type: about:blank
@@ -1840,7 +1400,7 @@ paths:
                 error:
                   value:
                     detail: Internal server error
-                    instance: /api/v1/workflow/tree
+                    instance: /api/v1/workflow-runs
                     status: 500
                     title: Internal Server Error
                     type: about:blank
@@ -1881,7 +1441,7 @@ paths:
                   value:
                     detail: Required request parameter 'baseDir' for method parameter
                       type String is not present
-                    instance: /api/v1/workflow/tree
+                    instance: /api/v1/workflow-runs
                     status: 400
                     title: Bad Request
                     type: about:blank
@@ -1909,7 +1469,7 @@ paths:
                 error:
                   value:
                     detail: "Acceptable representations: [application/json]."
-                    instance: /api/v1/workflow/tree
+                    instance: /api/v1/workflow-runs
                     status: 406
                     title: Not Acceptable
                     type: about:blank
@@ -1924,7 +1484,7 @@ paths:
                 error:
                   value:
                     detail: Internal server error
-                    instance: /api/v1/workflow/tree
+                    instance: /api/v1/workflow-runs
                     status: 500
                     title: Internal Server Error
                     type: about:blank
@@ -1969,7 +1529,7 @@ paths:
                   value:
                     detail: Required request parameter 'baseDir' for method parameter
                       type String is not present
-                    instance: /api/v1/workflow/tree
+                    instance: /api/v1/workflow-runs
                     status: 400
                     title: Bad Request
                     type: about:blank
@@ -1997,7 +1557,7 @@ paths:
                 error:
                   value:
                     detail: "Acceptable representations: [application/json]."
-                    instance: /api/v1/workflow/tree
+                    instance: /api/v1/workflow-runs
                     status: 406
                     title: Not Acceptable
                     type: about:blank
@@ -2012,7 +1572,7 @@ paths:
                 error:
                   value:
                     detail: Internal server error
-                    instance: /api/v1/workflow/tree
+                    instance: /api/v1/workflow-runs
                     status: 500
                     title: Internal Server Error
                     type: about:blank
@@ -2025,91 +1585,6 @@ paths:
       summary: Resume a paused schedule
       tags:
       - Workflow schedules
-  /api/v1/workflow/tree:
-    get:
-      description: |2-
-
-        Builds a folder tree from the workflow names (paths) of the caller's executions below `baseDir`; each leaf is one
-        execution with its submitted workflow and its outputs, rebuilt from the Temporal history. Newest first, at most 100
-        per folder. Expensive: it reads the full history of every listed execution. Read-only.
-      operationId: getWorkflowExecutionTree
-      parameters:
-      - description: Path prefix removed from every workflow name before it is split
-          into folders.
-        example: /home/continuum/workspace
-        in: query
-        name: baseDir
-        required: true
-        schema:
-          type: string
-      - description: "Optional Temporal visibility filter (e.g. `ExecutionStatus =\
-          \ 'Running'`). It is AND-combined with the caller's own runs, so it can\
-          \ only narrow the result. Rejected (400) with unbalanced parentheses, unterminated\
-          \ quotes, `;`, comments (`--`, `/*`, `#`), backslashes or control characters."
-        example: ExecutionStatus = 'Completed'
-        in: query
-        name: query
-        required: false
-        schema:
-          type: string
-          default: ""
-      responses:
-        "200":
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: "#/components/schemas/WorkflowTreeItem"
-          description: The tree roots.
-        "400":
-          content:
-            application/problem+json:
-              example:
-                type: about:blank
-                title: Bad Request
-                status: 400
-                detail: "Invalid visibility query: unbalanced parentheses"
-                instance: /api/v1/workflow/list
-              schema:
-                $ref: "#/components/schemas/ProblemDetail"
-          description: "`baseDir` is missing, or the `query` could escape the caller's\
-            \ filter or was rejected by Temporal."
-        "406":
-          content:
-            application/problem+json:
-              examples:
-                error:
-                  value:
-                    detail: "Acceptable representations: [application/json]."
-                    instance: /api/v1/workflow/tree
-                    status: 406
-                    title: Not Acceptable
-                    type: about:blank
-              schema:
-                $ref: "#/components/schemas/ProblemDetail"
-          description: The `Accept` header asks for a media type this operation does
-            not produce.
-        "500":
-          content:
-            application/problem+json:
-              examples:
-                error:
-                  value:
-                    detail: Internal server error
-                    instance: /api/v1/workflow/tree
-                    status: 500
-                    title: Internal Server Error
-                    type: about:blank
-              schema:
-                $ref: "#/components/schemas/ProblemDetail"
-          description: "Unexpected server error, or a dependency (PostgreSQL, Temporal,\
-            \ S3) failed."
-      security:
-      - continuumUserId: []
-      summary: Get the caller's executions grouped by workflow path
-      tags:
-      - Workflows
   /api/v1/workflow/validate:
     post:
       description: |2-
@@ -2220,7 +1695,7 @@ paths:
                   value:
                     detail: Required request parameter 'baseDir' for method parameter
                       type String is not present
-                    instance: /api/v1/workflow/tree
+                    instance: /api/v1/workflow-runs
                     status: 400
                     title: Bad Request
                     type: about:blank
@@ -2235,7 +1710,7 @@ paths:
                 error:
                   value:
                     detail: "Acceptable representations: [application/json]."
-                    instance: /api/v1/workflow/tree
+                    instance: /api/v1/workflow-runs
                     status: 406
                     title: Not Acceptable
                     type: about:blank
@@ -2250,7 +1725,7 @@ paths:
                 error:
                   value:
                     detail: Internal server error
-                    instance: /api/v1/workflow/tree
+                    instance: /api/v1/workflow-runs
                     status: 500
                     title: Internal Server Error
                     type: about:blank
@@ -2297,7 +1772,7 @@ paths:
                   value:
                     detail: Required request parameter 'baseDir' for method parameter
                       type String is not present
-                    instance: /api/v1/workflow/tree
+                    instance: /api/v1/workflow-runs
                     status: 400
                     title: Bad Request
                     type: about:blank
@@ -2325,7 +1800,7 @@ paths:
                 error:
                   value:
                     detail: "Acceptable representations: [application/json]."
-                    instance: /api/v1/workflow/tree
+                    instance: /api/v1/workflow-runs
                     status: 406
                     title: Not Acceptable
                     type: about:blank
@@ -2340,7 +1815,7 @@ paths:
                 error:
                   value:
                     detail: Internal server error
-                    instance: /api/v1/workflow/tree
+                    instance: /api/v1/workflow-runs
                     status: 500
                     title: Internal Server Error
                     type: about:blank
@@ -2351,93 +1826,6 @@ paths:
       security:
       - continuumUserId: []
       summary: Cancel a running workflow
-      tags:
-      - Workflows
-  /api/v1/workflow/{workflowId}/status:
-    get:
-      description: |2-
-
-        Returns the Temporal execution status and search attributes of one of the caller's runs. For the run's node statuses
-        and outputs use `GET /api/v1/workflow-runs/{workflowId}`. Read-only.
-      operationId: getWorkflowExecutionStatus
-      parameters:
-      - description: Workflow id returned by `POST /api/v1/workflow`.
-        example: 6b1f0e4e-8f4a-4d8c-9d61-3c2b7f1a9e10
-        in: path
-        name: workflowId
-        required: true
-        schema:
-          type: string
-      responses:
-        "200":
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/WorkflowExecutionStatus"
-          description: The execution status.
-        "400":
-          content:
-            application/problem+json:
-              examples:
-                error:
-                  value:
-                    detail: Required request parameter 'baseDir' for method parameter
-                      type String is not present
-                    instance: /api/v1/workflow/tree
-                    status: 400
-                    title: Bad Request
-                    type: about:blank
-              schema:
-                $ref: "#/components/schemas/ProblemDetail"
-          description: "Malformed request: a missing or unparsable parameter, or a\
-            \ body that is not valid JSON for this operation."
-        "404":
-          content:
-            application/problem+json:
-              example:
-                type: about:blank
-                title: Not Found
-                status: 404
-                detail: Workflow not found
-                instance: /api/v1/workflow/6b1f0e4e-8f4a-4d8c-9d61-3c2b7f1a9e10/cancel
-              schema:
-                $ref: "#/components/schemas/ProblemDetail"
-          description: "No run with this id is owned by the caller (unknown and other\
-            \ tenants' ids are indistinguishable), or Temporal no longer has its execution\
-            \ (retention expired)."
-        "406":
-          content:
-            application/problem+json:
-              examples:
-                error:
-                  value:
-                    detail: "Acceptable representations: [application/json]."
-                    instance: /api/v1/workflow/tree
-                    status: 406
-                    title: Not Acceptable
-                    type: about:blank
-              schema:
-                $ref: "#/components/schemas/ProblemDetail"
-          description: The `Accept` header asks for a media type this operation does
-            not produce.
-        "500":
-          content:
-            application/problem+json:
-              examples:
-                error:
-                  value:
-                    detail: Internal server error
-                    instance: /api/v1/workflow/tree
-                    status: 500
-                    title: Internal Server Error
-                    type: about:blank
-              schema:
-                $ref: "#/components/schemas/ProblemDetail"
-          description: "Unexpected server error, or a dependency (PostgreSQL, Temporal,\
-            \ S3) failed."
-      security:
-      - continuumUserId: []
-      summary: Get the Temporal status of one workflow run
       tags:
       - Workflows
   /api/v1/workflow/{workflowId}/terminate:
@@ -2474,7 +1862,7 @@ paths:
                   value:
                     detail: Required request parameter 'baseDir' for method parameter
                       type String is not present
-                    instance: /api/v1/workflow/tree
+                    instance: /api/v1/workflow-runs
                     status: 400
                     title: Bad Request
                     type: about:blank
@@ -2502,7 +1890,7 @@ paths:
                 error:
                   value:
                     detail: "Acceptable representations: [application/json]."
-                    instance: /api/v1/workflow/tree
+                    instance: /api/v1/workflow-runs
                     status: 406
                     title: Not Acceptable
                     type: about:blank
@@ -2517,7 +1905,7 @@ paths:
                 error:
                   value:
                     detail: Internal server error
-                    instance: /api/v1/workflow/tree
+                    instance: /api/v1/workflow-runs
                     status: 500
                     title: Internal Server Error
                     type: about:blank
@@ -3129,81 +2517,6 @@ components:
           - DELIVERED
           - BROKEN
           example: DELIVERED
-    WorkflowExecutionCount:
-      type: object
-      description: Number of the caller's Temporal executions that match the query.
-      properties:
-        count:
-          type: integer
-          format: int32
-          description: Total number of matching executions.
-          example: 12
-        groups:
-          type: array
-          description: Counts per execution status; only filled when the query ends
-            with `GROUP BY ExecutionStatus`.
-          items:
-            $ref: "#/components/schemas/WorkflowExecutionCountGroup"
-      required:
-      - count
-      - groups
-    WorkflowExecutionCountGroup:
-      type: object
-      description: Number of executions with one execution status.
-      properties:
-        count:
-          type: integer
-          format: int32
-          description: Number of executions in this group.
-          example: 3
-        name:
-          type: string
-          description: "The group value as Temporal returns it: the JSON-encoded execution\
-            \ status (quotes included)."
-          example: '"Running"'
-      required:
-      - count
-      - name
-    WorkflowExecutionStatus:
-      type: object
-      description: A workflow execution as Temporal sees it.
-      properties:
-        metadata:
-          type: object
-          additionalProperties:
-            type: string
-          description: "Temporal search attributes of the execution (except `BuildIds`):\
-            \ name → raw JSON-encoded value. `Continuum:WorkflowFileName` is the workflow\
-            \ name, `Continuum:ExecutionStatus` the numeric execution status."
-          example:
-            Continuum:WorkflowFileName: '"examples/text-cleanup.cwf"'
-            Continuum:ExecutionStatus: "2"
-        temporalStatus:
-          type: string
-          description: Temporal execution status.
-          enum:
-          - WORKFLOW_EXECUTION_STATUS_UNSPECIFIED
-          - WORKFLOW_EXECUTION_STATUS_RUNNING
-          - WORKFLOW_EXECUTION_STATUS_COMPLETED
-          - WORKFLOW_EXECUTION_STATUS_FAILED
-          - WORKFLOW_EXECUTION_STATUS_CANCELED
-          - WORKFLOW_EXECUTION_STATUS_TERMINATED
-          - WORKFLOW_EXECUTION_STATUS_CONTINUED_AS_NEW
-          - WORKFLOW_EXECUTION_STATUS_TIMED_OUT
-          example: WORKFLOW_EXECUTION_STATUS_COMPLETED
-        type:
-          type: string
-          description: Temporal workflow type.
-          example: IContinuumWorkflow
-        workflowId:
-          type: string
-          description: Workflow id.
-          example: 6b1f0e4e-8f4a-4d8c-9d61-3c2b7f1a9e10
-      required:
-      - metadata
-      - temporalStatus
-      - type
-      - workflowId
     WorkflowIssue:
       type: object
       description: "One problem found by the workflow validator. `node`, `edge` and\
@@ -3371,17 +2684,6 @@ components:
       - workflowId
       - workflowType
       - workflowUri
-    WorkflowRunCount:
-      type: object
-      description: Number of runs that match the filter.
-      properties:
-        count:
-          type: integer
-          format: int64
-          description: Number of the caller's runs that match the filter.
-          example: 42
-      required:
-      - count
     WorkflowRunData:
       type: object
       description: The workflow as it ran and the outputs of its nodes.
@@ -3578,98 +2880,6 @@ components:
       - paused
       - scheduleId
       - updatedAt
-    WorkflowTreeExecution:
-      type: object
-      description: "One execution in the workflow tree, rebuilt from its Temporal\
-        \ history."
-      properties:
-        createdAtTimestampUtc:
-          type: integer
-          format: int64
-          description: "When the first workflow task was scheduled, in epoch milliseconds\
-            \ (UTC)."
-          example: 1763716502481
-        id:
-          type: string
-          description: Workflow id (same as `workflowId`).
-          example: 6b1f0e4e-8f4a-4d8c-9d61-3c2b7f1a9e10
-        nodeToOutputsMap:
-          type:
-          - object
-          - "null"
-          additionalProperties:
-            type: object
-            additionalProperties:
-              $ref: "#/components/schemas/PortData"
-          description: "Outputs per node: node id → port id → output. From the result\
-            \ of a completed execution, otherwise from the node activities completed\
-            \ so far."
-        status:
-          type: string
-          description: "Last workflow execution event of the history, or `UNKNOWN`."
-          enum:
-          - UNKNOWN
-          - WORKFLOW_EXECUTION_STARTED
-          - WORKFLOW_EXECUTION_COMPLETED
-          - WORKFLOW_EXECUTION_FAILED
-          - WORKFLOW_EXECUTION_TIMED_OUT
-          - WORKFLOW_EXECUTION_CANCEL_REQUESTED
-          - WORKFLOW_EXECUTION_CANCELED
-          - WORKFLOW_EXECUTION_TERMINATED
-          - WORKFLOW_EXECUTION_CONTINUED_AS_NEW
-          - WORKFLOW_EXECUTION_SIGNALED
-          - WORKFLOW_EXECUTION_UPDATE_ACCEPTED
-          - WORKFLOW_EXECUTION_UPDATE_REJECTED
-          - WORKFLOW_EXECUTION_UPDATE_COMPLETED
-          - WORKFLOW_EXECUTION_UPDATE_ADMITTED
-          - WORKFLOW_EXECUTION_OPTIONS_UPDATED
-          example: WORKFLOW_EXECUTION_COMPLETED
-        updatesAtTimestampUtc:
-          type: integer
-          format: int64
-          description: "Time of the last history event, in epoch milliseconds (UTC)."
-          example: 1763716509112
-        workflowId:
-          type: string
-          description: Workflow id.
-          example: 6b1f0e4e-8f4a-4d8c-9d61-3c2b7f1a9e10
-        workflow_snapshot:
-          oneOf:
-          - $ref: "#/components/schemas/ContinuumWorkflowModel"
-          - type: "null"
-      required:
-      - createdAtTimestampUtc
-      - id
-      - status
-      - updatesAtTimestampUtc
-      - workflowId
-    WorkflowTreeItem:
-      type: object
-      description: "A folder of the workflow path, or one execution of a workflow."
-      properties:
-        children:
-          type:
-          - array
-          - "null"
-          description: "Sub-folders and executions, newest first; null for executions."
-          items:
-            $ref: "#/components/schemas/WorkflowTreeItem"
-        id:
-          type: string
-          description: "Folder name, or the workflow id for an execution."
-          example: examples
-        itemInfo:
-          oneOf:
-          - $ref: "#/components/schemas/WorkflowTreeExecution"
-          - type: "null"
-        name:
-          type: string
-          description: "Folder name, or the execution's start time (`java.util.Date#toString`)\
-            \ for an execution."
-          example: examples
-      required:
-      - id
-      - name
     WorkflowValidationProblem:
       type: object
       allOf:

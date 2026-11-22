@@ -6,12 +6,13 @@ This release is a security and multi-tenancy hardening release. Every workflow, 
 
 ## Highlights
 
-- **Tenant isolation on every workflow endpoint.** `/status`, `/cancel`, `/terminate`, `/active`, `/list`, `/count`, `/tree` and node output are scoped to the `x-continuum-user-id` caller. Another tenant's workflow or an unknown id is a 404 in both cases, so ids cannot be probed.
-- **Injection fixes** in the node-output preview (SQL), the Temporal visibility queries, the workbench Kubernetes manifests, the credential URL, and the KNIME node launcher (shell).
+- **Tenant isolation on every workflow endpoint.** `/cancel`, `/terminate`, run history and node output are scoped to the `x-continuum-user-id` caller. Another tenant's workflow or an unknown id is a 404 in both cases, so ids cannot be probed.
+- **Injection fixes** in the node-output preview (SQL), the workbench Kubernetes manifests, the credential URL, and the KNIME node launcher (shell).
 - **Workflow starts and schedule creation now reject unregistered node types with HTTP 400.** Clients must wait for the worker to register its nodes before starting workflows or creating schedules that use them.
 - **A workflow can no longer stick in `RUNNING` when it is cancelled right after it starts.**
 - **`continuum-cloud-gateway` and `continuum-knime-scheduler` are removed** from this repository.
 - **First-class OpenAPI docs** for the api-server, the cluster-manager and the credentials server: typed schemas, real status codes, examples, stable `operationId`s, committed specs in `docs/api/` guarded by CI. Docs are **off in the Helm chart** (`CONTINUUM_API_DOCS_ENABLED=false`).
+- **Stale api-server endpoints removed.** Eight endpoints no workbench or platform service calls are gone: `GET /api/v1/workflow/active`, `/workflow/{id}/status`, `/workflow/list`, `/workflow/count`, `/workflow/tree`, `GET /api/v1/workflow-runs/count`, `GET /api/v1/workflow/schedule/filter` and `GET /api/v1/node-explorer/nodes/documentation?nodeId=`. See "Removed endpoints" below.
 - **One error contract:** every api-server, cluster-manager and credentials-server error is an RFC 9457 `application/problem+json` body (the cluster-manager and credentials server keep a deprecated `error` property).
 
 ## What's Changed
@@ -40,8 +41,7 @@ This release is a security and multi-tenancy hardening release. Every workflow, 
 ### continuum-api-server: ownership
 
 - Every endpoint of `WorkflowController` reads the owner from the `x-continuum-user-id` header (default `anonymous`, so a local docker-compose setup needs no auth layer). Ownership comes from `workflow_runs.owned_by`.
-- `/{id}/cancel`, `/{id}/terminate` and `/{id}/status` return **404** for a workflow the caller does not own, and for an unknown id. The check runs **before** any Temporal signal is sent. Cancel and terminate of an unknown id used to be a silent 204.
-- `/list`, `/count`, `/tree` and `/active` are scoped to the caller's own runs. A caller with no runs gets an empty result and Temporal is not queried.
+- `/{id}/cancel` and `/{id}/terminate` return **404** for a workflow the caller does not own, and for an unknown id. The check runs **before** any Temporal signal is sent. Cancel and terminate of an unknown id used to be a silent 204.
 - Cancelling or terminating a workflow that has already finished is also a 404: Temporal has no running execution to signal, and the service passes that not-found on instead of answering 204.
 - New `ResourceNotFoundException`, mapped to a 404 `ProblemDetail` by `ApiExceptionHandler`.
 - A run with no `workflow_runs` row is not visible to any caller. That covers runs created before that table existed, and a scheduled run whose first update has not reached the message bridge yet.
@@ -52,12 +52,6 @@ This release is a security and multi-tenancy hardening release. Every workflow, 
 - The caller must own the run (looked up by `workflow_runs.run_id`) before the output is located or read. An unowned and a nonexistent run give the same 404 body.
 - `runId`, `nodeId` and `outputId` must match `^[A-Za-z0-9._-]{1,255}$`, and must not be `.` or contain `..`. `page` must be at least 0 and `pageSize` must be in `1..1000`. A violation is a **400** `application/problem+json` (`InvalidRequestException`).
 - The Parquet path, `LIMIT` and `OFFSET` are bound parameters (`read_parquet(?)`), never interpolated into SQL. The DuckDB connection has `httpfs` loaded, so an injected path could previously reach the network. The resolved cache file must also stay under the cache directory, and statements and result sets are closed.
-
-### continuum-api-server: Temporal visibility queries
-
-- New `TemporalVisibilityQuery`. Values are escaped, and a client `query` on `/list`, `/count` and `/tree` is AND-combined with the server's own owner filter as `(<owner filter>) AND (<client query>)`, so it can only narrow the caller's own runs.
-- A client query is rejected (400) when it has unbalanced parentheses, an unterminated quote, `;`, `--`, `/*`, `#`, a backslash or a control character. `/count` allows a trailing `GROUP BY ExecutionStatus`.
-- The owner filter is `WorkflowId IN (...)` in chunks of 500, with counts and groups merged across chunks.
 
 ### continuum-api-server: node properties
 
@@ -122,14 +116,14 @@ Applies to `continuum-api-server`, `continuum-cluster-manager` and `continuum-cr
 - **Spec groups.** `/v3/api-docs/public` is the public API, which Swagger UI opens first. The ungrouped `/v3/api-docs` has the same public paths.
 - **Identity headers** are no longer listed as optional parameters with default `anonymous`. They are described once as security schemes `continuumUserId` (`x-continuum-user-id`) and `continuumUserGroups` (`x-continuum-user-groups`), set by the trusted proxy. The node explorer and the workbench tag and variant lists are documented as not user-scoped. The server behaves as before (the header is still optional, default `anonymous`).
 - **Committed specs**: `docs/api/continuum-api-server.openapi.yaml`, `docs/api/continuum-cluster-manager.openapi.yaml` and `docs/api/continuum-credentials-server.openapi.yaml`. Each service's `OpenApiSpecTest` fails when the generated spec differs from the committed one. Regenerate with `./gradlew :<module>:test --tests '*OpenApiSpecTest*' -PupdateOpenApiSpec`. CI (`.github/workflows/openapi-spec-check.yml`) also lints them with Redocly (`redocly.yaml`).
-- **operationIds** (client method names) are now stable and descriptive, for example `startWorkflow`, `listWorkflowRuns`, `getNodeOutputPage`, `createWorkbench`. Before, they were the Kotlin method names (`findAll`, `count`, `count_1`, ...), so clients generated from the old spec get new method names.
-- **Schema names** are unique: `WorkflowExecutionCountGroup` (was `Group`), `WorkflowTreeExecution` (was `Execution`), `ScheduleValidationProblem` (was `Problem`), `WorkflowNode`/`WorkflowEdge` (was `Node`/`Edge`), `TableCell` (was `CellDto`), and others.
+- **operationIds** (client method names) are now stable and descriptive, for example `startWorkflow`, `listWorkflowRuns`, `getNodeOutputPage`, `createWorkbench`. Before, they were the Kotlin method names (`findAll`, `count_1`, ...), so clients generated from the old spec get new method names.
+- **Schema names** are unique: `ScheduleValidationProblem` (was `Problem`), `WorkflowNode`/`WorkflowEdge` (was `Node`/`Edge`), `TableCell` (was `CellDto`), and others.
 
 #### continuum-api-server: error bodies (client-visible)
 
 Status codes are unchanged except for the fixes listed under "Status code and behavior fixes". Bodies that were empty or Boot's default error JSON are now `application/problem+json`:
 
-- **404** with a `ProblemDetail` body (was an empty body): `GET /api/v1/workflow/{id}/status`, `POST /api/v1/workflow/{id}/cancel` and `/terminate` (`detail` "Workflow not found"), `GET /api/v1/workflow-runs/{id}` ("Workflow run not found"), `GET /api/v1/workflow/schedule/{id}` and the schedule pause, unpause, trigger and delete ("Schedule not found"; the message no longer contains the owner), the node documentation endpoints ("No documentation for this node").
+- **404** with a `ProblemDetail` body (was an empty body): `POST /api/v1/workflow/{id}/cancel` and `/terminate` (`detail` "Workflow not found"), `GET /api/v1/workflow-runs/{id}` ("Workflow run not found"), `GET /api/v1/workflow/schedule/{id}` and the schedule pause, unpause, trigger and delete ("Schedule not found"; the message no longer contains the owner), the node documentation endpoints ("No documentation for this node").
 - **400** with a `ProblemDetail` body (was an empty body): `POST /api/v1/workflow/schedule` when Temporal rejects the schedule (invalid cron or time zone; gRPC `INVALID_ARGUMENT`). Any other Temporal failure on a schedule operation (unreachable, timeout) is a 500, never a 400.
 - Spring MVC errors (missing parameter, unparsable path or query value, malformed JSON, unsupported method or media type, unknown path) are a `ProblemDetail` instead of Boot's default `{timestamp, status, error, path}`.
 - An unexpected error is a 500 `ProblemDetail` with the generic `detail` "Internal server error" (was Boot's default error body).
@@ -140,9 +134,7 @@ Status codes are unchanged except for the fixes listed under "Status code and be
 JSON field names are unchanged; only the documentation changed:
 
 - `GET /api/v1/workflow-runs` items are the `WorkflowRunSummary` DTO and `GET /api/v1/workflow-runs/{id}` is `WorkflowRun` (no longer JPA entities). Same fields. `WorkflowRun.runId` is now documented.
-- `GET /api/v1/workflow-runs/count` returns the typed `WorkflowRunCount` (same `{"count": n}`).
 - `data.nodeToOutputMap` is documented as node id → port id → `PortData`; run and node statuses as enums. `TableCell.value` is base64 (`format: byte`).
-- The tree field `workflow_snapshot` (snake_case) is documented and **deprecated**: use `data.workflowSnapshot` of `GET /api/v1/workflow-runs/{workflowId}`. It is still returned.
 - Kotlin-defaulted fields are optional in the spec (e.g. `ContinuumWorkflowModel.active`, `nodes`, `edges`; `NodeData.properties`, `propertiesSchema`, `propertiesUISchema`).
 - `continuum-commons` has `compileOnly` swagger annotations on the API models. No new runtime dependency for consumers of the library.
 
@@ -168,10 +160,8 @@ HTTP semantics. All are `application/problem+json`.
 
 | Service | Request | Before | Now |
 |---------|---------|--------|-----|
-| api-server | `filter` (or `sort`) that is not valid RSQL, names an unknown field or has a value of the wrong type, on `GET /api/v1/workflow-runs`, `/distinct-workflows`, `/count` and `GET /api/v1/workflow/schedule/filter` | 500 | 400 `Invalid filter` |
-| api-server | a visibility `query` Temporal rejects (e.g. an unknown search attribute) on `/workflow/list`, `/count`, `/tree` | 500 | 400 `Invalid visibility query: <Temporal's reason>` |
+| api-server | `filter` (or `sort`) that is not valid RSQL, names an unknown field or has a value of the wrong type, on `GET /api/v1/workflow-runs` and `/distinct-workflows` | 500 | 400 `Invalid filter` |
 | api-server | `GET /api/v1/data/{runId}/nodes/{nodeId}/outputs/{outputId}` for an owned run without that stored output | 500 | 404 `Node output not found` |
-| api-server | `GET /api/v1/workflow/{id}/status` for an owned run whose Temporal execution is gone (retention) | 500 | 404 |
 | api-server | `POST /api/v1/workflow` with a `name` that is blank or not a valid URI path (e.g. `My Workflow.cwf`) | 500 | 400 `Invalid workflow`; `/validate` reports it as an error |
 | api-server | `POST /api/v1/workflow/schedule` with a workflow `name` that is not a valid URI path (e.g. a KNIME schedule named `Nightly run`) | 201, then every run listing of the owner failed with 500 | 400 `Invalid workflow`, like a start |
 | api-server | schedule get, pause, unpause, trigger, delete for a schedule that exists in the database but no longer in Temporal | 500 | 404 `Schedule not found` |
@@ -206,6 +196,25 @@ HTTP semantics. All are `application/problem+json`.
   workflow `name`: a name with spaces is now rejected with 400. The workbench and the KNIME scheduler accept any 2xx; the management UI shows the error text for any
   status. `continuum-system-tests` expects the new codes and checks the fixed cases (they were known gaps).
 
+### Removed endpoints (continuum-api-server, client-visible)
+
+These endpoints had no caller left in the workbench, the orchestration service, the KNIME scheduler or the jsonforms playground. Their requests now get the unknown-path 404 `ProblemDetail`. Use the replacement instead:
+
+| Removed | operationId | Use instead |
+|---------|-------------|-------------|
+| `GET /api/v1/workflow/active` | `listActiveWorkflowIds` | `GET /api/v1/workflow-runs?filter=status==RUNNING` |
+| `GET /api/v1/workflow/{workflowId}/status` | `getWorkflowExecutionStatus` | `GET /api/v1/workflow-runs/{workflowId}` (`status`) |
+| `GET /api/v1/workflow/list` | `listWorkflowExecutions` | `GET /api/v1/workflow-runs` |
+| `GET /api/v1/workflow/count` | `countWorkflowExecutions` | `page.totalElements` of `GET /api/v1/workflow-runs?size=1` |
+| `GET /api/v1/workflow/tree` | `getWorkflowExecutionTree` | `GET /api/v1/workflow-runs/distinct-workflows` and `GET /api/v1/workflow-runs` |
+| `GET /api/v1/workflow-runs/count` | `countWorkflowRuns` | `page.totalElements` of `GET /api/v1/workflow-runs?size=1&filter=...` |
+| `GET /api/v1/workflow/schedule/filter` | `filterWorkflowSchedules` | `GET /api/v1/workflow/schedule` (optionally `?name=`) |
+| `GET /api/v1/node-explorer/nodes/documentation?nodeId=` | `getNodeDocumentationByQuery` | `GET /api/v1/node-explorer/nodes/{nodeId}/documentation` |
+
+- Schemas removed from the spec: `WorkflowExecutionStatus`, `WorkflowExecutionCount`, `WorkflowExecutionCountGroup`, `WorkflowTreeItem`, `WorkflowTreeExecution`, `WorkflowRunCount`.
+- With them go `TemporalVisibilityQuery` (no endpoint queries Temporal visibility any more), `TreeHelper` and `WorkflowRunRepository.findWorkflowIdsByOwnedBy`. The remaining endpoints behave exactly as before.
+- `continuum-system-tests` polls `GET /api/v1/workflow-runs/{workflowId}` for a run's final status instead of `/status`, and no longer checks the removed endpoints.
+
 ### Removed modules
 
 - **`continuum-cloud-gateway`** is removed (module, IntelliJ run config, release matrix entry, manual build checkbox and docs). It only read `workbench_instances`, which the cluster-manager owns, so there is nothing to migrate. Workbenches are reached through their own Ingress, gated by `GET /api/v1/workbench/authorize`.
@@ -213,7 +222,7 @@ HTTP semantics. All are `application/problem+json`.
 
 ### Tests
 
-- About 110 new tests (api-server 53, cluster-manager 43, commons 5, message bridge 3, worker starter 3, orchestration 2): ownership and 404s for every endpoint, hostile-input cases for node output, visibility queries, workbench templates, credentials and the KNIME launcher, a Temporal test-environment test for the cancel-right-after-start race, and the first tests of the message bridge.
+- About 110 new tests (api-server 53, cluster-manager 43, commons 5, message bridge 3, worker starter 3, orchestration 2): ownership and 404s for every endpoint, hostile-input cases for node output, workbench templates, credentials and the KNIME launcher, a Temporal test-environment test for the cancel-right-after-start race, and the first tests of the message bridge.
 
 ## Upgrade notes
 

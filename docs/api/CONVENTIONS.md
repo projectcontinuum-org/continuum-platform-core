@@ -109,7 +109,7 @@ continuum.core.api-docs:
 
 - Never expose JPA entities, `Map<String, Any>` or protobuf types directly when a typed DTO is feasible.
 - Every schema name is unique and meaningful: nested classes get `@Schema(name = "...")`
-  (`CountWorkflowResponse.Group` → `WorkflowCountGroup`, never a bare `Group`, `Problem`, `Execution`).
+  (`WorkflowRunDataResponse` → `WorkflowRunData`, never a bare `Data`, `Group`, `Problem` or `Execution`).
 - Every DTO field has `@Schema(description, example)`; say the unit (`ms`, `percent 0-100`), format (`uuid`, `date-time`,
   `byte` for base64), enum meaning, and when it is null.
 - Status fields are documented enums matching the Kotlin and Temporal values.

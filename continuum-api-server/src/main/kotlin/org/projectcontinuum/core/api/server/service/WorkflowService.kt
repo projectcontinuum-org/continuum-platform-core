@@ -2,30 +2,17 @@ package org.projectcontinuum.core.api.server.service
 
 import org.projectcontinuum.core.api.server.exception.WorkflowValidationException
 import org.projectcontinuum.core.api.server.model.StartWorkflowResponse
-import org.projectcontinuum.core.api.server.model.WorkflowStatus
 import org.projectcontinuum.core.api.server.model.WorkflowValidationResponse
 import org.projectcontinuum.core.api.server.repository.jpa.WorkflowRunRepository
 import org.projectcontinuum.core.api.server.entity.jpa.WorkflowRunEntity
-import org.projectcontinuum.core.api.server.utils.TemporalVisibilityQuery
-import org.projectcontinuum.core.api.server.utils.TreeHelper
 import org.projectcontinuum.core.commons.constant.TaskQueues
 import org.projectcontinuum.core.commons.model.ContinuumWorkflowModel
 import org.projectcontinuum.core.commons.model.ExecutionStatus
-import org.projectcontinuum.core.commons.model.PortData
 import org.projectcontinuum.core.commons.validation.WorkflowIssue
 import org.projectcontinuum.core.commons.validation.WorkflowValidationResult
 import org.projectcontinuum.core.commons.workflow.IContinuumWorkflow
-import tools.jackson.core.type.TypeReference
-import tools.jackson.databind.ObjectMapper
-import com.google.protobuf.ByteString
-import io.temporal.api.common.v1.Payload
 import io.temporal.api.common.v1.WorkflowExecution
-import io.temporal.api.enums.v1.EventType
-import io.temporal.api.workflowservice.v1.CountWorkflowExecutionsRequest
-import io.temporal.api.workflowservice.v1.CountWorkflowExecutionsResponse
-import io.temporal.api.workflowservice.v1.ListWorkflowExecutionsRequest
 import io.temporal.client.WorkflowClient
-import io.temporal.client.WorkflowException
 import io.temporal.client.WorkflowNotFoundException
 import io.temporal.client.WorkflowOptions
 import io.temporal.client.WorkflowStub
@@ -36,7 +23,6 @@ import org.slf4j.LoggerFactory
 import org.springframework.scheduling.annotation.EnableScheduling
 import org.springframework.stereotype.Service
 import java.net.URI
-import java.time.Instant
 import java.util.Timer
 import java.util.TimerTask
 import java.util.UUID
@@ -46,7 +32,6 @@ import java.util.UUID
 class WorkflowService(
   val workflowClient: WorkflowClient,
   val workflowRunRepository: WorkflowRunRepository,
-  val objectMapper: ObjectMapper,
   nodeExplorerService: NodeExplorerService
 ) {
 
@@ -56,9 +41,6 @@ class WorkflowService(
     private val LOGGER = LoggerFactory.getLogger(WorkflowService::class.java)
 
     private const val STOP_SIGNAL_GRACE_PERIOD_MS = 5000L
-
-    /** Max workflow ids per `WorkflowId IN (...)` owner filter, to keep each visibility query a sane size. */
-    private const val OWNER_FILTER_CHUNK_SIZE = 500
     private val stopScheduler = Timer("workflow-stop-scheduler", true)
   }
 
@@ -233,248 +215,5 @@ class WorkflowService(
         }
       }
     }, STOP_SIGNAL_GRACE_PERIOD_MS)
-  }
-
-  /** Running workflow executions owned by [ownedBy]; scoped with the same owner filter as [listAllWorkflow]. */
-  fun getActiveWorkflows(ownedBy: String): List<WorkflowStatus> {
-    val running = "WorkflowType='${IContinuumWorkflow::class.java.simpleName}' && ExecutionStatus='WORKFLOW_EXECUTION_STATUS_RUNNING'"
-    return ownerFilters(ownedBy).flatMap { ownerFilter ->
-      listExecutions(TemporalVisibilityQuery.scope(ownerFilter, running))
-    }
-  }
-
-  /**
-   * Server-side owner filters for the caller: one `WorkflowId IN (...)` clause per chunk of the caller's run ids
-   * (from `workflow_runs.owned_by`; Temporal has no owner search attribute). Empty when the caller owns no runs.
-   */
-  private fun ownerFilters(ownedBy: String): List<String> =
-    workflowRunRepository.findWorkflowIdsByOwnedBy(ownedBy)
-      .distinct()
-      .chunked(OWNER_FILTER_CHUNK_SIZE)
-      .map { TemporalVisibilityQuery.workflowIdIn(it) }
-
-  /**
-   * Lists the caller's workflow executions. [query] is an optional client-supplied Temporal visibility filter;
-   * it is validated and AND-combined with the caller's owner filter, so it can only narrow the result.
-   */
-  fun listAllWorkflow(
-    ownedBy: String,
-    query: String = ""
-  ): List<WorkflowStatus> {
-    // Validate up front so a hostile query is rejected even when the caller owns no runs.
-    TemporalVisibilityQuery.checkClientQuery(query)
-    return ownerFilters(ownedBy).flatMap { ownerFilter ->
-      listExecutions(TemporalVisibilityQuery.scope(ownerFilter, query))
-    }
-  }
-
-  private fun listExecutions(
-    scopedQuery: String,
-    nextToken: ByteString? = null
-  ): List<WorkflowStatus> {
-    val requestBuilder = ListWorkflowExecutionsRequest.newBuilder()
-      .setNamespace(workflowClient.options.namespace)
-      .setQuery(scopedQuery)
-    nextToken?.let { requestBuilder.setNextPageToken(it) }
-    val listResponse = workflowClient.workflowServiceStubs.blockingStub()
-      .listWorkflowExecutions(requestBuilder.build())
-    val workflowsList = listResponse.executionsList.map {
-      WorkflowStatus(
-        it.execution.workflowId,
-        it.type.name,
-        it.status,
-        it.searchAttributes.indexedFieldsMap
-          .filterKeys { key -> !key.equals("BuildIds") }
-          .mapValues { value -> value.value.data.toStringUtf8() }
-      )
-    }
-    val workflowMutableList = workflowsList.toMutableList()
-    if (listResponse.nextPageToken.size() > 0) {
-      val otherList = listExecutions(scopedQuery, listResponse.nextPageToken)
-      workflowMutableList.addAll(otherList)
-    }
-    return workflowMutableList
-  }
-
-  /**
-   * Counts the caller's workflow executions; [query] is scoped exactly like in [listAllWorkflow]. A trailing
-   * `GROUP BY ExecutionStatus` is supported. Results from each owner-filter chunk are summed.
-   */
-  fun countWorkflow(
-    ownedBy: String,
-    query: String
-  ): CountWorkflowExecutionsResponse {
-    TemporalVisibilityQuery.checkClientQuery(query, allowGroupByExecutionStatus = true)
-    var total = 0L
-    val groups = LinkedHashMap<List<Payload>, Long>()
-    ownerFilters(ownedBy).forEach { ownerFilter ->
-      val response = workflowClient.workflowServiceStubs.blockingStub()
-        .countWorkflowExecutions(
-          CountWorkflowExecutionsRequest.newBuilder()
-            .setNamespace(workflowClient.options.namespace)
-            .setQuery(TemporalVisibilityQuery.scope(ownerFilter, query, allowGroupByExecutionStatus = true))
-            .build()
-        )
-      total += response.count
-      response.groupsList.forEach { group ->
-        groups.merge(group.groupValuesList, group.count, Long::plus)
-      }
-    }
-    return CountWorkflowExecutionsResponse.newBuilder()
-      .setCount(total)
-      .addAllGroups(groups.map { (values, count) ->
-        CountWorkflowExecutionsResponse.AggregationGroup.newBuilder()
-          .addAllGroupValues(values)
-          .setCount(count)
-          .build()
-      })
-      .build()
-  }
-
-  fun getWorkflowStatusById(
-    ownedBy: String,
-    workflowId: String
-  ): WorkflowStatus {
-    if (!workflowRunRepository.existsByWorkflowIdAndOwnedBy(workflowId, ownedBy)) {
-      throw WorkflowNotFoundException(WorkflowExecution.newBuilder().setWorkflowId(workflowId).build(), null, null)
-    }
-    val query = "WorkflowType = ${TemporalVisibilityQuery.quote(IContinuumWorkflow::class.java.simpleName)}" +
-      " AND WorkflowId = ${TemporalVisibilityQuery.quote(workflowId)}"
-    val result = workflowClient.workflowServiceStubs.blockingStub()
-      .listWorkflowExecutions(
-        ListWorkflowExecutionsRequest.newBuilder()
-          .setNamespace(workflowClient.options.namespace)
-          .setQuery(query)
-          .build()
-      ).executionsList.map { execution ->
-        WorkflowStatus(
-          execution.execution.workflowId,
-          execution.type.name,
-          execution.status,
-          execution.searchAttributes.indexedFieldsMap
-            .filterKeys { !it.equals("BuildIds") }
-            .mapValues { it.value.data.toStringUtf8() }
-        )
-      }
-    // Owned, but Temporal no longer has the execution (its retention expired): not found, like an unknown id.
-    return result.firstOrNull()
-      ?: throw WorkflowNotFoundException(WorkflowExecution.newBuilder().setWorkflowId(workflowId).build(), null, null)
-  }
-
-  fun getWorkflowTree(
-    ownedBy: String,
-    baseDir: String,
-    query: String = ""
-  ): List<TreeHelper.TreeItem<TreeHelper.Execution>> {
-    val treeRoots = loadWorkflowTree(ownedBy, baseDir, query)
-    TreeHelper.Companion.sortTree(treeRoots) { first, second ->
-      if (first.itemInfo == null || second.itemInfo == null) {
-        // compare names if itemInfo is null
-        first.name.compareTo(second.name)
-      } else {
-        first.itemInfo.createdAtTimestampUtc.compareTo(second.itemInfo.createdAtTimestampUtc) * -1
-      }
-    }
-    return treeRoots
-  }
-
-  private fun loadWorkflowTree(
-    ownedBy: String,
-    baseDir: String,
-    query: String
-  ): MutableList<TreeHelper.TreeItem<TreeHelper.Execution>> {
-    val treeRoots = mutableListOf<TreeHelper.TreeItem<TreeHelper.Execution>>()
-    LOGGER.info("Refreshing Workflow tree...")
-    listAllWorkflow(ownedBy, query).forEach {
-      val categoryPath = it.metadata[IContinuumWorkflow.WORKFLOW_FILE_PATH.name]
-        ?.replace("\"", "")
-        ?.replace(baseDir, "")
-        ?.split("/")
-        ?.drop(1)
-        ?.toMutableList() ?: mutableListOf()
-      val history = workflowClient.fetchHistory(it.workflowId)
-      val startEvent = history.events
-        .firstOrNull { evt -> evt.eventType == EventType.EVENT_TYPE_WORKFLOW_TASK_SCHEDULED }
-      val lastEvent = history.lastEvent
-      val workflowInputString =
-        history.events[0].workflowExecutionStartedEventAttributes.input.payloadsList[0].data.toStringUtf8()
-      val workflowInput = objectMapper.readValue(workflowInputString, ContinuumWorkflowModel::class.java)
-      var workflowOutput: Map<String, Map<String, PortData>>?
-      if (lastEvent.eventType == EventType.EVENT_TYPE_WORKFLOW_EXECUTION_COMPLETED) {
-        val workflowOutputString =
-          lastEvent.workflowExecutionCompletedEventAttributes.result.payloadsList[0].data.toStringUtf8()
-        workflowOutput =
-          objectMapper.readValue(workflowOutputString, object : TypeReference<Map<String, Map<String, PortData>>>() {})
-      } else {
-        try {
-          // Project the workflow events into output
-          LOGGER.debug("Querying workflowId: ${it.workflowId} for output...")
-          // Build a set of scheduled event IDs for IContinuumNodeActivity ("Run") activities
-          val nodeActivityScheduledEventIds = history.events
-            .filter { evt ->
-              evt.eventType == EventType.EVENT_TYPE_ACTIVITY_TASK_SCHEDULED &&
-                evt.activityTaskScheduledEventAttributes.activityType.name == "Run"     // Corresponds to IContinuumNodeActivity.run() method call
-            }
-            .map { evt -> evt.eventId }
-            .toSet()
-          workflowOutput =
-            history.events.filter { evt ->
-              evt.eventType == EventType.EVENT_TYPE_ACTIVITY_TASK_COMPLETED &&
-                nodeActivityScheduledEventIds.contains(evt.activityTaskCompletedEventAttributes.scheduledEventId)
-            }
-              .associate { evt ->
-                val outputStr = evt.activityTaskCompletedEventAttributes.result.payloadsList[0].data.toStringUtf8()
-                val nodeOutput = objectMapper.readValue(outputStr, object : TypeReference<Map<String, Any>>() {})
-                // Make sure the nodeOutput contains nodeId and outputs
-                if (!nodeOutput.containsKey("nodeId") || !nodeOutput.containsKey("outputs")) {
-                  LOGGER.warn("Skipping eventId: {} as it does not contain nodeId or outputs! Event attributes: {}", evt.eventId, evt.activityTaskCompletedEventAttributes)
-                  return@associate "" to emptyMap()
-                }
-                val nodeId = nodeOutput["nodeId"] as String
-                val output = objectMapper.readValue(
-                  objectMapper.writeValueAsString(nodeOutput["outputs"]),
-                  object : TypeReference<Map<String, PortData>>() {}
-                )
-                LOGGER.debug("NodeId: {}, output: {}", nodeId, output)
-                nodeId to output
-              }.filter { entry -> entry.value.isNotEmpty() }
-          LOGGER.debug(
-            "Querying workflowId: {} for output... {} outputs found!",
-            it.workflowId,
-            workflowOutput
-          )
-
-//                    workflowOutput = workflowClient.newWorkflowStub(
-//                        IContinuumWorkflow::class.java,
-//                        it.workflowId
-//                    ).getWorkflowSnapshot().nodeToOutputsMap
-        } catch (e: WorkflowException) {
-          workflowOutput = mapOf()
-          LOGGER.error("Error querying workflowId: ${it.workflowId}!")
-        }
-      }
-      // Get the start and end time of the workflow id
-      TreeHelper.Companion.addItemToParent(
-        treeRoots = treeRoots,
-        execution = TreeHelper.Execution(
-          id = it.workflowId,
-          status = ExecutionStatus.fromHistoryEvents(history.events),
-          workflow_snapshot = workflowInput,
-          nodeToOutputsMap = workflowOutput,
-          workflowId = it.workflowId,
-          createdAtTimestampUtc = Instant.ofEpochSecond(
-            startEvent?.eventTime?.seconds ?: 0,
-            (startEvent?.eventTime?.nanos ?: 0).toLong()
-          ).toEpochMilli(),
-          updatesAtTimestampUtc = Instant.ofEpochSecond(
-            lastEvent?.eventTime?.seconds ?: 0,
-            (lastEvent?.eventTime?.nanos ?: 0).toLong()
-          ).toEpochMilli()
-        ),
-        categoryPath = categoryPath,
-        maxChildren = 100
-      )
-    }
-    return treeRoots
   }
 }

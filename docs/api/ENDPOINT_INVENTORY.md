@@ -33,10 +33,6 @@ Conventions for the spec itself are in [CONVENTIONS.md](CONVENTIONS.md).
 - **Node status** (`ContinuumWorkflowModel.NodeStatus`): ACTIVE, CONFIGURED, SCHEDULED, BUSY, SUCCESS, FAILED,
   CANCELLED, WARNING, PRE_PROCESSING, POST_PROCESSING, SKIPPED. **Edge status**: DELIVERED, BROKEN (null = source not
   finished). **Port data status**: SUCCESS, FAILED, WARNING.
-- **Temporal status** (`WorkflowStatus.temporalStatus`): `WORKFLOW_EXECUTION_STATUS_{UNSPECIFIED,RUNNING,COMPLETED,
-  FAILED,CANCELED,TERMINATED,CONTINUED_AS_NEW,TIMED_OUT}`.
-- **Tree execution status** (`ExecutionStatus`, `/workflow/tree`): the last `EVENT_TYPE_WORKFLOW_EXECUTION_*` history
-  event mapped to `WORKFLOW_EXECUTION_*`, or `UNKNOWN`.
 - **Node outputs.** A node's outputs are `Map<portId, PortData>`. A produced port is
   `{status: SUCCESS, contentType: "application/parquet", tableSpec: [{name, contentType}...], data: "{remote}<runId>/<nodeId>/output.<port>.parquet"}`.
   A non-retriable node failure is the port `$error`: `{status: FAILED, contentType: "text/plain", tableSpec: [], data: "<message>"}`.
@@ -85,20 +81,13 @@ is not part of the OpenAPI spec.
   200 with `valid: false`.
 - **400** malformed body only. **Idempotent**, no side effects.
 
-### GET /api/v1/workflow/active — list running workflow ids
+### Removed in platform 0.0.23 (no caller left in the workbench or the platform)
 
-- **Callers.** Workbench `getActiveWorkflows` (no current caller found), system tests.
-- **Identity.** User-scoped (owner filter `WorkflowId IN (...)`, chunks of 500).
-- **200** `string[]` of workflow ids whose Temporal status is RUNNING. Empty when the caller owns no runs (Temporal not
-  queried). Read-only.
-
-### GET /api/v1/workflow/{workflowId}/status — Temporal status of one run
-
-- **Callers.** System tests (`temporalStatus`, `metadata` key ending in `WorkflowFileName`). Not the workbench.
-- **Identity.** User-scoped. **404** (empty body before this change) for unknown or unowned ids, before any Temporal call.
-- **200** `WorkflowStatus {workflowId, type, temporalStatus, metadata}`. `metadata` = Temporal search attributes
-  except `BuildIds`, values are the raw payload JSON as strings (e.g. `"\"examples/demo.cwf\""`, `"2"`).
-- **404** also when the run is recorded but Temporal no longer has its execution (retention expired).
+`GET /api/v1/workflow/active`, `/workflow/{workflowId}/status`, `/workflow/list`, `/workflow/count`, `/workflow/tree`,
+`GET /api/v1/workflow-runs/count`, `GET /api/v1/workflow/schedule/filter` and
+`GET /api/v1/node-explorer/nodes/documentation?nodeId=`. Run state comes from `GET /api/v1/workflow-runs` and
+`/workflow-runs/{workflowId}`; schedules from `GET /api/v1/workflow/schedule` (optionally `?name=`) and
+`/workflow/schedule/{scheduleId}`; node docs from the path form above.
 
 ### POST /api/v1/workflow/{workflowId}/cancel and /terminate — stop a run
 
@@ -111,33 +100,6 @@ is not part of the OpenAPI spec.
 - **Idempotency.** Repeating on a running workflow re-signals; on a finished one it is a 404. Final run status
   `CANCELLED` / `TERMINATED` arrives over MQTT and in `workflow_runs`.
 - **TODO:** a failure of the delayed hard stop is only logged; the caller already got 204.
-
-### GET /api/v1/workflow/list — list the caller's executions from Temporal
-
-- **Callers.** System tests only.
-- **Query.** `query` optional Temporal visibility filter, AND-combined with the owner filter; rejected (400) when it has
-  unbalanced parentheses, unterminated quotes, `;`, `--`, `/*`, `#`, a backslash or control characters.
-- **200** `WorkflowStatus[]` (all pages). **400** hostile query, or a query Temporal rejects (gRPC
-  `INVALID_ARGUMENT`, e.g. an unknown search attribute; `detail` carries Temporal's reason). Other Temporal failures
-  stay 500. The same applies to `/count` and `/tree`.
-
-### GET /api/v1/workflow/count — count the caller's executions
-
-- **Callers.** System tests; workbench `WorkflowTreeService` (dead code).
-- **Query.** `query` as above; a trailing `GROUP BY ExecutionStatus` is allowed.
-- **200** `CountWorkflowResponse {count, groups[{name, count}]}`; `groups` only with GROUP BY, `name` is the raw group
-  value (e.g. `"\"Running\""`). Counts are summed over owner-filter chunks. **TODO:** `name` keeps the JSON quotes of
-  the Temporal payload; probably unintended.
-
-### GET /api/v1/workflow/tree — executions grouped by workflow file path
-
-- **Callers.** System tests; workbench `WorkflowTreeService` (dead code).
-- **Query.** `baseDir` required (400 when missing); `query` optional as above.
-- **200** `TreeItem[]`: categories (folders of the `Continuum:WorkflowFileName` path after removing `baseDir`) with
-  `children`, leaves with `itemInfo` = `Execution {id, workflowId, status, workflow_snapshot, nodeToOutputsMap,
-  createdAtTimestampUtc, updatesAtTimestampUtc}` (epoch ms). Newest first; at most 100 per folder.
-- **Side effects.** Fetches the full Temporal history of every listed run: expensive. Read-only.
-- **Legacy.** `workflow_snapshot` is snake_case; no HTTP client reads it. Kept, documented as deprecated.
 
 ### GET /api/v1/workflow-runs — page of run summaries from the database
 
@@ -168,12 +130,6 @@ is not part of the OpenAPI spec.
 - **200** page of distinct `workflowUri` strings, sorted. With a filter the distinct set is computed in memory over all
   matching rows. **400** for a malformed filter (as above).
 
-### GET /api/v1/workflow-runs/count — count the caller's runs
-
-- **Callers.** System tests.
-- **Query.** `filter` RSQL optional.
-- **200** `{count: <long>}`. **400** for a malformed filter (as above).
-
 ### POST /api/v1/workflow/schedule — create a cron schedule
 
 - **Callers.** Workbench schedule dialog (response not read), KNIME scheduler (deserializes the full response), system tests.
@@ -200,11 +156,6 @@ is not part of the OpenAPI spec.
 - **200** `WorkflowScheduleResponse[]`; each entry calls Temporal `describe()` for `paused` and `nextRunTimes`.
   **500** a schedule row whose Temporal schedule is missing, or Temporal failing.
   **TODO:** one stale row fails the whole list; skipping or reporting it per entry is a product decision.
-
-### GET /api/v1/workflow/schedule/filter — list schedules by RSQL
-
-- **Query.** `filter` RSQL over `WorkflowScheduleEntity` fields (`name`, `cronExpression`, `timeZone`, `createdAt`,
-  `updatedAt`, `scheduleId`). **200** as list. **400** for a malformed filter (as above).
 
 ### GET /api/v1/workflow/schedule/{scheduleId} — get one schedule
 
@@ -260,10 +211,11 @@ and any other Temporal failure to 500. A delete that fails in Temporal keeps the
 - **200** tree of matches with their category ancestors (`children` filled). Not user-scoped.
 - **TODO:** `%` and `_` in `query` act as SQL LIKE wildcards (bound parameter, so no injection).
 
-### GET /api/v1/node-explorer/nodes/{nodeId}/documentation and GET /nodes/documentation?nodeId= — node docs
+### GET /api/v1/node-explorer/nodes/{nodeId}/documentation — node docs
 
+- **Callers.** Workbench `NodeExplorerService` (node docs tab), system tests.
 - **200** `text/markdown` documentation registered by the worker. **404** unknown node or no documentation (empty
-  body before). The query variant exists for node ids a proxy might mangle in a path. Not user-scoped. Cached 30 s.
+  body before). Not user-scoped. Cached 30 s.
 
 ### POST /api/v1/node-explorer/nodes/task-queues — resolve node ids to worker task queues
 

@@ -23,8 +23,6 @@ import org.projectcontinuum.core.commons.constant.TaskQueues
 import org.projectcontinuum.core.commons.context.ContinuumOwnerContext
 import org.projectcontinuum.core.commons.context.ContinuumScheduleContext
 import org.projectcontinuum.core.commons.workflow.IContinuumWorkflow
-import io.github.perplexhub.rsql.RSQLJPASupport
-import org.springframework.data.jpa.domain.Specification
 import org.springframework.stereotype.Service
 import java.util.UUID
 
@@ -116,20 +114,6 @@ class WorkflowScheduleService(
     val entities = if (name != null) workflowScheduleRepository.findByOwnedByAndName(ownedBy, name)
                    else workflowScheduleRepository.findByOwnedBy(ownedBy)
     return entities.map { entity ->
-      toResponse(entity, scheduleClient.getHandle(entity.scheduleId.toString()).describe())
-    }
-  }
-
-  fun listSchedulesByRsql(ownedBy: String, rsqlFilter: String?): List<WorkflowScheduleResponse> {
-    var spec: Specification<WorkflowScheduleEntity> = Specification.where { root, _, cb ->
-      cb.equal(root.get<String>("ownedBy"), ownedBy)
-    }
-
-    if (!rsqlFilter.isNullOrBlank()) {
-      spec = spec.and(RSQLJPASupport.toSpecification(rsqlFilter))
-    }
-
-    return workflowScheduleRepository.findAll(spec).map { entity ->
       toResponse(entity, scheduleClient.getHandle(entity.scheduleId.toString()).describe())
     }
   }

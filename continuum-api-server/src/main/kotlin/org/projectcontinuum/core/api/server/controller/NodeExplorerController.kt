@@ -112,32 +112,6 @@ re-registered node's documentation can lag that long. $NOT_USER_SCOPED Read-only
             ?: throw ResourceNotFoundException("No documentation for this node")
     }
 
-    @GetMapping("/nodes/documentation", produces = [MediaType.TEXT_MARKDOWN_VALUE])
-    @Operation(
-        operationId = "getNodeDocumentationByQuery",
-        summary = "Get a node's documentation (node id as a query parameter)",
-        description = """
-Same as `GET /api/v1/node-explorer/nodes/{nodeId}/documentation`, for node ids that a proxy might alter in a path.
-$NOT_USER_SCOPED Read-only."""
-    )
-    @ApiResponse(
-        responseCode = "200",
-        description = "The documentation.",
-        content = [Content(mediaType = MediaType.TEXT_MARKDOWN_VALUE, schema = Schema(type = "string"), examples = [ExampleObject(value = DOCUMENTATION_EXAMPLE)])]
-    )
-    @ApiResponse(
-        responseCode = "404",
-        description = "The node is not registered, or has no documentation.",
-        content = [Content(mediaType = OpenApiConfig.PROBLEM_JSON, schema = Schema(ref = OpenApiConfig.PROBLEM_DETAIL_SCHEMA), examples = [ExampleObject(value = DOCUMENTATION_NOT_FOUND)])]
-    )
-    fun getDocumentationByParam(
-        @Parameter(description = "Node id (fully qualified class name of the node model).", example = ApiExamples.TEXT_NORMALIZER_NODE, required = true)
-        @RequestParam nodeId: String
-    ): String {
-        return nodeExplorerService.getDocumentation(nodeId)
-            ?: throw ResourceNotFoundException("No documentation for this node")
-    }
-
     @PostMapping("/nodes/task-queues", consumes = ["application/json"])
     @Operation(
         operationId = "resolveNodeTaskQueues",
