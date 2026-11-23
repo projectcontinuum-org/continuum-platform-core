@@ -3,7 +3,6 @@ package org.projectcontinuum.core.api.server.controller
 import io.temporal.api.common.v1.WorkflowExecution
 import io.temporal.client.WorkflowNotFoundException
 import org.junit.jupiter.api.Test
-import org.mockito.kotlin.any
 import org.mockito.kotlin.eq
 import org.mockito.kotlin.isNull
 import org.mockito.kotlin.verify
@@ -13,9 +12,7 @@ import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest
 import org.springframework.test.context.bean.override.mockito.MockitoBean
 import org.springframework.test.web.servlet.MockMvc
-import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post
-import org.springframework.test.web.servlet.result.MockMvcResultMatchers.content
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.status
 
 @WebMvcTest(WorkflowController::class)
@@ -69,16 +66,5 @@ class WorkflowControllerOwnershipTest {
 
     verify(workflowService).cancelWorkflow(eq("anonymous"), eq("run-1"), isNull())
     verify(workflowService).terminateWorkflow(eq("anonymous"), eq("run-1"), isNull())
-  }
-
-  @Test
-  fun `active workflows are requested for the calling owner only`() {
-    whenever(workflowService.getActiveWorkflows(any())).thenReturn(emptyList())
-
-    mockMvc.perform(get("/api/v1/workflow/active").header("x-continuum-user-id", "alice"))
-      .andExpect(status().isOk)
-      .andExpect(content().json("[]"))
-
-    verify(workflowService).getActiveWorkflows(eq("alice"))
   }
 }

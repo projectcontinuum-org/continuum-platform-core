@@ -89,37 +89,6 @@ exact `name`. Read-only."""
     @RequestParam(required = false) name: String?
   ): List<WorkflowScheduleResponse> = workflowScheduleService.listSchedules(ownedBy, name)
 
-  @GetMapping("/filter")
-  @Operation(
-    operationId = "filterWorkflowSchedules",
-    summary = "List the caller's schedules matching an RSQL filter",
-    description = """
-Lists the caller's schedules that match an RSQL filter over `name`, `cronExpression`, `timeZone`, `scheduleId`,
-`createdAt` and `updatedAt` (e.g. `name=like=*nightly*`). Always narrowed to the caller's own schedules. Read-only."""
-  )
-  @ApiResponse(
-    responseCode = "200",
-    description = "The matching schedules.",
-    content = [Content(mediaType = "application/json", array = ArraySchema(schema = Schema(implementation = WorkflowScheduleResponse::class)))]
-  )
-  @ApiResponse(
-    responseCode = "400",
-    description = "The `filter` is not valid RSQL, names a field that cannot be filtered on, or has a value of the wrong type.",
-    content = [
-      Content(
-        mediaType = OpenApiConfig.PROBLEM_JSON,
-        schema = Schema(ref = OpenApiConfig.PROBLEM_DETAIL_SCHEMA),
-        examples = [ExampleObject(value = """{"type":"about:blank","title":"Invalid filter","status":400,"detail":"Invalid filter: it names a field that cannot be filtered on","instance":"/api/v1/workflow/schedule/filter"}""")]
-      )
-    ]
-  )
-  fun listSchedulesByRsql(
-    @Parameter(hidden = true)
-    @RequestHeader("x-continuum-user-id", required = false, defaultValue = "anonymous") ownedBy: String,
-    @Parameter(description = "RSQL filter; omit for all of the caller's schedules.", example = "name=like=*nightly*")
-    @RequestParam(required = false) filter: String?
-  ): List<WorkflowScheduleResponse> = workflowScheduleService.listSchedulesByRsql(ownedBy, filter)
-
   @GetMapping("/{scheduleId}")
   @Operation(
     operationId = "getWorkflowSchedule",

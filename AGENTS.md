@@ -80,6 +80,9 @@ When the user requests a durable behavior change, record it here or in the relev
 
 - Kotlin must read descriptively. Use named parameters at call sites (constructors, data classes, functions with 2+ arguments), in tests too, and prefer descriptive names and explanatory locals over dense one-liners
 - Every API change ships with a consistent OpenAPI spec, in the same change: an agent never adds or modifies an HTTP endpoint, request/response model or status code without updating its annotations, the endpoint inventory and the committed spec as described in "API Documentation Contract" below
+- Every API change keeps `docs/api/ENDPOINT_INVENTORY.md` and `docs/api/CONVENTIONS.md` in sync with the code, in the same change: the inventory always matches what the endpoints do today, and CONVENTIONS.md always matches how the specs are built today (steps 1 and 2 of "Rule for AI agents" below). Never leave either describing a removed endpoint, class, schema or rule
+- Every change updates the release notes in the same change: add it to `release_notes/RELEASE_NOTES_v<platformVersion>.md`, where `<platformVersion>` is the current value in `gradle.properties` (the version being prepared). Never edit the file of a version that has already been released (a `release/<version>` tag exists); if the current version is already released, bump `platformVersion` or ask first. Put it under the matching module section in "Details", add a line to "Highlights" or "Upgrade notes" when it is client-visible or breaking, and correct any existing line the change makes untrue. Report the task as not done while the release notes are stale
+- Every change to a module updates the README.md that documents it, in the same change: the module's own README.md if it has one, otherwise the repository root README.md. Keep what a reader runs or relies on true: module lists and tables, setup and run commands, ports, configuration and environment variables, endpoints, node lists, versions and badges, and project-structure trees. Remove what the change deleted, add what it introduced, and correct anything it made untrue. If no README section is affected, say so in the report instead of skipping the check. Report the task as not done while a README is stale
 
 ## API Documentation Contract
 
@@ -90,7 +93,9 @@ Every Spring Boot service with `@RestController` endpoints follows [docs/api/CON
 Applies to any change that adds, removes or modifies an endpoint (path, method, parameter, header, request body, response body, status code, error body), a request/response model or one of its fields, a validation rule a client can hit, or a shared commons model that appears in a payload. Do all of the following in the same change, before reporting the task as done:
 
 1. **Inventory first.** Add or update the endpoint's section in [docs/api/ENDPOINT_INVENTORY.md](docs/api/ENDPOINT_INVENTORY.md) from the code (callers, identity, params with constraints, every success and error status with its body, side effects, idempotency). Unknown intent is a `TODO:` there, never a guess in the spec.
-2. **Annotate** to [docs/api/CONVENTIONS.md](docs/api/CONVENTIONS.md):
+   - A removed endpoint loses its section and is listed under "Removed in platform <version>" with its replacement.
+   - Keep the rest of the file true: the cross-cutting facts at the top, the **Callers** lines of other endpoints (a caller that moves to another endpoint changes both sections) and any section that names a renamed or deleted class, field, schema or error text.
+2. **Keep [docs/api/CONVENTIONS.md](docs/api/CONVENTIONS.md) current, then annotate to it.** When a change alters how the specs are built (a new or changed `OpenApiConfig` element, group, security scheme, shared schema or example, `OperationCustomizer`, schema-naming rule, configuration property, drift test or CI step), update the matching CONVENTIONS.md section in the same change. When it deletes or renames something CONVENTIONS.md uses as an example (a class, schema or endpoint), replace the example with one that exists. Then annotate:
    - `@Tag` on the controller.
    - `@Operation` with a new, unique lowerCamelCase `operationId` (never rename an existing one without a release note), a summary under 80 characters and a description with side effects.
    - `@Parameter` with a description and an example; identity headers stay `@Parameter(hidden = true)` with `@SecurityRequirement` on user-scoped operations.
@@ -98,12 +103,12 @@ Applies to any change that adds, removes or modifies an endpoint (path, method, 
    - `@ApiResponse` for every real status, including 201/204/404/409 and errors as `ProblemDetail` with an example.
    - `@Schema(description, example)` on every new or changed field. Fields with Kotlin defaults get `requiredMode = NOT_REQUIRED`. Nested types get a unique `@Schema(name)`. Enums and string statuses list their values.
    - Internal endpoints go in the `internal` group only.
-3. **Regenerate and review** the committed spec: `./gradlew :<module>:test --tests '*OpenApiSpecTest*' -PupdateOpenApiSpec`, then read the diff of `docs/api/<module>.openapi.yaml` and check that it shows exactly the intended change. A changed commons model can change several specs; regenerate every affected module.
+3. **Regenerate and review** the committed spec: `./gradlew :<module>:generateOpenApiSpec` (`./gradlew build` and `check` run it for you, in api-server, cluster-manager and credentials-server), then read the diff of `docs/api/<module>.openapi.yaml` and check that it shows exactly the intended change. A changed commons model can change several specs; regenerate every affected module.
 4. **Verify:** `./gradlew :<module>:test` passes (including `OpenApiSpecTest`), and `npx --yes @redocly/cli@2 lint docs/api/*.openapi.yaml --config redocly.yaml` reports no errors and no warnings. Fix findings in the annotations, never by editing the YAML by hand.
 5. **Record client-visible changes** (status codes, error bodies, renamed or removed fields, operationIds, schema names) in `release_notes/RELEASE_NOTES_v<platformVersion>.md`, and update `continuum-system-tests` checks that assert them.
 6. **A new service** with `@RestController` endpoints gets the full setup from CONVENTIONS.md: an `OpenApiConfig`, the docs flag in `application.yml`, an `OpenApiSpecTest`, a committed spec, and an entry in `.github/workflows/openapi-spec-check.yml`.
 
-If any step cannot be done (for example the lint cannot run), say so in the report and do not claim the API change is complete.
+If any step cannot be done (for example the lint cannot run), say so in the report and do not claim the API change is complete. Before reporting, search `docs/api/ENDPOINT_INVENTORY.md` and `docs/api/CONVENTIONS.md` for every path, operationId, class and schema name the change added, removed or renamed, and fix each stale mention.
 
 ### Reference
 - Errors are RFC 9457 `ProblemDetail` (`application/problem+json`). Identity headers are documented as security schemes, never as parameters. Internal endpoints (operator, ForwardAuth) belong to the `internal` spec group only.
@@ -294,7 +299,7 @@ Container images build with Jib (no Docker daemon) and push to **Docker Hub** at
 
 CI runs `.github/workflows/generic-module-builder.yml`, triggered manually via `.github/workflows/build-module.yml` (tick one or more modules, or "All modules", plus whether to publish to Maven and/or Docker Hub; each ticked module runs as its own matrix leg) and on every published GitHub release via `.github/workflows/on-release.yml` (all libraries and services).
 
-Release notes live in `release_notes/`, one file per version: `RELEASE_NOTES_v<platformVersion>.md` (same layout as `continuum-workbench`). Add changes to the file of the version being prepared; start a new file when `platformVersion` is bumped.
+Release notes live in `release_notes/`, one file per version: `RELEASE_NOTES_v<platformVersion>.md` (same layout as `continuum-workbench`). Every change is recorded in the file of the version being prepared (see "User Preferences"); start a new file when `platformVersion` is bumped.
 
 PRs that touch the documented services, `continuum-commons`, `docs/api/` or the shared build files run `.github/workflows/openapi-spec-check.yml`: the `OpenApiSpecTest` drift tests plus a regenerate-and-`git diff` check of `docs/api/*.openapi.yaml`, and a Redocly lint of the committed specs.
 

@@ -1,12 +1,16 @@
 package org.projectcontinuum.core.commons.model
 
 import io.temporal.api.enums.v1.EventType.*
-import io.temporal.api.history.v1.HistoryEvent
 import io.swagger.v3.oas.annotations.media.Schema
 
+/**
+ * Value of the `Continuum:ExecutionStatus` Temporal search attribute ([value] is the Temporal `EventType` number of the
+ * matching `EVENT_TYPE_WORKFLOW_EXECUTION_*` event). Set by the api-server at start and by `ContinuumWorkflow` as the
+ * run progresses.
+ */
 @Schema(
   name = "ExecutionStatus",
-  description = "The last `EVENT_TYPE_WORKFLOW_EXECUTION_*` event of a run's Temporal history, without the `EVENT_TYPE_` prefix; `UNKNOWN` when none matched."
+  description = "A workflow execution event type without the `EVENT_TYPE_` prefix; `UNKNOWN` before the run started."
 )
 enum class ExecutionStatus(val value: Long) {
   UNKNOWN(EVENT_TYPE_UNSPECIFIED_VALUE.toLong()),
@@ -23,31 +27,5 @@ enum class ExecutionStatus(val value: Long) {
   WORKFLOW_EXECUTION_UPDATE_REJECTED(EVENT_TYPE_WORKFLOW_EXECUTION_UPDATE_REJECTED_VALUE.toLong()),
   WORKFLOW_EXECUTION_UPDATE_COMPLETED(EVENT_TYPE_WORKFLOW_EXECUTION_UPDATE_COMPLETED_VALUE.toLong()),
   WORKFLOW_EXECUTION_UPDATE_ADMITTED(EVENT_TYPE_WORKFLOW_EXECUTION_UPDATE_ADMITTED_VALUE.toLong()),
-  WORKFLOW_EXECUTION_OPTIONS_UPDATED(EVENT_TYPE_WORKFLOW_EXECUTION_OPTIONS_UPDATED_VALUE.toLong());
-
-  companion object {
-    fun fromHistoryEvents(eventHistory: List<HistoryEvent>): ExecutionStatus {
-      val lastWorkflowEvent = eventHistory
-        // Filter all the workflow events
-        .filter { it.eventType.name.startsWith("EVENT_TYPE_WORKFLOW_EXECUTION_") }
-        .maxBy { it.eventTime.seconds + (it.eventTime.nanos * 1e-9) }
-      return when (lastWorkflowEvent.eventType) {
-        EVENT_TYPE_WORKFLOW_EXECUTION_STARTED -> WORKFLOW_EXECUTION_STARTED
-        EVENT_TYPE_WORKFLOW_EXECUTION_COMPLETED -> WORKFLOW_EXECUTION_COMPLETED
-        EVENT_TYPE_WORKFLOW_EXECUTION_FAILED -> WORKFLOW_EXECUTION_FAILED
-        EVENT_TYPE_WORKFLOW_EXECUTION_TIMED_OUT -> WORKFLOW_EXECUTION_TIMED_OUT
-        EVENT_TYPE_WORKFLOW_EXECUTION_CANCEL_REQUESTED -> WORKFLOW_EXECUTION_CANCEL_REQUESTED
-        EVENT_TYPE_WORKFLOW_EXECUTION_CANCELED -> WORKFLOW_EXECUTION_CANCELED
-        EVENT_TYPE_WORKFLOW_EXECUTION_TERMINATED -> WORKFLOW_EXECUTION_TERMINATED
-        EVENT_TYPE_WORKFLOW_EXECUTION_CONTINUED_AS_NEW -> WORKFLOW_EXECUTION_CONTINUED_AS_NEW
-        EVENT_TYPE_WORKFLOW_EXECUTION_SIGNALED -> WORKFLOW_EXECUTION_SIGNALED
-        EVENT_TYPE_WORKFLOW_EXECUTION_UPDATE_ACCEPTED -> WORKFLOW_EXECUTION_UPDATE_ACCEPTED
-        EVENT_TYPE_WORKFLOW_EXECUTION_UPDATE_REJECTED -> WORKFLOW_EXECUTION_UPDATE_REJECTED
-        EVENT_TYPE_WORKFLOW_EXECUTION_UPDATE_COMPLETED -> WORKFLOW_EXECUTION_UPDATE_COMPLETED
-        EVENT_TYPE_WORKFLOW_EXECUTION_UPDATE_ADMITTED -> WORKFLOW_EXECUTION_UPDATE_ADMITTED
-        EVENT_TYPE_WORKFLOW_EXECUTION_OPTIONS_UPDATED -> WORKFLOW_EXECUTION_OPTIONS_UPDATED
-        else -> UNKNOWN
-      }
-    }
-  }
+  WORKFLOW_EXECUTION_OPTIONS_UPDATED(EVENT_TYPE_WORKFLOW_EXECUTION_OPTIONS_UPDATED_VALUE.toLong())
 }

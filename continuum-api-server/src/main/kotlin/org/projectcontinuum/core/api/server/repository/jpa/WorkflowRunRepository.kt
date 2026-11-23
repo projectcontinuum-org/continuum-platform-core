@@ -20,12 +20,6 @@ interface WorkflowRunRepository : JpaRepository<WorkflowRunEntity, String>, JpaS
     )
     fun findDistinctWorkflowUris(@Param("ownedBy") ownedBy: String, pageable: Pageable): Page<String>
 
-    @Query(
-        value = "SELECT w.workflow_id FROM workflow_runs w WHERE w.owned_by = :ownedBy",
-        nativeQuery = true
-    )
-    fun findWorkflowIdsByOwnedBy(@Param("ownedBy") ownedBy: String): List<String>
-
     fun existsByWorkflowIdAndOwnedBy(workflowId: String, ownedBy: String): Boolean
 
     /** True when [ownedBy] owns the run whose Temporal run id is [runId] (the id node outputs are stored under). */

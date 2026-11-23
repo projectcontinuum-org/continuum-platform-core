@@ -161,46 +161,6 @@ class WorkflowScheduleControllerTest {
   }
 
   @Test
-  fun `GET schedule list by RSQL filter returns filtered results`() {
-    val scheduleId = UUID.randomUUID()
-    whenever(workflowScheduleService.listSchedulesByRsql(eq("alice"), eq("name==My Workflow"))).thenReturn(listOf(response(scheduleId, "alice")))
-
-    mockMvc.perform(
-      get("/api/v1/workflow/schedule/filter")
-        .header("x-continuum-user-id", "alice")
-        .param("filter", "name==My Workflow")
-    )
-      .andExpect(status().isOk)
-      .andExpect(jsonPath("$.length()").value(1))
-  }
-
-  @Test
-  fun `GET schedule list by RSQL filter with multiple conditions`() {
-    val scheduleId = UUID.randomUUID()
-    whenever(workflowScheduleService.listSchedulesByRsql(eq("alice"), eq("name==~.*Hourly.*;createdAt>2024-01-01"))).thenReturn(listOf(response(scheduleId, "alice")))
-
-    mockMvc.perform(
-      get("/api/v1/workflow/schedule/filter")
-        .header("x-continuum-user-id", "alice")
-        .param("filter", "name==~.*Hourly.*;createdAt>2024-01-01")
-    )
-      .andExpect(status().isOk)
-  }
-
-  @Test
-  fun `GET schedule list by RSQL filter without filter returns all for owner`() {
-    val scheduleId = UUID.randomUUID()
-    whenever(workflowScheduleService.listSchedulesByRsql(eq("alice"), anyOrNull())).thenReturn(listOf(response(scheduleId, "alice")))
-
-    mockMvc.perform(
-      get("/api/v1/workflow/schedule/filter")
-        .header("x-continuum-user-id", "alice")
-    )
-      .andExpect(status().isOk)
-      .andExpect(jsonPath("$.length()").value(1))
-  }
-
-  @Test
   fun `GET schedule by id returns 200 when found`() {
     val scheduleId = UUID.randomUUID()
     whenever(workflowScheduleService.getSchedule("alice", scheduleId)).thenReturn(response(scheduleId, "alice"))

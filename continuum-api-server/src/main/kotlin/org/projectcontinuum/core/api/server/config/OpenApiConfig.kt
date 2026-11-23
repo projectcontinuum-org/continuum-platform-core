@@ -237,7 +237,7 @@ class OpenApiConfig(
       "title" to HttpStatus.valueOf(status).reasonPhrase,
       "status" to status,
       "detail" to exampleDetail,
-      "instance" to "/api/v1/workflow/tree"
+      "instance" to "/api/v1/workflow-runs"
     )
     return ApiResponse()
       .description(description)

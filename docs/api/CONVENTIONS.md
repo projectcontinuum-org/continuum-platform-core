@@ -109,7 +109,7 @@ continuum.core.api-docs:
 
 - Never expose JPA entities, `Map<String, Any>` or protobuf types directly when a typed DTO is feasible.
 - Every schema name is unique and meaningful: nested classes get `@Schema(name = "...")`
-  (`CountWorkflowResponse.Group` → `WorkflowCountGroup`, never a bare `Group`, `Problem`, `Execution`).
+  (`WorkflowRunDataResponse` → `WorkflowRunData`, never a bare `Data`, `Group`, `Problem` or `Execution`).
 - Every DTO field has `@Schema(description, example)`; say the unit (`ms`, `percent 0-100`), format (`uuid`, `date-time`,
   `byte` for base64), enum meaning, and when it is null.
 - Status fields are documented enums matching the Kotlin and Temporal values.
@@ -142,7 +142,11 @@ continuum.core.api-docs:
 - It compares `/v3/api-docs.yaml/public` with `docs/api/<module>.openapi.yaml` and fails on a difference. The test sets
   `continuum.core.api-docs.server-url=/`, so the committed spec has the relative server URL `/` (valid directly, behind
   `/api-server` or `/credentials-manager`, and for openapi-generator; Redocly rejects localhost URLs). Regenerate with
-  `./gradlew :<module>:test --tests '*OpenApiSpecTest*' -PupdateOpenApiSpec`, then review and commit the diff.
+  `./gradlew :<module>:generateOpenApiSpec`, then review and commit the diff.
+  `check` (so `build`) depends on `generateOpenApiSpec` in every service that has a spec (`gradle/openapi-spec.gradle.kts`,
+  applied from the module's `build.gradle.kts`): it rewrites `docs/api/<module>.openapi.yaml` from the code, then
+  `OpenApiSpecTest` runs against it. A build therefore never fails on a stale spec; it leaves the change as a git diff in
+  `docs/api/`, which CI fails on until it is committed. `-PupdateOpenApiSpec` on `test` still does the same thing.
 - `redocly lint` (config `redocly.yaml` at the repo root) must pass with no errors and no warnings for every committed
   spec. `no-ambiguous-paths` is off: `/api/v1/workflow/schedule/{scheduleId}` and `/api/v1/workflow/{workflowId}/cancel`
   overlap by shape but Spring resolves them deterministically and the URLs are a published contract.

@@ -95,6 +95,9 @@ tasks.withType<Test> {
   }
 }
 
+// `check` (so `build`) regenerates the committed spec first: see gradle/openapi-spec.gradle.kts.
+apply(from = rootProject.file("gradle/openapi-spec.gradle.kts"))
+
 // ============================================================================
 // Frontend build tasks (uses node-gradle plugin to auto-download Node.js)
 // ============================================================================

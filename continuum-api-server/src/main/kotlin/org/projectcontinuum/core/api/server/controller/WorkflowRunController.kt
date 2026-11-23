@@ -11,7 +11,6 @@ import io.swagger.v3.oas.annotations.tags.Tag
 import org.projectcontinuum.core.api.server.config.ApiTags
 import org.projectcontinuum.core.api.server.config.OpenApiConfig
 import org.projectcontinuum.core.api.server.exception.ResourceNotFoundException
-import org.projectcontinuum.core.api.server.model.WorkflowRunCountResponse
 import org.projectcontinuum.core.api.server.model.WorkflowRunResponse
 import org.projectcontinuum.core.api.server.model.WorkflowRunSummary
 import org.projectcontinuum.core.api.server.service.WorkflowRunService
@@ -139,32 +138,5 @@ every matching run. Read-only."""
     @RequestParam(required = false, defaultValue = "50") size: Int
   ): Page<String> {
     return workflowRunService.findDistinctWorkflows(ownedBy, filter, page, size)
-  }
-
-  @GetMapping("/count")
-  @Operation(
-    operationId = "countWorkflowRuns",
-    summary = "Count the caller's workflow runs",
-    description = "Counts the caller's runs in the database that match the optional RSQL `filter`. Read-only."
-  )
-  @ApiResponse(responseCode = "200", description = "The count.")
-  @ApiResponse(
-    responseCode = "400",
-    description = "The `filter` is not valid RSQL, names a field that cannot be filtered on, or has a value of the wrong type.",
-    content = [
-      Content(
-        mediaType = OpenApiConfig.PROBLEM_JSON,
-        schema = Schema(ref = OpenApiConfig.PROBLEM_DETAIL_SCHEMA),
-        examples = [ExampleObject(value = """{"type":"about:blank","title":"Invalid filter","status":400,"detail":"Invalid filter: it names a field that cannot be filtered on","instance":"/api/v1/workflow-runs"}""")]
-      )
-    ]
-  )
-  fun count(
-    @Parameter(hidden = true)
-    @RequestHeader("x-continuum-user-id", required = false, defaultValue = "anonymous") ownedBy: String,
-    @Parameter(description = FILTER_DESCRIPTION, example = "status==FAILED")
-    @RequestParam(required = false) filter: String?
-  ): WorkflowRunCountResponse {
-    return WorkflowRunCountResponse(count = workflowRunService.count(ownedBy, filter))
   }
 }

@@ -107,7 +107,4 @@ object ApiExamples {
 
   const val SCHEDULE_NOT_FOUND_PROBLEM =
     """{"type":"about:blank","title":"Not Found","status":404,"detail":"Schedule not found","instance":"/api/v1/workflow/schedule/$SCHEDULE_ID"}"""
-
-  const val INVALID_QUERY_PROBLEM =
-    """{"type":"about:blank","title":"Bad Request","status":400,"detail":"Invalid visibility query: unbalanced parentheses","instance":"/api/v1/workflow/list"}"""
 }

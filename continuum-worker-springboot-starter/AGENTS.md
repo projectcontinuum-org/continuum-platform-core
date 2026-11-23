@@ -19,6 +19,7 @@ Core platform team. Published to Maven Central as `org.projectcontinuum.core:con
 
 ## Work Guidance
 
+- README: every change here updates the repository root `README.md` (module table, worker configuration) in the same change (root `AGENTS.md`, "User Preferences").
 - Config properties consumed by workers:
   - `continuum.core.worker.storage.bucket-name`
   - `continuum.core.worker.storage.bucket-base-path`

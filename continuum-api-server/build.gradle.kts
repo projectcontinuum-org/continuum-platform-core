@@ -120,6 +120,9 @@ tasks.withType<Test> {
     }
 }
 
+// `check` (so `build`) regenerates the committed spec first: see gradle/openapi-spec.gradle.kts.
+apply(from = rootProject.file("gradle/openapi-spec.gradle.kts"))
+
 jib {
     from {
         image = "eclipse-temurin:21-jre"

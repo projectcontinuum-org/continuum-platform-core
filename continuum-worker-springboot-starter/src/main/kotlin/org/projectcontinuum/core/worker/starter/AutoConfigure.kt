@@ -21,7 +21,6 @@ import org.springframework.context.annotation.*
  * automatically registering beans for:
  * - [ContinuumNodeActivity] - Temporal activity for node execution
  * - Configuration classes (S3Config, CorsConfig, S3BucketInitializer)
- * - REST controllers (NodeRepositoryController)
  * - [FeatureRegistrationPublisher] - Publishes node registrations to Kafka
  *
  * Note: Workflow orchestration (ContinuumWorkflow, InitializeActivity, StatusHelper)

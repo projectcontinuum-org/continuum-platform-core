@@ -35,10 +35,11 @@ Core platform team. Container image: `projectcontinuum/continuum-cluster-manager
 - JSON: HTTP bodies go through Spring Boot's Jackson 3 mapper. `config.JacksonConfig` registers the **Jackson 3** `KotlinModule` (`tools.jackson.module`, `NullIsSameAsDefault`), so omitted fields take their Kotlin defaults (a partial `resources` in a create) and a missing required field is a 400. A Jackson 2 `KotlinModule` bean is ignored by Boot 4; keep this one on Jackson 3.
 - Suspended workbenches have no Deployment, Service or Ingress on purpose. `refreshStatusFromK8s` never touches a SUSPENDED entity, and `updateWorkbench` on a SUSPENDED one only saves the new settings (no Kubernetes call); `resumeWorkbench` applies them. Update requests use `ResourceUpdate` (every field optional, an omitted one keeps the current value); create requests use `ResourceSpec` (omitted fields take the defaults).
 - Forwarded headers: `config.ForwardedHeadersConfig` registers Spring's `ForwardedHeaderFilter` (instead of `server.forward-headers-strategy`) and skips `GET /api/v1/workbench/authorize`, which must still see `X-Forwarded-Host` from Traefik ForwardAuth. Keep that exclusion; `openapi.ForwardedHeadersTest` pins it. `/authorize` also declares `produces = */*`: ForwardAuth forwards the browser's `Accept: text/html`, which the class-level `application/json` would answer with 406.
-- OpenAPI: follow `docs/api/CONVENTIONS.md` and `docs/api/ENDPOINT_INVENTORY.md`. `config.OpenApiConfig` owns metadata, the `public`/`internal` groups (`/authorize` is internal only), the `continuumUserId` security scheme, the `ProblemDetail` schema and the shared 400/406/500 responses. `CONTINUUM_API_DOCS_ENABLED`, `CONTINUUM_API_DOCS_INTERNAL_ENABLED`, `CONTINUUM_API_DOCS_SERVER_URL` as in the api-server. Tags: "Workbenches" (user-scoped), "Workbench catalog" (tags, variants; not user-scoped), "Workbench access control" (internal).
+- OpenAPI: follow `docs/api/CONVENTIONS.md` and `docs/api/ENDPOINT_INVENTORY.md`, and keep both in sync with every API change, in the same change (root `AGENTS.md`, "Rule for AI agents", steps 1 and 2). `config.OpenApiConfig` owns metadata, the `public`/`internal` groups (`/authorize` is internal only), the `continuumUserId` security scheme, the `ProblemDetail` schema and the shared 400/406/500 responses. `CONTINUUM_API_DOCS_ENABLED`, `CONTINUUM_API_DOCS_INTERNAL_ENABLED`, `CONTINUUM_API_DOCS_SERVER_URL` as in the api-server. Tags: "Workbenches" (user-scoped), "Workbench catalog" (tags, variants; not user-scoped), "Workbench access control" (internal).
 
 ## Work Guidance
 
+- README: every change here updates the repository root `README.md` (module table, the OpenAPI table) in the same change (root `AGENTS.md`, "User Preferences").
 - Any change to an endpoint, a request/response model or a status code follows the root `AGENTS.md` rule "Rule for AI agents: every API change updates the OpenAPI spec": inventory, annotations, regenerated `docs/api/continuum-cluster-manager.openapi.yaml`, Redocly lint and release notes, in the same change.
 - In local dev without Kubernetes, `KUBERNETES_MASTER_URL` and `KUBECONFIG` can be left blank; the Fabric8 client will attempt to auto-detect from `~/.kube/config`.
 - The `WorkbenchInstanceRepository` is a plain Spring Data JPA repository; tests can use H2.
@@ -48,5 +49,5 @@ Core platform team. Container image: `projectcontinuum/continuum-cluster-manager
 ```bash
 ./gradlew :continuum-cluster-manager:test
 # after an intended API change: regenerate docs/api/continuum-cluster-manager.openapi.yaml, review, commit
-./gradlew :continuum-cluster-manager:test --tests '*OpenApiSpecTest*' -PupdateOpenApiSpec
+./gradlew :continuum-cluster-manager:generateOpenApiSpec
 ```
