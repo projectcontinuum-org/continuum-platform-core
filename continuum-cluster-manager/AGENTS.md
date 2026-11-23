@@ -49,5 +49,5 @@ Core platform team. Container image: `projectcontinuum/continuum-cluster-manager
 ```bash
 ./gradlew :continuum-cluster-manager:test
 # after an intended API change: regenerate docs/api/continuum-cluster-manager.openapi.yaml, review, commit
-./gradlew :continuum-cluster-manager:test --tests '*OpenApiSpecTest*' -PupdateOpenApiSpec
+./gradlew :continuum-cluster-manager:generateOpenApiSpec
 ```

@@ -87,7 +87,7 @@ Core platform team. Container image: `projectcontinuum/continuum-api-server`. Ru
 ```bash
 ./gradlew :continuum-api-server:test
 # after an intended API change: regenerate docs/api/continuum-api-server.openapi.yaml, review, commit
-./gradlew :continuum-api-server:test --tests '*OpenApiSpecTest*' -PupdateOpenApiSpec
+./gradlew :continuum-api-server:generateOpenApiSpec
 ```
 
 - `openapi.OpenApiSpecTest` / `OpenApiDisabledTest` boot the full context (`FullContextWithoutExternalSystems`: Temporal, S3 and DuckDB mocked, H2 in place of PostgreSQL, the main `application.yml` imported because the test one shadows it). `-PdumpOpenApiSpecs=<dir>` writes the fetched specs as JSON for inspection.

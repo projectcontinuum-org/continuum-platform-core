@@ -35,7 +35,7 @@ Core platform team. Container image: `projectcontinuum/continuum-credentials-ser
 ```bash
 ./gradlew :continuum-credentials-server:test
 # after an intended API change: regenerate docs/api/continuum-credentials-server.openapi.yaml, review, commit
-./gradlew :continuum-credentials-server:test --tests '*OpenApiSpecTest*' -PupdateOpenApiSpec
+./gradlew :continuum-credentials-server:generateOpenApiSpec
 ```
 
 - `openapi.OpenApiSpecTest` boots the full context on H2 (`H2JdbcConfig`, the main `application.yml` imported because the test one shadows it); `exception.ProblemDetailContractTest` pins the error contract.

@@ -3,7 +3,7 @@ name: OpenAPI Spec Check
 # The OpenAPI specs of the platform services are committed in docs/api/<module>.openapi.yaml and reviewed like code.
 # This job regenerates them from the code (each service's OpenApiSpecTest fails when the generated spec differs from
 # the committed one) and lints the committed specs. To update a spec after an intended API change:
-#   ./gradlew :<module>:test --tests '*OpenApiSpecTest*' -PupdateOpenApiSpec
+#   ./gradlew :<module>:generateOpenApiSpec   (also run by `./gradlew build`)
 # then review and commit the diff in docs/api/.
 on:
   pull_request:
@@ -77,7 +77,7 @@ jobs:
       - name: Fail on an unreviewed spec diff
         run: |
           if ! git diff --exit-code -- docs/api/; then
-            echo "::error title=OpenAPI drift::The committed specs in docs/api/ are out of date. Run ./gradlew :<module>:test --tests '*OpenApiSpecTest*' -PupdateOpenApiSpec and commit the result."
+            echo "::error title=OpenAPI drift::The committed specs in docs/api/ are out of date. Run ./gradlew :<module>:generateOpenApiSpec (or ./gradlew build) and commit the result."
             exit 1
           fi
           untracked=$(git ls-files --others --exclude-standard -- docs/api/)
