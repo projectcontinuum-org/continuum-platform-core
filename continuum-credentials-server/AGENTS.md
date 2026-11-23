@@ -24,6 +24,7 @@ Core platform team. Container image: `projectcontinuum/continuum-credentials-ser
 
 ## Work Guidance
 
+- README: every change here updates the repository root `README.md` (module table, Quick Start, the OpenAPI table) in the same change (root `AGENTS.md`, "User Preferences").
 - Any change to an endpoint, a request/response model or a status code follows the root `AGENTS.md` rule "Rule for AI agents: every API change updates the OpenAPI spec": inventory, annotations, regenerated `docs/api/continuum-credentials-server.openapi.yaml`, Redocly lint and release notes, in the same change.
 - Frontend build is triggered automatically by `./gradlew :continuum-credentials-server:build`. To build only the frontend: `./gradlew :continuum-credentials-server:frontendBuild`.
 - `CREDENTIALS_ENCRYPTION_MASTER_KEY` must be set before starting the server. In local dev, docker-compose provides a test key (`dGVzdC1tYXN0ZXIta2V5LWZvci1sb2NhbC1kZXY=`).

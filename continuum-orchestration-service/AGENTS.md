@@ -20,6 +20,7 @@ Core platform team. Container image: `projectcontinuum/continuum-orchestration-s
 
 ## Work Guidance
 
+- README: every change here updates the repository root `README.md` (module table, How It Works) in the same change (root `AGENTS.md`, "User Preferences").
 - Temporal workflow code must be deterministic — no `Date.now()`, `Math.random()`, or I/O. Use `Workflow.getLogger()`, not a static logger. Side effects go in activities.
 - `nodeIdToActivityMap` holds per-node activity stubs, each routed to the correct task queue. Do not share a single stub across different queues.
 - `nodeErrorsMap` uses the `$error` output port as the sentinel. Any output map containing `"$error"` key means the node failed.

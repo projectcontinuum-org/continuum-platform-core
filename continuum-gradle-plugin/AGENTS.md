@@ -19,6 +19,7 @@ Core platform team. Published to Maven Central as `org.projectcontinuum.core:con
 
 ## Work Guidance
 
+- README: every change here updates the repository root `README.md` (module table, plugin ids and defaults) in the same change (root `AGENTS.md`, "User Preferences").
 - The plugin uses `afterEvaluate` to read `continuum { }` extension values — changes to extension defaults take effect in the next evaluation, not immediately in `apply()`.
 - `DEFAULT_*` constants define current ecosystem defaults. Update them when bumping platform-wide versions.
 - Tests (`ContinuumFeaturePluginTest`, `ContinuumWorkerPluginTest`) use Gradle TestKit — they apply the plugin to a temporary project and verify task outcomes.

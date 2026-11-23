@@ -39,6 +39,7 @@ Core platform team. Container image: `projectcontinuum/continuum-cluster-manager
 
 ## Work Guidance
 
+- README: every change here updates the repository root `README.md` (module table, the OpenAPI table) in the same change (root `AGENTS.md`, "User Preferences").
 - Any change to an endpoint, a request/response model or a status code follows the root `AGENTS.md` rule "Rule for AI agents: every API change updates the OpenAPI spec": inventory, annotations, regenerated `docs/api/continuum-cluster-manager.openapi.yaml`, Redocly lint and release notes, in the same change.
 - In local dev without Kubernetes, `KUBERNETES_MASTER_URL` and `KUBECONFIG` can be left blank; the Fabric8 client will attempt to auto-detect from `~/.kube/config`.
 - The `WorkbenchInstanceRepository` is a plain Spring Data JPA repository; tests can use H2.

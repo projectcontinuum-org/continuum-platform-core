@@ -66,6 +66,7 @@ Core platform team. Container image: `projectcontinuum/continuum-api-server`. Ru
 
 ## Work Guidance
 
+- README: every change here updates the repository root `README.md` (module table, Quick Start ports and `bootRun` commands, the OpenAPI table) in the same change (root `AGENTS.md`, "User Preferences").
 - Any change to an endpoint, a request/response model or a status code follows the root `AGENTS.md` rule "Rule for AI agents: every API change updates the OpenAPI spec": inventory, annotations, regenerated `docs/api/continuum-api-server.openapi.yaml`, Redocly lint and release notes, in the same change.
 - DDL is managed via `src/main/resources/schema.sql` (applied by `spring.sql.init.mode = always`). JPA `ddl-auto` is `none`.
 - OpenAPI: follow `docs/api/CONVENTIONS.md`; the endpoint facts behind the annotations are in `docs/api/ENDPOINT_INVENTORY.md`. Keep both in sync with every API change, in the same change (root `AGENTS.md`, "Rule for AI agents", steps 1 and 2).
