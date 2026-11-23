@@ -120,6 +120,7 @@ Applies to `continuum-api-server`, `continuum-cluster-manager` and `continuum-cr
 - **Committed specs**: `docs/api/continuum-api-server.openapi.yaml`, `docs/api/continuum-cluster-manager.openapi.yaml` and `docs/api/continuum-credentials-server.openapi.yaml`. Each service's `OpenApiSpecTest` fails when the generated spec differs from the committed one. Regenerate with `./gradlew :<module>:test --tests '*OpenApiSpecTest*' -PupdateOpenApiSpec`. CI (`.github/workflows/openapi-spec-check.yml`) also lints them with Redocly (`redocly.yaml`).
 - **operationIds** (client method names) are now stable and descriptive, for example `startWorkflow`, `listWorkflowRuns`, `getNodeOutputPage`, `createWorkbench`. Before, they were the Kotlin method names (`findAll`, `count_1`, ...), so clients generated from the old spec get new method names.
 - **Schema names** are unique: `ScheduleValidationProblem` (was `Problem`), `WorkflowNode`/`WorkflowEdge` (was `Node`/`Edge`), `TableCell` (was `CellDto`), and others.
+- **`WorkflowRunData.nodeToOutputMap`** is documented as exactly `node id → port id → PortData`. The spec used to add the Kotlin `Map` accessors (`empty`, `entries`, `keys`, `size`, `values`) as properties next to it, which made generated TypeScript clients fail to compile. Responses are unchanged.
 
 #### continuum-api-server: error bodies (client-visible)
 

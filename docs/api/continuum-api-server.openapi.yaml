@@ -2707,35 +2707,6 @@ components:
                 - name: clean
                   contentType: text/plain
                 data: "{remote}0b7c6f0a-2a55-4f43-9a36-0c8f4d2b1e77/normalize/output.data.parquet"
-          properties:
-            empty:
-              type: boolean
-            entries:
-              type: array
-              items:
-                type: object
-                properties:
-                  key:
-                    type: string
-                  value:
-                    type: object
-                    additionalProperties:
-                      $ref: "#/components/schemas/PortData"
-              uniqueItems: true
-            keys:
-              type: array
-              items:
-                type: string
-              uniqueItems: true
-            size:
-              type: integer
-              format: int32
-            values:
-              type: array
-              items:
-                type: object
-                additionalProperties:
-                  $ref: "#/components/schemas/PortData"
         workflowSnapshot:
           $ref: "#/components/schemas/ContinuumWorkflowModel"
           description: The submitted workflow with the live `data.status` of every

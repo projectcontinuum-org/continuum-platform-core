@@ -1,5 +1,6 @@
 package org.projectcontinuum.core.api.server.model
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties
 import io.swagger.v3.oas.annotations.media.Schema
 import org.projectcontinuum.core.api.server.entity.jpa.WorkflowRunEntity
 import org.projectcontinuum.core.api.server.entity.jpa.WorkflowRunSummaryEntity
@@ -131,6 +132,11 @@ data class WorkflowRunDataResponse(
   val nodeToOutputMap: Map<String, Any>
 )
 
-/** Documentation type only: node id → port id → [PortData]. Never instantiated. */
+/**
+ * Documentation type only: node id → port id → [PortData]. Never instantiated.
+ * swagger-core also introspects a `Map` subtype as a bean, which would publish the Kotlin `Map` accessors as
+ * properties of the schema (`empty`, `entries`, `keys`, `size`, `values`) and break generated clients, so they are ignored.
+ */
 @Schema(name = "NodeToOutputMap", description = "Outputs per node: node id → port id → output.")
+@JsonIgnoreProperties("empty", "entries", "keys", "size", "values")
 private abstract class NodeToOutputMapSchema : Map<String, Map<String, PortData>>
