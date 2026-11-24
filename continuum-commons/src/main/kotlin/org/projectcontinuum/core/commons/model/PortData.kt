@@ -23,9 +23,10 @@ data class PortData @JsonCreator constructor(
   @field:Schema(description = "Columns of the table: one `{name, contentType}` entry per column. Empty for `\$error` and `\$variable`.")
   @param:JsonProperty("tableSpec") val tableSpec: List<Map<String, String>>,
   @field:Schema(
-    description = "For a table: its location, `{remote}<runId>/<nodeId>/output.<port>.parquet` (read it with the node " +
-      "output endpoint). For `\$error`: the error message. For `\$variable`: an object of flow variable names to values.",
-    type = "string",
+    description = "A string or a JSON object, depending on the port. For a table: a string, its location " +
+      "`{remote}<runId>/<nodeId>/output.<port>.parquet` (read it with the node output endpoint). For `\$error`: a " +
+      "string, the error message. For `\$variable`: a JSON object of flow variable names to values.",
+    types = ["string", "object"],
     example = "{remote}0b7c6f0a-2a55-4f43-9a36-0c8f4d2b1e77/normalize/output.data.parquet"
   )
   @param:JsonProperty("data") val data: Any

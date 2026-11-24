@@ -265,6 +265,20 @@ Every platform HTTP service publishes an OpenAPI 3.1 spec and Swagger UI while r
 - Endpoint behavior, callers and open questions: [`docs/api/ENDPOINT_INVENTORY.md`](docs/api/ENDPOINT_INVENTORY.md).
   Annotation conventions: [`docs/api/CONVENTIONS.md`](docs/api/CONVENTIONS.md).
 
+### Upgrading
+
+Read the "Upgrade notes" of every [release notes](release_notes/) file between your version and the target before
+upgrading. Upgrading to **0.0.23**:
+
+- **Rebuild every feature worker against `continuumPlatformVersion=0.0.23` and deploy the workers before the
+  orchestration service.** A worker built against 0.0.22 or older fails every node, because it cannot read the new
+  `SCHEDULED` status.
+- **Flow variables need 0.0.23 on both sides.** Before any workflow sets flow variables, every worker that runs one
+  of its nodes must be 0.0.23, and so must the orchestration service. An older worker tries to download the
+  `$variable` key from S3 and the node fails. Workflows without flow variables work with any mix of versions.
+
+Details: [`release_notes/RELEASE_NOTES_v0.0.23.md`](release_notes/RELEASE_NOTES_v0.0.23.md#upgrade-notes).
+
 ---
 
 ## 🧩 Architecture Philosophy: Workers, Not Monoliths

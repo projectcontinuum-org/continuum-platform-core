@@ -15,7 +15,8 @@ import org.projectcontinuum.core.commons.utils.FlowVariables
  * - `inherited(N)` = fan-in merge of `available(parent)` over N's parent edges
  *
  * Fan-in merge: parent edges are ordered by the index of their target port in the node's declared inputs, then by
- * `targetHandle`, then by `source`. For each key the first value wins (lowest input port). An identical later value is
+ * `targetHandle`, then by `source`. For each key the first value wins (lowest input port). A later value that is the
+ * same JSON value ([FlowVariables.valuesEqual]: numeric-aware, so `5` and `5L` or `1.0` and `1` match) is
  * deduplicated silently; a different later value is a [Conflict].
  *
  * Pure: reads only the workflow model and the outputs map, so it is deterministic under Temporal replay.
@@ -102,7 +103,7 @@ internal object FlowVariableMerger {
         val existing = merged[key]
         when {
           existing == null -> merged[key] = Sourced(value = value, fromNodeId = parentId)
-          existing.value == value -> Unit
+          FlowVariables.valuesEqual(first = existing.value, second = value) -> Unit
           else -> conflicts += Conflict(
             key = key,
             targetNodeId = node.id,

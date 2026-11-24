@@ -2358,10 +2358,14 @@ components:
             \ flow variables."
           example: application/parquet
         data:
-          type: string
-          description: "For a table: its location, `{remote}<runId>/<nodeId>/output.<port>.parquet`\
-            \ (read it with the node output endpoint). For `$error`: the error message.\
-            \ For `$variable`: an object of flow variable names to values."
+          type:
+          - string
+          - object
+          description: "A string or a JSON object, depending on the port. For a table:\
+            \ a string, its location `{remote}<runId>/<nodeId>/output.<port>.parquet`\
+            \ (read it with the node output endpoint). For `$error`: a string, the\
+            \ error message. For `$variable`: a JSON object of flow variable names\
+            \ to values."
           example: "{remote}0b7c6f0a-2a55-4f43-9a36-0c8f4d2b1e77/normalize/output.data.parquet"
         status:
           type: string

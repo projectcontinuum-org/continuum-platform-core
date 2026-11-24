@@ -38,7 +38,8 @@ Conventions for the spec itself are in [CONVENTIONS.md](CONVENTIONS.md).
   A non-retriable node failure is the port `$error`: `{status: FAILED, contentType: "text/plain", tableSpec: [], data: "<message>"}`.
   A node that set flow variables also has the system key `$variable`: `{status: SUCCESS, contentType: "application/json", tableSpec: [], data: {<name>: <value>, ...}}`,
   holding only the variables that node set (not the inherited ones). It is absent when the node set none. Every key
-  starting with `$` is a system key, not a port: clients listing ports must skip them.
+  starting with `$` is a system key, not a port: clients listing ports must skip them. So `PortData.data` is a string
+  (tables, `$error`) or an object (`$variable`); the spec types it `[string, object]`.
   Parquet lives in S3/MinIO at `<bucket-base-path>/<runId>/<nodeId>/output.<port>.parquet`.
 - **MQTT.** Every run update goes Kafka → message-bridge → MQTT topic `continuum/workflow/execution/{workflowId}/update`,
   and the same event is upserted into `workflow_runs` (status, progress, `data.workflowSnapshot`, `data.nodeToOutputMap`).

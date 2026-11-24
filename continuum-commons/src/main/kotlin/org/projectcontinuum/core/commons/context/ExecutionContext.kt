@@ -3,6 +3,7 @@ package org.projectcontinuum.core.commons.context
 import org.projectcontinuum.core.commons.exception.CredentialsNotFoundException
 import tools.jackson.core.JacksonException
 import tools.jackson.module.kotlin.jacksonObjectMapper
+import java.util.Collections
 
 /**
  * Fetches a single credential by name on demand.
@@ -61,17 +62,22 @@ fun interface CredentialFetcher {
  * executionContext.setFlowVariable(name = "batchNumber", value = batch + 1)
  * ```
  *
- * `copy()` does not carry the output variables written so far.
+ * An execution context is per node run and mutable (it collects the node's output flow variables), so it is a plain
+ * class: no value equality, `copy()` or destructuring.
  *
  * @param ownerId The user/tenant who owns this workflow execution (from x-continuum-user-id header)
  * @param credentialFetcher Fetches a credential's key-value data by name, on demand.
- * @param inputFlowVariables Flow variables collected from this node's ancestors (read-only).
+ * @param inputFlowVariables Flow variables collected from this node's ancestors. Copied into an unmodifiable map, so
+ *   later changes to the passed map are not seen and the node cannot change it.
  */
-data class ExecutionContext(
+class ExecutionContext(
   val ownerId: String? = null,
   private val credentialFetcher: CredentialFetcher = CredentialFetcher { null },
-  val inputFlowVariables: Map<String, Any> = emptyMap()
+  inputFlowVariables: Map<String, Any> = emptyMap()
 ) {
+
+  /** The flow variables inherited from this node's ancestors: an unmodifiable copy, in the order received. */
+  val inputFlowVariables: Map<String, Any> = Collections.unmodifiableMap(LinkedHashMap(inputFlowVariables))
 
   /** This node's own flow variables, in the order they were first set. */
   private val outputFlowVariables = LinkedHashMap<String, Any>()

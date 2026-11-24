@@ -58,6 +58,31 @@ class FlowVariablesTest {
   }
 
   @Test
+  fun `valuesEqual treats the same JSON number as equal whatever its JVM type`() {
+    assertTrue(FlowVariables.valuesEqual(first = 5, second = 5L))
+    assertTrue(FlowVariables.valuesEqual(first = 1.0, second = 1))
+    assertTrue(FlowVariables.valuesEqual(first = 2.50, second = java.math.BigDecimal("2.5")))
+    assertTrue(FlowVariables.valuesEqual(first = java.math.BigInteger.TEN, second = 10.0f))
+    assertTrue(FlowVariables.valuesEqual(first = 0.1, second = java.math.BigDecimal("0.1")))
+    assertFalse(FlowVariables.valuesEqual(first = 5, second = 6L))
+    assertFalse(FlowVariables.valuesEqual(first = 1.5, second = 1))
+    assertFalse(FlowVariables.valuesEqual(first = Long.MAX_VALUE, second = Long.MAX_VALUE - 1))
+  }
+
+  @Test
+  fun `valuesEqual compares maps and lists deeply and keeps types apart`() {
+    val first = mapOf("limit" to 10, "columns" to listOf("a", 1), "nested" to mapOf("ratio" to 1.0))
+    val sameInOtherForm = linkedMapOf("nested" to mapOf("ratio" to 1L), "columns" to listOf("a", 1.0), "limit" to 10L)
+
+    assertTrue(FlowVariables.valuesEqual(first = first, second = sameInOtherForm), "key order and number types are ignored")
+    assertFalse(FlowVariables.valuesEqual(first = listOf(1, 2), second = listOf(2, 1)), "list order matters")
+    assertFalse(FlowVariables.valuesEqual(first = mapOf("a" to 1), second = mapOf("a" to 1, "b" to 2)))
+    assertFalse(FlowVariables.valuesEqual(first = "5", second = 5), "a string is not a number")
+    assertFalse(FlowVariables.valuesEqual(first = true, second = 1))
+    assertTrue(FlowVariables.valuesEqual(first = "batch", second = "batch"))
+  }
+
+  @Test
   fun `withoutSystemPorts keeps only data ports`() {
     val ports = mapOf(
       "out" to dataPort,

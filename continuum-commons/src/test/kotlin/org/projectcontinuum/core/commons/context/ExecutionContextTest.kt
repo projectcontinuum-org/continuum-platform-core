@@ -50,6 +50,20 @@ class ExecutionContextTest {
   }
 
   @Test
+  fun `inherited variables are an unmodifiable copy of the map passed in`() {
+    val incoming = linkedMapOf<String, Any>("x" to 1)
+    val executionContext = ExecutionContext(inputFlowVariables = incoming)
+
+    @Suppress("UNCHECKED_CAST")
+    val castToMutable = executionContext.inputFlowVariables as MutableMap<String, Any>
+    assertThrows<UnsupportedOperationException> { castToMutable["x"] = 2 }
+    assertThrows<UnsupportedOperationException> { castToMutable.remove("x") }
+
+    incoming["y"] = 2
+    assertEquals(mapOf("x" to 1), executionContext.inputFlowVariables, "later changes to the passed map are not seen")
+  }
+
+  @Test
   fun `getOutputFlowVariables returns a copy`() {
     val executionContext = ExecutionContext()
     executionContext.setFlowVariable(name = "x", value = 1)

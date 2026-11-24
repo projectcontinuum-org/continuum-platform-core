@@ -153,6 +153,35 @@ class FlowVariableMergerTest {
   }
 
   @Test
+  fun `the same value in another numeric type after deserialization is not a conflict`() {
+    // After the JSON round trip one branch's 5 can arrive as Int and the other's as Long, or 1.0 next to 1.
+    val outputs = mapOf(
+      "A" to completed(),
+      "B" to completed(mapOf("count" to 5, "ratio" to 1.0, "settings" to mapOf("limit" to 10, "tags" to listOf(1, 2)))),
+      "C" to completed(mapOf("count" to 5L, "ratio" to 1, "settings" to mapOf("tags" to listOf(1L, 2.0), "limit" to 10L)))
+    )
+
+    val result = collect(workflow = diamond, nodeId = "D", outputs = outputs)
+
+    assertEquals(emptyList(), result.conflicts)
+    assertEquals(5, result.variables["count"], "the lower port's value is kept as received")
+    assertEquals(1.0, result.variables["ratio"])
+  }
+
+  @Test
+  fun `a really different number is still a conflict`() {
+    val outputs = mapOf(
+      "A" to completed(),
+      "B" to completed(mapOf("count" to 5)),
+      "C" to completed(mapOf("count" to 5.5))
+    )
+
+    val result = collect(workflow = diamond, nodeId = "D", outputs = outputs)
+
+    assertEquals(listOf("count"), result.conflicts.map { it.key })
+  }
+
+  @Test
   fun `edges into undeclared ports are ordered by target handle then source`() {
     val undeclared = ContinuumWorkflowModel(
       id = "undeclared",
