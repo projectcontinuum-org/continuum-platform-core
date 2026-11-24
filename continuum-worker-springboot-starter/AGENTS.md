@@ -8,7 +8,14 @@ Core platform team. Published to Maven Central as `org.projectcontinuum.core:con
 
 ## Local Contracts
 
-- `ContinuumNodeActivity` — Temporal `@ActivityImpl` on `ACTIVITY_TASK_QUEUE` (overridable via `continuum.core.worker.node-task-queue`). Discovers all `@ContinuumNode` beans at `@PostConstruct`, validates the annotation is present, then creates prototype instances on demand via `ApplicationContext.getBean()`. Processes `ProcessNodeModel` (with inputs) and `TriggerNodeModel` (no inputs) paths.
+- `ContinuumNodeActivity` — Temporal `@ActivityImpl` on `ACTIVITY_TASK_QUEUE` (overridable via `continuum.core.worker.node-task-queue`). Discovers all `@ContinuumNode` beans at `@PostConstruct`, validates the annotation is present and that no declared port id (`inputPorts`, `outputPorts`, `metadata.inputs`, `metadata.outputs`) starts with `$` (`IllegalStateException`), then creates prototype instances on demand via `ApplicationContext.getBean()`. Processes `ProcessNodeModel` (with inputs) and `TriggerNodeModel` (no inputs) paths; both get the same `ExecutionContext` (owner, credentials, flow variables).
+- Flow variables:
+  - `inputs["$variable"]` becomes `ExecutionContext.inputFlowVariables`. Every `$` key is stripped before `prepareNodeInputs`, so a system key is never downloaded from S3.
+  - `outputs["$variable"]` carries the variables the node set itself (`getOutputFlowVariables()`) plus the run's `DefaultFlowVariables`, added in `run()` by `withDefaultFlowVariables` for every result, success or `$error`. Never merge the inherited variables back in: the orchestrator collects them from the ancestors.
+  - Defaults: `executionStatus`, `errorMessage` (failed only), `startTimestamp` / `endTimestamp` (epoch ms, measured around the whole activity), `durationMs`, `inputCount` (process nodes: `{portId: rows}` from the downloaded Parquet footers) and `outputCount` (successful nodes: `{portId: rows}` written). They override a node-set variable of the same name and are not counted against the size cap. There is no `statusCode` default.
+  - The emitted map is checked against `continuum.core.worker.flow-variables.max-size-bytes` (default 65536, serialized as JSON with the Temporal payload mapper) before outputs are uploaded. Over the cap, or not serializable, is a non-retriable `NodeRuntimeException`.
+  - An `output.$<id>.parquet` file is refused (non-retriable).
+  - Error outputs carry `$error` plus `$variable` with the defaults (the node-set variables of a failed run are dropped).
 - S3 file naming: inputs as `{runId}/{nodeId}/input.{portId}.parquet`, outputs as `{runId}/{nodeId}/output.{portId}.parquet`. S3 key is prefixed with `cacheBucketBasePath`.
 - Progress reporting is rate-limited (`continuum.core.worker.progress-report-rate-limit-ms`, default 5000 ms). Always reports 0%, 100%, and stage changes regardless of rate limit. Progress signals are sent to the parent Temporal workflow via `IContinuumWorkflow.updateNodeProgressSignal()`.
 - Background heartbeat scheduler (`continuum.core.worker.heartbeat-interval-ms`, default 60000 ms) keeps long-running activities alive in Temporal even when the node doesn't call `report()`.
@@ -28,6 +35,8 @@ Core platform team. Published to Maven Central as `org.projectcontinuum.core:con
   - `continuum.core.worker.progress-report-rate-limit-ms`
   - `continuum.core.worker.heartbeat-interval-ms`
   - `continuum.core.worker.credentials-server-base-url` (default `http://localhost:8083`)
+  - `continuum.core.worker.flow-variables.max-size-bytes` (default `65536`)
+- Activity tests that need the worker's progress signals delivered (every successful node signals 100%) run the activity under a small host workflow in `TestWorkflowEnvironment` (see `ContinuumNodeActivityFlowVariablesTest`). A bare `TestActivityEnvironment` cannot deliver signals, so only failure paths work there.
 - The `@ActivityImpl` task queue annotation uses a Spring property expression — the constant in `TaskQueues.ACTIVITY_TASK_QUEUE` is the default, but each worker can override it to deploy on a different queue.
 
 ## Verification

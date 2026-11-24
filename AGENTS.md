@@ -211,7 +211,8 @@ Every node in a feature worker must:
 1. Be annotated with `@ContinuumNode` (not just `@Component`) — enforced at build time by `validateContinuumNodeAnnotations` Gradle task and at startup by `ContinuumNodeActivity`.
 2. Extend `ProcessNodeModel` (for data nodes) or `TriggerNodeModel` (for source nodes).
 3. Override `inputPorts`, `outputPorts`, and `metadata` (as `ContinuumWorkflowModel.NodeData`).
-4. Implement `execute()` — override the base overload for simple nodes, or the `ExecutionContext` overload for nodes that need credentials.
+4. Implement `execute()` — override the base overload for simple nodes, or the `ExecutionContext` overload for nodes that need credentials or flow variables (`executionContext.getFlowVariable<T>(name)` reads what ancestors set; `setFlowVariable(name, value)` passes a value to every downstream node).
+5. Never use a port id starting with `$`: it is reserved for system keys (`$error`, `$variable`). The worker refuses to start, and the workflow validator rejects such ids.
 
 ```kotlin
 @ContinuumNode
@@ -262,6 +263,8 @@ The `continuum` DSL extension in each feature `build.gradle.kts` controls versio
 #### Data format
 
 All inter-node data is Apache Parquet (Snappy compressed, Avro schema `DataRow`). `NodeOutputWriter.OutputPortWriter` writes rows; `NodeInputReader` reads them. Output files are named `output.{portId}.parquet`; input files `input.{portId}.parquet`. Both are staged in a local cache path before upload/after download from MinIO.
+
+Flow variables (small JSON key/value pairs) travel beside the data ports under the reserved system key `$variable`. A node's `outputs["$variable"]` holds what that node set plus the default variables the worker exports for every run (`<nodeType>_<nodeId>.executionStatus`, `.durationMs`, ...), so it is present for every finished node. The orchestrator collects every ancestor's variables into `inputs["$variable"]`, omitted only when empty (root nodes). Details are in the commons, worker-starter and orchestration AGENTS.md files.
 
 #### Key versions
 

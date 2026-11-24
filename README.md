@@ -111,6 +111,7 @@ A click turned outcome.
 | 🔁 | **Indestructible Execution** | Workflows survive crashes, restarts, and infrastructure failures |
 | ⚡ | **Live Streaming Updates** | Watch your workflow execute step-by-step in real time |
 | 📊 | **Columnar Data Passing** | Parquet tables between nodes — fast, query-ready |
+| 🏷️ | **Flow Variables** | Nodes set small key/value variables (`executionContext.setFlowVariable(...)`) that every downstream node can read; they travel under the reserved `$variable` key, capped per node by `continuum.core.worker.flow-variables.max-size-bytes` (default 64 KiB). Every node also exports defaults such as `restNode_3.executionStatus`, `.durationMs` and `.outputCount` |
 | 🧪 | **AI / ML Ready** | Train models with Unsloth, run inference, all inside your flow |
 | 🐳 | **Self-Hostable** | Docker Compose up and you're running |
 
@@ -152,6 +153,7 @@ A click turned outcome.
 | **Engine** | [Temporal](https://temporal.io) | Durable execution, auto-retry, infinite scale |
 | **Events** | Kafka → MQTT over WebSockets | Real-time step-by-step workflow updates |
 | **Data** | Apache Parquet | Fast, columnar, query-ready inter-node data |
+| **Flow Variables** | `$variable` system key, JSON | Small key/value context collected from all ancestors, next to the data ports |
 | **Storage** | AWS S3 / MinIO | Open, portable, no vendor lock-in |
 | **Backend** | Kotlin + Spring Boot | Type-safe, clean, battle-tested |
 | **Resilience** | Temporal | Fails? Retries. Crashes? Recovers. Forever. |
@@ -262,6 +264,20 @@ Every platform HTTP service publishes an OpenAPI 3.1 spec and Swagger UI while r
   `npx @openapitools/openapi-generator-cli generate -i docs/api/continuum-api-server.openapi.yaml -g typescript-fetch -o out/`.
 - Endpoint behavior, callers and open questions: [`docs/api/ENDPOINT_INVENTORY.md`](docs/api/ENDPOINT_INVENTORY.md).
   Annotation conventions: [`docs/api/CONVENTIONS.md`](docs/api/CONVENTIONS.md).
+
+### Upgrading
+
+Read the "Upgrade notes" of every [release notes](release_notes/) file between your version and the target before
+upgrading. Upgrading to **0.0.23**:
+
+- **Rebuild every feature worker against `continuumPlatformVersion=0.0.23` and deploy the workers before the
+  orchestration service.** A worker built against 0.0.22 or older fails every node, because it cannot read the new
+  `SCHEDULED` status.
+- **Every worker and the orchestration service must be 0.0.23: there is no mixed-version mode.** Every node now
+  exports default flow variables, so every workflow carries the `$variable` key. A worker older than 0.0.23 tries to
+  download that key from S3, so every node with an upstream node fails.
+
+Details: [`release_notes/RELEASE_NOTES_v0.0.23.md`](release_notes/RELEASE_NOTES_v0.0.23.md#upgrade-notes).
 
 ---
 

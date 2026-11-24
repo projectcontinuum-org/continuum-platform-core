@@ -24,6 +24,33 @@ class NodeOutputWriterTest {
   }
 
   @Test
+  fun `createOutputPortWriter rejects a reserved system port id`() {
+    val writer = NodeOutputWriter(tempDir)
+
+    for (reservedPortId in listOf("\$variable", "\$error", "\$custom")) {
+      val exception = assertThrows<org.projectcontinuum.core.commons.exception.NodeRuntimeException> {
+        writer.createOutputPortWriter(reservedPortId)
+      }
+      assertFalse(exception.isRetriable)
+      assertTrue(exception.message.contains("reserved"), exception.message)
+      assertFalse(tempDir.resolve("output.$reservedPortId.parquet").toFile().exists())
+    }
+  }
+
+  @Test
+  fun `getRowCount counts the rows written per port`() {
+    val writer = NodeOutputWriter(tempDir)
+    writer.createOutputPortWriter("port-0").use { portWriter ->
+      (0L until 3L).forEach { rowNumber -> portWriter.write(rowNumber, mapOf("n" to rowNumber)) }
+    }
+    writer.createOutputPortWriter("port-1").close()
+
+    assertEquals(3L, writer.getRowCount("port-0"))
+    assertEquals(0L, writer.getRowCount("port-1"))
+    assertNull(writer.getRowCount("never-created"))
+  }
+
+  @Test
   fun `write single row and verify table spec`() {
     val writer = NodeOutputWriter(tempDir)
     val portWriter = writer.createOutputPortWriter("port-0")

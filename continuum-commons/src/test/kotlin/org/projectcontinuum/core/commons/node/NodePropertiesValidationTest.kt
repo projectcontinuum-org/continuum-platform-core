@@ -151,4 +151,53 @@ class NodePropertiesValidationTest {
 
     assertTrue(node.executed)
   }
+
+  /** Overrides only the ExecutionContext overload, to set initial flow variables. */
+  private class FlowVariableTriggerNode(override val metadata: ContinuumWorkflowModel.NodeData) : TriggerNodeModel() {
+    override val outputPorts = emptyMap<String, ContinuumWorkflowModel.NodePort>()
+    override val categories = listOf("Test")
+
+    override fun execute(
+      properties: Map<String, Any>?,
+      nodeOutputWriter: NodeOutputWriter,
+      executionContext: ExecutionContext
+    ) {
+      executionContext.setFlowVariable(name = "count", value = properties!!.getValue("count"))
+    }
+  }
+
+  @Test
+  fun `trigger node run with an execution context reaches the legacy execute`() {
+    val node = RecordingTriggerNode(metadata("Trigger"))
+
+    node.run(
+      node = workflowNode(node.metadata, mapOf("count" to 5)),
+      nodeOutputWriter = NodeOutputWriter(tempDir),
+      executionContext = ExecutionContext()
+    )
+
+    assertTrue(node.executed)
+  }
+
+  @Test
+  fun `trigger node run with an execution context validates and lets the node set flow variables`() {
+    val node = FlowVariableTriggerNode(metadata("Trigger"))
+    val executionContext = ExecutionContext()
+
+    assertThrows<NodeRuntimeException> {
+      node.run(
+        node = workflowNode(node.metadata, mapOf("count" to "many")),
+        nodeOutputWriter = NodeOutputWriter(tempDir),
+        executionContext = executionContext
+      )
+    }
+    assertTrue(executionContext.getOutputFlowVariables().isEmpty())
+
+    node.run(
+      node = workflowNode(node.metadata, mapOf("count" to 5)),
+      nodeOutputWriter = NodeOutputWriter(tempDir),
+      executionContext = executionContext
+    )
+    assertEquals(mapOf("count" to 5), executionContext.getOutputFlowVariables())
+  }
 }

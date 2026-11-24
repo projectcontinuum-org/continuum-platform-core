@@ -1,0 +1,81 @@
+{
+    "id": "linear-3node-test-workflow",
+    "name": "/test-workflows/linear-3node.cwf",
+    "active": false,
+    "nodes": [
+        {
+            "id": "A",
+            "type": "BaseNode",
+            "position": { "x": 0, "y": 0 },
+            "data": {
+                "id": "test.node.NodeA",
+                "description": "Root node",
+                "title": "Node A",
+                "nodeModel": "test.node.NodeA",
+                "inputs": null,
+                "outputs": { "out-1": { "name": "out-1", "contentType": "text/plain" } },
+                "properties": {},
+                "propertiesSchema": {},
+                "propertiesUISchema": {},
+                "status": null
+            },
+            "width": 224,
+            "height": 100,
+            "selected": false
+        },
+        {
+            "id": "B",
+            "type": "BaseNode",
+            "position": { "x": 300, "y": 0 },
+            "data": {
+                "id": "test.node.NodeB",
+                "description": "Middle node",
+                "title": "Node B",
+                "nodeModel": "test.node.NodeB",
+                "inputs": { "in-1": { "name": "in-1", "contentType": "text/plain" } },
+                "outputs": { "out-1": { "name": "out-1", "contentType": "text/plain" } },
+                "properties": {},
+                "propertiesSchema": {},
+                "propertiesUISchema": {},
+                "status": null
+            },
+            "width": 224,
+            "height": 100,
+            "selected": false
+        },
+        {
+            "id": "C",
+            "type": "BaseNode",
+            "position": { "x": 600, "y": 0 },
+            "data": {
+                "id": "test.node.NodeC",
+                "description": "Last node",
+                "title": "Node C",
+                "nodeModel": "test.node.NodeC",
+                "inputs": { "in-1": { "name": "in-1", "contentType": "text/plain" } },
+                "outputs": { "out-1": { "name": "out-1", "contentType": "text/plain" } },
+                "properties": {},
+                "propertiesSchema": {},
+                "propertiesUISchema": {},
+                "status": null
+            },
+            "width": 224,
+            "height": 100,
+            "selected": false
+        }
+    ],
+    "edges": [
+        {
+            "type": "BaseEdge",
+            "source": "A", "sourceHandle": "out-1",
+            "target": "B", "targetHandle": "in-1",
+            "id": "edge-A-B"
+        },
+        {
+            "type": "BaseEdge",
+            "source": "B", "sourceHandle": "out-1",
+            "target": "C", "targetHandle": "in-1",
+            "id": "edge-B-C"
+        }
+    ]
+}

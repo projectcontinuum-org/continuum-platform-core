@@ -1,0 +1,131 @@
+package org.projectcontinuum.core.commons.context
+
+import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertNotEquals
+import org.junit.jupiter.api.Assertions.assertNotSame
+import org.junit.jupiter.api.Assertions.assertNull
+import org.junit.jupiter.api.Assertions.assertTrue
+import org.junit.jupiter.api.Test
+import org.junit.jupiter.api.assertThrows
+
+class ExecutionContextTest {
+
+  data class Threshold(val column: String, val limit: Int)
+
+  @Test
+  fun `inherited flow variables are readable, raw and converted`() {
+    val executionContext = ExecutionContext(
+      inputFlowVariables = mapOf(
+        "count" to 3,
+        "label" to "batch",
+        "threshold" to mapOf("column" to "score", "limit" to 10)
+      )
+    )
+
+    assertEquals(3, executionContext.getFlowVariable("count"))
+    assertEquals(3L, executionContext.getFlowVariable<Long>("count"))
+    assertEquals("batch", executionContext.getFlowVariable<String>("label"))
+    assertEquals(Threshold(column = "score", limit = 10), executionContext.getFlowVariable<Threshold>("threshold"))
+    assertNull(executionContext.getFlowVariable("missing"))
+    assertNull(executionContext.getFlowVariable<Int>("missing"))
+  }
+
+  @Test
+  fun `a value that cannot be converted fails`() {
+    val executionContext = ExecutionContext(inputFlowVariables = mapOf("label" to "batch"))
+
+    assertThrows<IllegalArgumentException> { executionContext.getFlowVariable<Int>("label") }
+  }
+
+  @Test
+  fun `writes collect into the output map and never change the inherited variables`() {
+    val executionContext = ExecutionContext(inputFlowVariables = mapOf("x" to 1))
+
+    executionContext.setFlowVariable(name = "x", value = 10)
+    executionContext.setFlowVariables(variables = mapOf("y" to 2, "z" to 3))
+    executionContext.setFlowVariable(name = "y", value = 20)
+
+    assertEquals(mapOf("x" to 1), executionContext.inputFlowVariables)
+    assertEquals(1, executionContext.getFlowVariable("x"))
+    assertEquals(mapOf("x" to 10, "y" to 20, "z" to 3), executionContext.getOutputFlowVariables())
+  }
+
+  @Test
+  fun `inherited variables are an unmodifiable copy of the map passed in`() {
+    val incoming = linkedMapOf<String, Any>("x" to 1)
+    val executionContext = ExecutionContext(inputFlowVariables = incoming)
+
+    @Suppress("UNCHECKED_CAST")
+    val castToMutable = executionContext.inputFlowVariables as MutableMap<String, Any>
+    assertThrows<UnsupportedOperationException> { castToMutable["x"] = 2 }
+    assertThrows<UnsupportedOperationException> { castToMutable.remove("x") }
+
+    incoming["y"] = 2
+    assertEquals(mapOf("x" to 1), executionContext.inputFlowVariables, "later changes to the passed map are not seen")
+  }
+
+  @Test
+  fun `copy, equality and destructuring work as they did for the data class`() {
+    val fetcher = CredentialFetcher { null }
+    val original = ExecutionContext(ownerId = "alice", credentialFetcher = fetcher, inputFlowVariables = mapOf("x" to 1))
+    original.setFlowVariable(name = "own", value = true)
+
+    val renamed = original.copy(ownerId = "bob")
+    assertEquals("bob", renamed.ownerId)
+    assertEquals(mapOf("x" to 1), renamed.inputFlowVariables)
+    assertTrue(renamed.getOutputFlowVariables().isEmpty(), "a copy does not carry output variables")
+
+    val sameValues = ExecutionContext(ownerId = "alice", credentialFetcher = fetcher, inputFlowVariables = mapOf("x" to 1))
+    assertEquals(sameValues, original, "output variables are not part of equality")
+    assertEquals(sameValues.hashCode(), original.hashCode())
+    assertNotEquals(renamed, original)
+    assertEquals(original, original.copy())
+
+    val (ownerId) = original
+    assertEquals("alice", ownerId)
+    assertTrue(original.toString().startsWith("ExecutionContext(ownerId=alice,"), original.toString())
+  }
+
+  @Test
+  fun `a copy with new inherited variables stores them unmodifiable`() {
+    val incoming = linkedMapOf<String, Any>("y" to 2)
+    val copied = ExecutionContext().copy(inputFlowVariables = incoming)
+    incoming["z"] = 3
+
+    assertEquals(mapOf("y" to 2), copied.inputFlowVariables)
+    @Suppress("UNCHECKED_CAST")
+    val castToMutable = copied.inputFlowVariables as MutableMap<String, Any>
+    assertThrows<UnsupportedOperationException> { castToMutable["y"] = 0 }
+  }
+
+  @Test
+  fun `getOutputFlowVariables returns a copy`() {
+    val executionContext = ExecutionContext()
+    executionContext.setFlowVariable(name = "x", value = 1)
+
+    val snapshot = executionContext.getOutputFlowVariables()
+    executionContext.setFlowVariable(name = "y", value = 2)
+
+    assertEquals(mapOf("x" to 1), snapshot)
+  }
+
+  @Test
+  fun `a blank name is rejected`() {
+    val executionContext = ExecutionContext()
+
+    assertThrows<IllegalArgumentException> { executionContext.setFlowVariable(name = " ", value = 1) }
+    assertTrue(executionContext.getOutputFlowVariables().isEmpty())
+  }
+
+  @Test
+  fun `EMPTY is a fresh context every time so flow variables never leak between nodes`() {
+    val first = ExecutionContext.EMPTY
+    first.setFlowVariable(name = "leak", value = true)
+
+    val second = ExecutionContext.EMPTY
+
+    assertNotSame(first, second)
+    assertTrue(second.getOutputFlowVariables().isEmpty())
+    assertTrue(second.inputFlowVariables.isEmpty())
+  }
+}

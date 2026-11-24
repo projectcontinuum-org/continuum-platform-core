@@ -15,14 +15,18 @@ import org.projectcontinuum.core.commons.protocol.progress.ContinuumNodeActivity
 import org.projectcontinuum.core.commons.protocol.progress.NodeProgress
 import org.projectcontinuum.core.commons.protocol.progress.NodeProgressCallback
 import org.projectcontinuum.core.commons.protocol.progress.StageStatus
+import org.projectcontinuum.core.commons.utils.DefaultFlowVariables
+import org.projectcontinuum.core.commons.utils.FlowVariables
 import org.projectcontinuum.core.commons.utils.NodeInputReader
 import org.projectcontinuum.core.commons.utils.NodeOutputWriter
 import org.projectcontinuum.core.commons.workflow.IContinuumWorkflow
 import org.projectcontinuum.core.commons.context.CredentialFetcher
 import org.projectcontinuum.core.worker.starter.credential.CredentialFetcherService
+import com.fasterxml.jackson.module.kotlin.KotlinModule
 import io.temporal.activity.Activity
 import io.temporal.activity.ActivityExecutionContext
 import io.temporal.client.ActivityCompletionException
+import io.temporal.common.converter.JacksonJsonPayloadConverter
 import io.temporal.spring.boot.ActivityImpl
 import jakarta.annotation.PostConstruct
 import org.slf4j.LoggerFactory
@@ -66,6 +70,12 @@ import kotlin.system.measureTimeMillis
  * 3. Output Parquet files are uploaded back to S3
  * 4. References to S3 objects are returned to the workflow
  *
+ * ## Flow variables
+ * `inputs["$variable"]` (inherited flow variables, collected by the orchestrator) is handed to the node through
+ * [ExecutionContext.inputFlowVariables] and is never downloaded. `outputs["$variable"]` carries the variables the node
+ * set itself plus the run's [DefaultFlowVariables], so it is present for every result, success or `$error`. Inherited
+ * variables are never passed back.
+ *
  * ## Error Handling
  * - [NodeRuntimeException] with `isRetriable = false` causes immediate failure
  * - Other exceptions trigger Temporal's retry mechanism
@@ -77,6 +87,7 @@ import kotlin.system.measureTimeMillis
  * @property cacheStoragePath Local filesystem path for caching workflow data
  * @property progressReportRateLimitMs Minimum milliseconds between progress reports to avoid bloating workflow history (default: 100ms)
  * @property heartbeatIntervalMs Interval in milliseconds for background heartbeats to keep long-running activities alive (default: 60000ms)
+ * @property maxFlowVariablesSizeBytes Maximum serialized JSON size of the flow variables one node sets; larger fails the node, non-retriable (default: 65536)
  * @author Continuum Team
  * @since 1.0.0
  * @see IContinuumNodeActivity
@@ -98,11 +109,20 @@ class ContinuumNodeActivity(
   @param:Value("\${continuum.core.worker.progress-report-rate-limit-ms:5000}")
   private val progressReportRateLimitMs: Long,
   @param:Value("\${continuum.core.worker.heartbeat-interval-ms:60000}")
-  private val heartbeatIntervalMs: Long
+  private val heartbeatIntervalMs: Long,
+  @param:Value("\${continuum.core.worker.flow-variables.max-size-bytes:65536}")
+  private val maxFlowVariablesSizeBytes: Long = DEFAULT_MAX_FLOW_VARIABLES_SIZE_BYTES
 ) : IContinuumNodeActivity {
 
   companion object {
     private val LOGGER = LoggerFactory.getLogger(ContinuumNodeActivity::class.java)
+
+    /** Default cap on the serialized size of the flow variables one node sets (64 KiB). */
+    const val DEFAULT_MAX_FLOW_VARIABLES_SIZE_BYTES = 65536L
+
+    /** Same JSON mapping as the Temporal payload converter (see `AutoConfigure`), used to measure flow variables. */
+    private val FLOW_VARIABLES_MAPPER = JacksonJsonPayloadConverter.newDefaultObjectMapper()
+      .apply { registerModule(KotlinModule.Builder().build()) }
 
     /** Prefix used to indicate data is stored remotely in S3 */
     private const val REMOTE_DATA_PREFIX = "{remote}"
@@ -132,15 +152,41 @@ class ContinuumNodeActivity(
     applicationContext.getBeanNamesForType(ProcessNodeModel::class.java).forEach { beanName ->
       val beanType = applicationContext.getType(beanName)!!
       validateNodeModelAnnotation(beanType)
+      val processNode = applicationContext.getBean(beanType) as ProcessNodeModel
+      validateReservedPortIds(
+        nodeClass = beanType,
+        portIds = processNode.inputPorts.keys +
+          processNode.outputPorts.keys +
+          processNode.metadata.inputs.orEmpty().keys +
+          processNode.metadata.outputs.orEmpty().keys
+      )
       processNodeClassNames.add(beanType.name)
     }
     applicationContext.getBeanNamesForType(TriggerNodeModel::class.java).forEach { beanName ->
       val beanType = applicationContext.getType(beanName)!!
       validateNodeModelAnnotation(beanType)
+      val triggerNode = applicationContext.getBean(beanType) as TriggerNodeModel
+      validateReservedPortIds(
+        nodeClass = beanType,
+        portIds = triggerNode.outputPorts.keys + triggerNode.metadata.outputs.orEmpty().keys
+      )
       triggerNodeClassNames.add(beanType.name)
     }
     LOGGER.info("Registered process nodes: $processNodeClassNames")
     LOGGER.info("Registered trigger nodes: $triggerNodeClassNames")
+  }
+
+  /**
+   * Fails startup when a node declares a port id reserved for system keys (`$error`, `$variable`, any id starting
+   * with `$`), which would collide with the system entries of the node's `inputs` / `outputs` maps.
+   */
+  private fun validateReservedPortIds(nodeClass: Class<*>, portIds: Set<String>) {
+    val reservedPortIds = portIds.filter { IContinuumNodeActivity.NodeOutputSystemPort.isSystemPort(it) }
+    check(reservedPortIds.isEmpty()) {
+      "Node model '${nodeClass.name}' declares port id(s) $reservedPortIds. Port ids starting with " +
+        "'${IContinuumNodeActivity.NodeOutputSystemPort.SYSTEM_PORT_PREFIX}' are reserved for system keys " +
+        "such as \$error and \$variable."
+    }
   }
 
   /**
@@ -190,6 +236,8 @@ class ContinuumNodeActivity(
     node: ContinuumWorkflowModel.Node,
     inputs: Map<String, PortData>
   ): IContinuumNodeActivity.NodeActivityOutput {
+    val startTimestamp = System.currentTimeMillis()
+    val runStatistics = NodeRunStatistics()
     val workflowRunId = Activity.getExecutionContext().info.runId
     val nodeModel = node.data.nodeModel
 
@@ -212,14 +260,28 @@ class ContinuumNodeActivity(
     reportBusy(node.id)
 
     return try {
-      when {
-        processNodeClassNames.contains(nodeModel) -> executeProcessNode(node, inputs, progressCallback, executionStartTime)
-        triggerNodeClassNames.contains(nodeModel) -> executeTriggerNode(node, progressCallback, executionStartTime)
+      val nodeOutput = when {
+        processNodeClassNames.contains(nodeModel) ->
+          executeProcessNode(node, inputs, progressCallback, executionStartTime, runStatistics)
+        triggerNodeClassNames.contains(nodeModel) ->
+          executeTriggerNode(node, inputs, progressCallback, executionStartTime, runStatistics)
         else -> createErrorOutput(node.id, "Node model '$nodeModel' not found")
-      }.also { cancellation.rethrowIfCancelled() }
+      }
+      cancellation.rethrowIfCancelled()
+      withDefaultFlowVariables(
+        node = node,
+        nodeOutput = nodeOutput,
+        startTimestamp = startTimestamp,
+        runStatistics = runStatistics
+      )
     } catch (e: NodeRuntimeException) {
       cancellation.rethrowIfCancelled()
-      handleNodeException(node, e)
+      withDefaultFlowVariables(
+        node = node,
+        nodeOutput = handleNodeException(node, e),
+        startTimestamp = startTimestamp,
+        runStatistics = runStatistics
+      )
     } catch (e: Throwable) {
       // Report the cancellation to Temporal, not whatever the interrupted node threw on its way out
       cancellation.rethrowIfCancelled()
@@ -228,6 +290,12 @@ class ContinuumNodeActivity(
       heartbeatScheduler.shutdownNow()
       cancellation.close()
     }
+  }
+
+  /** Row counts gathered during one node run, for the default flow variables. Null until known. */
+  private class NodeRunStatistics {
+    var inputRowCounts: Map<String, Long>? = null
+    var outputRowCounts: Map<String, Long>? = null
   }
 
   /**
@@ -272,35 +340,33 @@ class ContinuumNodeActivity(
 
   /**
    * Executes a process node with the given inputs.
+   *
+   * The `$variable` system key is read from [inputs] as the node's inherited flow variables and never downloaded.
+   * The returned outputs carry `$variable` only when the node set flow variables itself ([run] then adds the
+   * [DefaultFlowVariables] to every result, so the activity's outputs always have it); inherited variables are not
+   * passed back (the orchestrator collects them from the ancestors).
    */
   private fun executeProcessNode(
     node: ContinuumWorkflowModel.Node,
     inputs: Map<String, PortData>,
     progressCallback: NodeProgressCallback,
-    executionStartTime: AtomicLong
+    executionStartTime: AtomicLong,
+    runStatistics: NodeRunStatistics
   ): IContinuumNodeActivity.NodeActivityOutput {
     val workflowRunId = Activity.getExecutionContext().info.runId
     val nodeModel = node.data.nodeModel
+    val inputFlowVariables = FlowVariables.extract(inputs)
 
     LOGGER.info("Downloading input files for node ${node.id} ($nodeModel)")
-    val nodeInputs = prepareNodeInputs(node.id, inputs)
+    val nodeInputs = prepareNodeInputs(node.id, FlowVariables.withoutSystemPorts(inputs))
     LOGGER.info("Input files downloaded for node ${node.id} ($nodeModel)")
+    runStatistics.inputRowCounts = countInputRows(nodeId = node.id, nodeInputs = nodeInputs)
 
     val nodeOutputWriter = NodeOutputWriter(cacheStoragePath.resolve("$workflowRunId/${node.id}"))
 
     executionStartTime.set(System.currentTimeMillis())
 
-    // The node fetches whichever credential(s) it needs, by name, on demand via
-    // ExecutionContext.getCredential(name) — the framework does not scan propertiesUISchema.
-    val ownerId = ContinuumOwnerContext.get()
-    val executionContext = ExecutionContext(
-      ownerId = ownerId,
-      credentialFetcher = if (ownerId != null) {
-        CredentialFetcher { name -> credentialFetcherService.fetch(name, ownerId) }
-      } else {
-        CredentialFetcher { null }
-      }
-    )
+    val executionContext = createExecutionContext(inputFlowVariables = inputFlowVariables)
 
     createProcessNode(nodeModel).run(
       node = node,
@@ -312,36 +378,170 @@ class ContinuumNodeActivity(
 
     progressCallback.report(NodeProgress(100))
 
+    val emittedFlowVariables = executionContext.getOutputFlowVariables()
+    checkFlowVariablesSize(node = node, flowVariables = emittedFlowVariables)
+
     LOGGER.info("Uploading output files for node ${node.id} ($nodeModel)")
     val nodeOutput = prepareNodeOutputs(node.id, nodeOutputWriter)
     LOGGER.info("Output files uploaded for node ${node.id} ($nodeModel)")
+    runStatistics.outputRowCounts = countOutputRows(nodeOutput = nodeOutput, nodeOutputWriter = nodeOutputWriter)
 
-    return IContinuumNodeActivity.NodeActivityOutput(nodeId = node.id, outputs = nodeOutput)
+    return IContinuumNodeActivity.NodeActivityOutput(
+      nodeId = node.id,
+      outputs = withFlowVariables(outputs = nodeOutput, flowVariables = emittedFlowVariables)
+    )
   }
 
   /**
-   * Executes a trigger node (no inputs required).
+   * Executes a trigger node (no data inputs). Inherited flow variables in [inputs], if any, are still offered to the
+   * node; the outputs carry `$variable` only when the node set flow variables itself ([run] adds the
+   * [DefaultFlowVariables] afterwards).
    */
   private fun executeTriggerNode(
     node: ContinuumWorkflowModel.Node,
+    inputs: Map<String, PortData>,
     progressCallback: NodeProgressCallback,
-    executionStartTime: AtomicLong
+    executionStartTime: AtomicLong,
+    runStatistics: NodeRunStatistics
   ): IContinuumNodeActivity.NodeActivityOutput {
     val workflowRunId = Activity.getExecutionContext().info.runId
     val nodeOutputWriter = NodeOutputWriter(cacheStoragePath.resolve("$workflowRunId/${node.id}"))
 
     executionStartTime.set(System.currentTimeMillis())
 
-    createTriggerNode(node.data.nodeModel).run(node, nodeOutputWriter = nodeOutputWriter)
+    val executionContext = createExecutionContext(inputFlowVariables = FlowVariables.extract(inputs))
+
+    createTriggerNode(node.data.nodeModel).run(
+      node = node,
+      nodeOutputWriter = nodeOutputWriter,
+      executionContext = executionContext
+    )
 
     progressCallback.report(NodeProgress(100))
 
+    val emittedFlowVariables = executionContext.getOutputFlowVariables()
+    checkFlowVariablesSize(node = node, flowVariables = emittedFlowVariables)
+
     val nodeOutput = prepareNodeOutputs(node.id, nodeOutputWriter)
+    runStatistics.outputRowCounts = countOutputRows(nodeOutput = nodeOutput, nodeOutputWriter = nodeOutputWriter)
 
     return IContinuumNodeActivity.NodeActivityOutput(
       nodeId = node.id,
-      outputs = nodeOutput
+      outputs = withFlowVariables(outputs = nodeOutput, flowVariables = emittedFlowVariables)
     )
+  }
+
+  /**
+   * Builds the [ExecutionContext] for one node run. The node fetches whichever credential(s) it needs, by name, on
+   * demand via `ExecutionContext.getCredential(name)` — the framework does not scan propertiesUISchema.
+   */
+  private fun createExecutionContext(inputFlowVariables: Map<String, Any>): ExecutionContext {
+    val ownerId = ContinuumOwnerContext.get()
+    return ExecutionContext(
+      ownerId = ownerId,
+      credentialFetcher = if (ownerId != null) {
+        CredentialFetcher { name -> credentialFetcherService.fetch(name, ownerId) }
+      } else {
+        CredentialFetcher { null }
+      },
+      inputFlowVariables = inputFlowVariables
+    )
+  }
+
+  // ==========================================================================
+  // Flow Variables
+  // ==========================================================================
+
+  /**
+   * Fails the node (non-retriable) when the flow variables it set serialize to more than [maxFlowVariablesSizeBytes]
+   * UTF-8 bytes of JSON, or cannot be serialized at all.
+   */
+  private fun checkFlowVariablesSize(node: ContinuumWorkflowModel.Node, flowVariables: Map<String, Any>) {
+    if (flowVariables.isEmpty()) return
+    val serializedSizeBytes = try {
+      FLOW_VARIABLES_MAPPER.writeValueAsBytes(flowVariables).size.toLong()
+    } catch (e: Exception) {
+      throw NodeRuntimeException(
+        isRetriable = false,
+        workflowId = Activity.getExecutionContext().info.workflowId,
+        nodeId = node.id,
+        message = "Flow variables of node '${node.id}' cannot be serialized to JSON: ${e.message}"
+      )
+    }
+    if (serializedSizeBytes > maxFlowVariablesSizeBytes) {
+      throw NodeRuntimeException(
+        isRetriable = false,
+        workflowId = Activity.getExecutionContext().info.workflowId,
+        nodeId = node.id,
+        message = "Flow variables of node '${node.id}' are $serializedSizeBytes bytes, max $maxFlowVariablesSizeBytes " +
+          "(continuum.core.worker.flow-variables.max-size-bytes)"
+      )
+    }
+  }
+
+  /** Adds the `$variable` system key to [outputs] when [flowVariables] is non-empty; otherwise returns [outputs] as is. */
+  private fun withFlowVariables(
+    outputs: Map<String, PortData>,
+    flowVariables: Map<String, Any>
+  ): Map<String, PortData> {
+    if (flowVariables.isEmpty()) return outputs
+    return outputs + (IContinuumNodeActivity.NodeOutputSystemPort.VARIABLE.key to FlowVariables.toPortData(flowVariables))
+  }
+
+  /**
+   * Adds this run's [DefaultFlowVariables] (`<nodeType>_<nodeId>.executionStatus`, `.durationMs`, ...) to
+   * `$variable` of [nodeOutput], for successful and failed nodes alike. They are written over a node-set variable of
+   * the same name. Not counted against [maxFlowVariablesSizeBytes], which caps what the node sets itself.
+   */
+  private fun withDefaultFlowVariables(
+    node: ContinuumWorkflowModel.Node,
+    nodeOutput: IContinuumNodeActivity.NodeActivityOutput,
+    startTimestamp: Long,
+    runStatistics: NodeRunStatistics
+  ): IContinuumNodeActivity.NodeActivityOutput {
+    val errorPort = nodeOutput.outputs[IContinuumNodeActivity.NodeOutputSystemPort.ERROR.key]
+    val failed = errorPort != null
+    val defaultFlowVariables = DefaultFlowVariables.build(
+      prefix = DefaultFlowVariables.prefix(nodeModel = node.data.nodeModel, nodeId = node.id),
+      failed = failed,
+      errorMessage = errorPort?.data?.toString(),
+      startTimestamp = startTimestamp,
+      endTimestamp = System.currentTimeMillis(),
+      inputRowCounts = runStatistics.inputRowCounts,
+      outputRowCounts = if (failed) null else runStatistics.outputRowCounts
+    )
+    val ownFlowVariables = FlowVariables.extract(nodeOutput.outputs)
+    return nodeOutput.copy(
+      outputs = withFlowVariables(
+        outputs = nodeOutput.outputs,
+        flowVariables = ownFlowVariables + defaultFlowVariables
+      )
+    )
+  }
+
+  /** Rows per downloaded input port, read from the Parquet footers. A port whose count cannot be read is left out. */
+  private fun countInputRows(nodeId: String, nodeInputs: Map<String, NodeInputReader>): Map<String, Long> {
+    val inputRowCounts = LinkedHashMap<String, Long>()
+    nodeInputs.forEach { (portId, inputReader) ->
+      try {
+        inputRowCounts[portId] = inputReader.getRowCount()
+      } catch (e: Exception) {
+        LOGGER.warn("Cannot count the rows of input port '$portId' of node $nodeId: ${e.message}")
+      }
+    }
+    return inputRowCounts
+  }
+
+  /** Rows written per uploaded output port (system keys are not ports). */
+  private fun countOutputRows(
+    nodeOutput: Map<String, PortData>,
+    nodeOutputWriter: NodeOutputWriter
+  ): Map<String, Long> {
+    val outputRowCounts = LinkedHashMap<String, Long>()
+    FlowVariables.withoutSystemPorts(nodeOutput).keys.forEach { portId ->
+      nodeOutputWriter.getRowCount(portId)?.let { rowCount -> outputRowCounts[portId] = rowCount }
+    }
+    return outputRowCounts
   }
 
   // ==========================================================================
@@ -554,6 +754,17 @@ class ContinuumNodeActivity(
         val portId = outputFile.fileName.toString()
           .removePrefix(OUTPUT_FILE_PREFIX)
           .removeSuffix(PARQUET_EXTENSION)
+
+        if (IContinuumNodeActivity.NodeOutputSystemPort.isSystemPort(portId)) {
+          throw NodeRuntimeException(
+            isRetriable = false,
+            workflowId = Activity.getExecutionContext().info.workflowId,
+            nodeId = nodeId,
+            message = "Node '$nodeId' wrote output port '$portId'. Port ids starting with " +
+              "'${IContinuumNodeActivity.NodeOutputSystemPort.SYSTEM_PORT_PREFIX}' are reserved for system keys " +
+              "such as \$error and \$variable."
+          )
+        }
 
         val relativeFileKey = "$workflowRunId/$nodeId/$OUTPUT_FILE_PREFIX$portId$PARQUET_EXTENSION"
         uploadToS3(outputFile, relativeFileKey)

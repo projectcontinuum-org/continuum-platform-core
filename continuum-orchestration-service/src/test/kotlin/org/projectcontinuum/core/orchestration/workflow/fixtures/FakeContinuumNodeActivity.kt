@@ -6,6 +6,8 @@ import org.projectcontinuum.core.commons.exception.PropertiesValidationException
 import org.projectcontinuum.core.commons.model.ContinuumWorkflowModel
 import org.projectcontinuum.core.commons.model.PortData
 import org.projectcontinuum.core.commons.model.PortDataStatus
+import org.projectcontinuum.core.commons.utils.DefaultFlowVariables
+import org.projectcontinuum.core.commons.utils.FlowVariables
 import org.projectcontinuum.core.commons.utils.ValidationHelper
 import io.temporal.activity.Activity
 import org.projectcontinuum.core.commons.protocol.progress.ContinuumNodeActivitySignal
@@ -56,11 +58,73 @@ class FakeContinuumNodeActivity : IContinuumNodeActivity {
    */
   val registeredSchemas: MutableMap<String, Map<String, Any>> = ConcurrentHashMap()
 
+  /** Inputs the orchestrator sent, keyed by graph node id (last attempt wins). */
+  val receivedInputs: MutableMap<String, Map<String, PortData>> = ConcurrentHashMap()
+
+  /**
+   * Flow variables a node sets, keyed by graph node id. Like the real worker, the fake returns only these under
+   * `$variable` (never the inherited ones it received) and omits the key when there are none.
+   */
+  val flowVariablesToSet: MutableMap<String, Map<String, Any>> = ConcurrentHashMap()
+
+  /**
+   * When true, every returned output also carries the [DefaultFlowVariables] the real worker exports for each run,
+   * built with the same names (`<nodeType>_<nodeId>.executionStatus`, ...), on success and on `$error` alike.
+   * Off by default so the merge-rule tests can assert exact maps.
+   */
+  @Volatile
+  var emitDefaultFlowVariables: Boolean = false
+
+  /** Rows per output port reported in `outputCount` when [emitDefaultFlowVariables] is on; unset ports report 0. */
+  val outputRowCounts: MutableMap<String, Map<String, Long>> = ConcurrentHashMap()
+
   override fun run(
     node: ContinuumWorkflowModel.Node,
     inputs: Map<String, PortData>
   ): NodeActivityOutput {
+    val startTimestamp = System.currentTimeMillis()
+    val output = runWithoutDefaults(node = node, inputs = inputs)
+    return if (emitDefaultFlowVariables) {
+      withDefaultFlowVariables(node = node, inputs = inputs, output = output, startTimestamp = startTimestamp)
+    } else {
+      output
+    }
+  }
+
+  /** Mirrors `ContinuumNodeActivity.withDefaultFlowVariables`: own variables plus defaults; a failure keeps only the defaults. */
+  private fun withDefaultFlowVariables(
+    node: ContinuumWorkflowModel.Node,
+    inputs: Map<String, PortData>,
+    output: NodeActivityOutput,
+    startTimestamp: Long
+  ): NodeActivityOutput {
+    val errorPort = output.outputs[IContinuumNodeActivity.NodeOutputSystemPort.ERROR.key]
+    val failed = errorPort != null
+    val dataInputPortIds = FlowVariables.withoutSystemPorts(inputs).keys
+    val dataOutputPortIds = FlowVariables.withoutSystemPorts(output.outputs).keys
+    val configuredOutputRows = outputRowCounts[node.id].orEmpty()
+    val defaults = DefaultFlowVariables.build(
+      prefix = DefaultFlowVariables.prefix(nodeModel = node.data.nodeModel, nodeId = node.id),
+      failed = failed,
+      errorMessage = errorPort?.data?.toString(),
+      startTimestamp = startTimestamp,
+      endTimestamp = System.currentTimeMillis(),
+      inputRowCounts = if (node.data.inputs.isNullOrEmpty()) null else dataInputPortIds.associateWith { 0L },
+      outputRowCounts = if (failed) null else dataOutputPortIds.associateWith { portId -> configuredOutputRows[portId] ?: 0L }
+    )
+    val ownVariables = if (failed) emptyMap() else FlowVariables.extract(output.outputs)
+    return NodeActivityOutput(
+      output.nodeId,
+      output.outputs + (IContinuumNodeActivity.NodeOutputSystemPort.VARIABLE.key to FlowVariables.toPortData(ownVariables + defaults))
+    )
+  }
+
+  private fun runWithoutDefaults(
+    node: ContinuumWorkflowModel.Node,
+    inputs: Map<String, PortData>
+  ): NodeActivityOutput {
     invokedNodeIds.add(node.id)
+    receivedInputs[node.id] = inputs
     // Mirror the real worker: report BUSY as soon as the activity starts
     Activity.getExecutionContext().workflowClient
       .newWorkflowStub(
@@ -115,6 +179,14 @@ class FakeContinuumNodeActivity : IContinuumNodeActivity {
     blockUntil[node.id]?.await(5, TimeUnit.SECONDS)
 
     errorOutputs[node.id]?.let { return NodeActivityOutput(node.id, it) }
-    return NodeActivityOutput(node.id, successOutputs[node.id] ?: emptyMap())
+    val dataOutputs = successOutputs[node.id] ?: emptyMap()
+    val ownFlowVariables = flowVariablesToSet[node.id].orEmpty()
+    if (ownFlowVariables.isEmpty()) {
+      return NodeActivityOutput(node.id, dataOutputs)
+    }
+    return NodeActivityOutput(
+      node.id,
+      dataOutputs + (IContinuumNodeActivity.NodeOutputSystemPort.VARIABLE.key to FlowVariables.toPortData(ownFlowVariables))
+    )
   }
 }
