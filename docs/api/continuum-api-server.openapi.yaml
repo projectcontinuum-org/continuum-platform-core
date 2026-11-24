@@ -2360,15 +2360,15 @@ components:
             \ flow variables."
           example: application/parquet
         data:
-          type:
-          - string
-          - object
           description: "A string or a JSON object, depending on the port. For a table:\
             \ a string, its location `{remote}<runId>/<nodeId>/output.<port>.parquet`\
             \ (read it with the node output endpoint). For `$error`: a string, the\
             \ error message. For `$variable`: a JSON object of flow variable names\
             \ to values."
           example: "{remote}0b7c6f0a-2a55-4f43-9a36-0c8f4d2b1e77/normalize/output.data.parquet"
+          oneOf:
+          - type: string
+          - $ref: "#/components/schemas/PortDataJsonObject"
         status:
           type: string
           description: "Whether the port was produced (`SUCCESS`), produced with warnings\
@@ -2391,6 +2391,9 @@ components:
       - data
       - status
       - tableSpec
+    PortDataJsonObject:
+      type: object
+      description: "A JSON object. For `$variable`: flow variable names to their values."
     ProblemDetail:
       type: object
       description: "RFC 9457 problem detail, the error body of every Continuum service\

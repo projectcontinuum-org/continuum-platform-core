@@ -4,6 +4,17 @@ import com.fasterxml.jackson.annotation.JsonCreator
 import com.fasterxml.jackson.annotation.JsonProperty
 import io.swagger.v3.oas.annotations.media.Schema
 
+/**
+ * Schema-only marker for the JSON object branch of [PortData.data] (a flow variables map): it gives the `oneOf` an
+ * explicit `type: object`, which a plain `Map` does not (springdoc renders it as an empty schema).
+ */
+@Schema(
+  name = "PortDataJsonObject",
+  types = ["object"],
+  description = "A JSON object. For `\$variable`: flow variable names to their values."
+)
+internal interface PortDataJsonObject
+
 @Schema(
   name = "PortData",
   description = "One output of a node. A produced port references its Parquet file in object storage; a failed node has " +
@@ -27,7 +38,8 @@ data class PortData @JsonCreator constructor(
     description = "A string or a JSON object, depending on the port. For a table: a string, its location " +
       "`{remote}<runId>/<nodeId>/output.<port>.parquet` (read it with the node output endpoint). For `\$error`: a " +
       "string, the error message. For `\$variable`: a JSON object of flow variable names to values.",
-    types = ["string", "object"],
+    // oneOf, not a multi-type `type: [string, object]`: openapi-generator cannot turn the latter into a TypeScript type.
+    oneOf = [String::class, PortDataJsonObject::class],
     example = "{remote}0b7c6f0a-2a55-4f43-9a36-0c8f4d2b1e77/normalize/output.data.parquet"
   )
   @param:JsonProperty("data") val data: Any
