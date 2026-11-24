@@ -11,7 +11,7 @@ import org.projectcontinuum.core.commons.utils.FlowVariables
  * default variables for its run), never the inherited ones. The variables
  * available after node P are its inherited ones overridden by its own:
  *
- * - `own(P)` = `outputs["$variable"]` of P (empty when P set none, or has not produced outputs)
+ * - `own(P)` = `outputs["$variable"]` of P (empty when P has not produced outputs, or ran on a worker older than 0.0.23)
  * - `available(P)` = `inherited(P)` + `own(P)` (P's own value wins)
  * - `inherited(N)` = fan-in merge of `available(parent)` over N's parent edges
  *

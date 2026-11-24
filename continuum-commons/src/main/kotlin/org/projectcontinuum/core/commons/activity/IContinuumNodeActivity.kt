@@ -17,9 +17,12 @@ interface IContinuumNodeActivity {
    * Reserved keys in a node's `inputs` / `outputs` maps that carry system data instead of a data port.
    *
    * - [ERROR]: present in `outputs` only when the node failed; `data` is the error message.
-   * - [VARIABLE]: flow variables, a JSON object (`Map<String, Any>`) with content type `application/json`. In `outputs`
-   *   it holds only the variables the node set itself; in `inputs` it holds the variables collected from all of the
-   *   node's ancestors. Present only when the map is non-empty.
+   * - [VARIABLE]: flow variables, a JSON object (`Map<String, Any>`) with content type `application/json`.
+   *   - In `outputs` it holds the node's own variables: what the node set itself plus the default variables the
+   *     worker exports for every run (`DefaultFlowVariables`: `<nodeType>_<nodeId>.executionStatus`, `.durationMs`,
+   *     ...). Never the inherited ones. Present for every finished node, failed ones included (next to [ERROR]).
+   *   - In `inputs` it holds the variables collected from all of the node's ancestors. Present for every node with at
+   *     least one parent; omitted for root nodes, where it would be empty.
    *
    * Every ID starting with [SYSTEM_PORT_PREFIX] is reserved: no node ID or port ID may use it.
    */

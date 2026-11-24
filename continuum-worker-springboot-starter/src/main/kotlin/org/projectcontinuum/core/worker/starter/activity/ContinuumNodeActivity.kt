@@ -72,8 +72,9 @@ import kotlin.system.measureTimeMillis
  *
  * ## Flow variables
  * `inputs["$variable"]` (inherited flow variables, collected by the orchestrator) is handed to the node through
- * [ExecutionContext.inputFlowVariables] and is never downloaded. `outputs["$variable"]` carries only the variables the
- * node set itself, and only when there are any.
+ * [ExecutionContext.inputFlowVariables] and is never downloaded. `outputs["$variable"]` carries the variables the node
+ * set itself plus the run's [DefaultFlowVariables], so it is present for every result, success or `$error`. Inherited
+ * variables are never passed back.
  *
  * ## Error Handling
  * - [NodeRuntimeException] with `isRetriable = false` causes immediate failure
@@ -341,7 +342,8 @@ class ContinuumNodeActivity(
    * Executes a process node with the given inputs.
    *
    * The `$variable` system key is read from [inputs] as the node's inherited flow variables and never downloaded.
-   * The returned outputs carry `$variable` only when the node set flow variables itself; inherited variables are not
+   * The returned outputs carry `$variable` only when the node set flow variables itself ([run] then adds the
+   * [DefaultFlowVariables] to every result, so the activity's outputs always have it); inherited variables are not
    * passed back (the orchestrator collects them from the ancestors).
    */
   private fun executeProcessNode(
@@ -392,7 +394,8 @@ class ContinuumNodeActivity(
 
   /**
    * Executes a trigger node (no data inputs). Inherited flow variables in [inputs], if any, are still offered to the
-   * node; the outputs carry `$variable` only when the node set flow variables itself.
+   * node; the outputs carry `$variable` only when the node set flow variables itself ([run] adds the
+   * [DefaultFlowVariables] afterwards).
    */
   private fun executeTriggerNode(
     node: ContinuumWorkflowModel.Node,

@@ -7,8 +7,9 @@ import io.swagger.v3.oas.annotations.media.Schema
 @Schema(
   name = "PortData",
   description = "One output of a node. A produced port references its Parquet file in object storage; a failed node has " +
-    "the single port `\$error` whose `data` is the error message. The system key `\$variable`, present only when the " +
-    "node set flow variables, holds them as a JSON object in `data`."
+    "the port `\$error` whose `data` is the error message. The system key `\$variable`, present for every finished " +
+    "node (failed ones too), holds the node's flow variables as a JSON object in `data`: the ones it set plus the " +
+    "default ones the worker exports for every run (`<nodeType>_<nodeId>.executionStatus`, `.durationMs`, ...)."
 )
 data class PortData @JsonCreator constructor(
   @field:Schema(description = "Whether the port was produced (`SUCCESS`), produced with warnings (`WARNING`) or is the error of a failed node (`FAILED`).", example = "SUCCESS")

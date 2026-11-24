@@ -267,6 +267,111 @@ class ContinuumWorkflowTest {
     }
   }
 
+  /** The entries of [variables] named under [prefix] (`<prefix>.<variable>`), keyed by the bare variable name. */
+  private fun defaultsUnder(variables: Map<String, Any>?, prefix: String): Map<String, Any> =
+    variables.orEmpty()
+      .filterKeys { name -> name.startsWith("$prefix.") }
+      .mapKeys { (name, _) -> name.removePrefix("$prefix.") }
+
+  /** Default-variable prefixes of the `test.node.NodeX` fixtures (node ids equal the letters). */
+  private val prefixA = "nodeA_A"
+  private val prefixB = "nodeB_B"
+  private val prefixC = "nodeC_C"
+  private val prefixD = "nodeD_D"
+
+  @Test
+  fun `default flow variables of every ancestor add up down a chain, each stored only once`() {
+    newEnv().use { env ->
+      env.fakeNodeActivity.emitDefaultFlowVariables = true
+      env.fakeNodeActivity.flowVariablesToSet["A"] = mapOf("x" to 1)
+      env.fakeNodeActivity.outputRowCounts["A"] = mapOf("out-1" to 4L)
+      env.fakeNodeActivity.outputRowCounts["B"] = mapOf("out-1" to 3L)
+
+      val result = runLinearThreeNode(env)
+
+      val storedA = FlowVariables.extract(result.getValue("A"))
+      val storedB = FlowVariables.extract(result.getValue("B"))
+      // Each node stores its own variables and defaults only, never an ancestor's
+      assertEquals(setOf(prefixA), storedA.keys.filter { it != "x" }.map { it.substringBefore('.') }.toSet())
+      assertEquals(setOf(prefixB), storedB.keys.map { it.substringBefore('.') }.toSet())
+
+      // A root node receives nothing; each later node receives every ancestor's defaults, but never its own
+      assertEquals(null, receivedFlowVariables(env.fakeNodeActivity, "A"))
+      val receivedB = receivedFlowVariables(env.fakeNodeActivity, "B")!!
+      val receivedC = receivedFlowVariables(env.fakeNodeActivity, "C")!!
+      assertEquals(setOf("x", prefixA), receivedB.keys.map { it.substringBefore('.') }.toSet())
+      assertEquals(setOf("x", prefixA, prefixB), receivedC.keys.map { it.substringBefore('.') }.toSet())
+
+      // What C inherits is exactly what A and B stored, unchanged on the way
+      assertTrue(FlowVariables.valuesEqual(first = storedA + storedB, second = receivedC), "C received $receivedC")
+      val defaultsOfA = defaultsUnder(variables = receivedC, prefix = prefixA)
+      assertEquals("SUCCESS", defaultsOfA["executionStatus"])
+      assertTrue(FlowVariables.valuesEqual(first = mapOf("out-1" to 4L), second = defaultsOfA["outputCount"]))
+      assertTrue(FlowVariables.valuesEqual(first = mapOf("out-1" to 3L), second = defaultsUnder(receivedC, prefixB)["outputCount"]))
+      assertTrue(FlowVariables.valuesEqual(first = mapOf("in-1" to 0L), second = defaultsUnder(receivedC, prefixB)["inputCount"]))
+      assertFalse(defaultsOfA.containsKey("inputCount"), "a root node reads no inputs")
+    }
+  }
+
+  @Test
+  fun `defaults of a shared ancestor reach a fan-in node once, next to each branch's own`() {
+    newEnv().use { env ->
+      env.fakeNodeActivity.emitDefaultFlowVariables = true
+      listOf("A", "B", "C", "D").forEach { id -> env.fakeNodeActivity.successOutputs[id] = mapOf("out-1" to samplePortData(id)) }
+
+      val model = WorkflowFixtures.loadWorkflow("/test-workflows/diamond-4node.cwf.json")
+      val (_, future) = startWorkflow(env, model)
+      val result = future.get(10, TimeUnit.SECONDS)
+
+      val receivedD = receivedFlowVariables(env.fakeNodeActivity, "D")!!
+      assertEquals(setOf(prefixA, prefixB, prefixC), receivedD.keys.map { it.substringBefore('.') }.toSet())
+      // A's defaults arrive by both branches with the same values: merged, and equal to what A stored
+      assertTrue(
+        FlowVariables.valuesEqual(
+          first = FlowVariables.extract(result.getValue("A")),
+          second = receivedD.filterKeys { it.startsWith("$prefixA.") }
+        )
+      )
+      // Unique names per node: the two branches' defaults never collide
+      assertEquals("SUCCESS", defaultsUnder(receivedD, prefixB)["executionStatus"])
+      assertEquals("SUCCESS", defaultsUnder(receivedD, prefixC)["executionStatus"])
+      assertEquals(setOf(prefixD), FlowVariables.extract(result.getValue("D")).keys.map { it.substringBefore('.') }.toSet())
+    }
+  }
+
+  @Test
+  fun `a failed node stores its defaults with the error and its descendants never run`() {
+    newEnv().use { env ->
+      env.fakeNodeActivity.emitDefaultFlowVariables = true
+      env.fakeNodeActivity.successOutputs["A"] = mapOf("out-1" to samplePortData("A"))
+      env.fakeNodeActivity.flowVariablesToSet["B"] = mapOf("lost" to true)
+      env.fakeNodeActivity.errorOutputs["B"] =
+        mapOf(IContinuumNodeActivity.NodeOutputSystemPort.ERROR.key to samplePortData("boom"))
+
+      val model = WorkflowFixtures.loadWorkflow("/test-workflows/linear-3node.cwf.json")
+      val (_, future) = startWorkflow(env, model)
+      val executionException = assertFailsWith<ExecutionException> { future.get(10, TimeUnit.SECONDS) }
+
+      val appFailure = (executionException.cause as WorkflowFailedException).cause as ApplicationFailure
+      @Suppress("UNCHECKED_CAST")
+      val details = appFailure.details.get(0, Map::class.java) as Map<String, Map<String, Map<String, Map<String, Any>>>>
+      val failedOutputs = details.getValue("nodeErrors").getValue("B")
+      assertEquals(
+        setOf(IContinuumNodeActivity.NodeOutputSystemPort.ERROR.key, variableKey),
+        failedOutputs.keys
+      )
+      @Suppress("UNCHECKED_CAST")
+      val storedB = failedOutputs.getValue(variableKey)["data"] as Map<String, Any>
+      assertEquals("FAILED", storedB["$prefixB.executionStatus"])
+      assertEquals("boom", storedB["$prefixB.errorMessage"])
+      assertFalse(storedB.containsKey("$prefixB.outputCount"), "a failed node has no output counts")
+      assertFalse(storedB.containsKey("lost"), "a failed node's own variables are dropped")
+      // B still received A's defaults, and C was skipped so nothing carried B's onward
+      assertEquals("SUCCESS", defaultsUnder(receivedFlowVariables(env.fakeNodeActivity, "B"), prefixA)["executionStatus"])
+      assertFalse(env.fakeNodeActivity.invokedNodeIds.contains("C"))
+    }
+  }
+
   @Test
   fun `a workflow without flow variables sends and stores exactly the data ports`() {
     newEnv().use { env ->

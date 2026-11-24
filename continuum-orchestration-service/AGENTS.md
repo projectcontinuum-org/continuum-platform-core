@@ -32,6 +32,7 @@ Core platform team. Container image: `projectcontinuum/continuum-orchestration-s
 - `nodeIdToActivityMap` holds per-node activity stubs, each routed to the correct task queue. Do not share a single stub across different queues.
 - `nodeErrorsMap` uses the `$error` output port as the sentinel. Any output map containing `"$error"` key means the node failed.
 - Workflow is cancelled via `CanceledFailure` (Temporal cancellation or termination). All SCHEDULED and BUSY nodes are marked CANCELLED, and the event is published.
+- `FakeContinuumNodeActivity` returns `flowVariablesToSet` under `$variable`, like the worker. With `emitDefaultFlowVariables = true` it also adds the worker's `DefaultFlowVariables` (built with the same commons code, `outputRowCounts` per port), on success and on `$error`. It is off by default so the merge-rule tests can assert exact maps. Turn it on in any test about what real workflows carry. Keep it in step with `ContinuumNodeActivity.withDefaultFlowVariables`.
 - Test fixtures in `src/test/resources/test-workflows/` that name a real node model (e.g. `SplitNodeModel`) must carry properties valid against that node's registered schema, not just the copy in the file. `WorkflowPropertiesValidationTest` checks this and covers the invalid-property cases: one attempt, no retry, downstream nodes do not run. To enable that check in other tests, set `FakeContinuumNodeActivity.registeredSchemas`.
 
 ## Verification

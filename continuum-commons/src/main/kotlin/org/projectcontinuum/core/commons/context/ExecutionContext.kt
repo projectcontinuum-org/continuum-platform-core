@@ -62,8 +62,10 @@ fun interface CredentialFetcher {
  * executionContext.setFlowVariable(name = "batchNumber", value = batch + 1)
  * ```
  *
- * An execution context is per node run and mutable (it collects the node's output flow variables), so it is a plain
- * class: no value equality, `copy()` or destructuring.
+ * Not a `data class`, but it keeps the members the 0.0.22 data class had, with the same meaning: [copy], [equals] /
+ * [hashCode] over the constructor values, [toString] and [component1]. A copy goes through the constructor, so its
+ * inherited variables are copied and unmodifiable again. Like a data class copy, it does not carry the output flow
+ * variables written so far, and those are not part of equality.
  *
  * @param ownerId The user/tenant who owns this workflow execution (from x-continuum-user-id header)
  * @param credentialFetcher Fetches a credential's key-value data by name, on demand.
@@ -141,6 +143,53 @@ class ExecutionContext(
 
   /** Returns a copy of the flow variables this node set itself (inherited variables are not included). */
   fun getOutputFlowVariables(): Map<String, Any> = LinkedHashMap(outputFlowVariables)
+
+  // --------------------------------------------------------------------------
+  // Members of the former data class, kept for source and binary compatibility
+  // --------------------------------------------------------------------------
+
+  /**
+   * Returns a new context with the given values. Goes through the constructor, so [inputFlowVariables] is copied into
+   * an unmodifiable map; the output flow variables set so far are not carried over.
+   */
+  fun copy(
+    ownerId: String? = this.ownerId,
+    credentialFetcher: CredentialFetcher = this.credentialFetcher,
+    inputFlowVariables: Map<String, Any> = this.inputFlowVariables
+  ): ExecutionContext = ExecutionContext(
+    ownerId = ownerId,
+    credentialFetcher = credentialFetcher,
+    inputFlowVariables = inputFlowVariables
+  )
+
+  /** The two-argument `copy` of the 0.0.22 data class, kept for binary compatibility only; Kotlin callers get [copy]. */
+  @Deprecated(message = "Binary compatibility with continuum-commons 0.0.22", level = DeprecationLevel.HIDDEN)
+  fun copy(
+    ownerId: String? = this.ownerId,
+    credentialFetcher: CredentialFetcher = this.credentialFetcher
+  ): ExecutionContext = copy(ownerId = ownerId, credentialFetcher = credentialFetcher, inputFlowVariables = inputFlowVariables)
+
+  /** [ownerId], for destructuring (`val (ownerId) = executionContext`), as the data class allowed. */
+  operator fun component1(): String? = ownerId
+
+  /** Equal when [ownerId], the credential fetcher and [inputFlowVariables] are equal, as for the data class. */
+  override fun equals(other: Any?): Boolean {
+    if (this === other) return true
+    if (other !is ExecutionContext) return false
+    return ownerId == other.ownerId &&
+      credentialFetcher == other.credentialFetcher &&
+      inputFlowVariables == other.inputFlowVariables
+  }
+
+  override fun hashCode(): Int {
+    var result = ownerId?.hashCode() ?: 0
+    result = 31 * result + credentialFetcher.hashCode()
+    result = 31 * result + inputFlowVariables.hashCode()
+    return result
+  }
+
+  override fun toString(): String =
+    "ExecutionContext(ownerId=$ownerId, credentialFetcher=$credentialFetcher, inputFlowVariables=$inputFlowVariables)"
 
   companion object {
     /**

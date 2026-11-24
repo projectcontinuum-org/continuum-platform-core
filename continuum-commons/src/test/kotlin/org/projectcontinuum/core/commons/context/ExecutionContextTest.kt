@@ -1,6 +1,7 @@
 package org.projectcontinuum.core.commons.context
 
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertNotEquals
 import org.junit.jupiter.api.Assertions.assertNotSame
 import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.Assertions.assertTrue
@@ -61,6 +62,40 @@ class ExecutionContextTest {
 
     incoming["y"] = 2
     assertEquals(mapOf("x" to 1), executionContext.inputFlowVariables, "later changes to the passed map are not seen")
+  }
+
+  @Test
+  fun `copy, equality and destructuring work as they did for the data class`() {
+    val fetcher = CredentialFetcher { null }
+    val original = ExecutionContext(ownerId = "alice", credentialFetcher = fetcher, inputFlowVariables = mapOf("x" to 1))
+    original.setFlowVariable(name = "own", value = true)
+
+    val renamed = original.copy(ownerId = "bob")
+    assertEquals("bob", renamed.ownerId)
+    assertEquals(mapOf("x" to 1), renamed.inputFlowVariables)
+    assertTrue(renamed.getOutputFlowVariables().isEmpty(), "a copy does not carry output variables")
+
+    val sameValues = ExecutionContext(ownerId = "alice", credentialFetcher = fetcher, inputFlowVariables = mapOf("x" to 1))
+    assertEquals(sameValues, original, "output variables are not part of equality")
+    assertEquals(sameValues.hashCode(), original.hashCode())
+    assertNotEquals(renamed, original)
+    assertEquals(original, original.copy())
+
+    val (ownerId) = original
+    assertEquals("alice", ownerId)
+    assertTrue(original.toString().startsWith("ExecutionContext(ownerId=alice,"), original.toString())
+  }
+
+  @Test
+  fun `a copy with new inherited variables stores them unmodifiable`() {
+    val incoming = linkedMapOf<String, Any>("y" to 2)
+    val copied = ExecutionContext().copy(inputFlowVariables = incoming)
+    incoming["z"] = 3
+
+    assertEquals(mapOf("y" to 2), copied.inputFlowVariables)
+    @Suppress("UNCHECKED_CAST")
+    val castToMutable = copied.inputFlowVariables as MutableMap<String, Any>
+    assertThrows<UnsupportedOperationException> { castToMutable["y"] = 0 }
   }
 
   @Test
