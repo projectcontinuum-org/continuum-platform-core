@@ -264,7 +264,7 @@ The `continuum` DSL extension in each feature `build.gradle.kts` controls versio
 
 All inter-node data is Apache Parquet (Snappy compressed, Avro schema `DataRow`). `NodeOutputWriter.OutputPortWriter` writes rows; `NodeInputReader` reads them. Output files are named `output.{portId}.parquet`; input files `input.{portId}.parquet`. Both are staged in a local cache path before upload/after download from MinIO.
 
-Flow variables (small JSON key/value pairs) travel beside the data ports under the reserved system key `$variable`. A node's `outputs["$variable"]` holds only what that node set. The orchestrator collects every ancestor's variables into `inputs["$variable"]`. The key is omitted when empty. Details are in the commons, worker-starter and orchestration AGENTS.md files.
+Flow variables (small JSON key/value pairs) travel beside the data ports under the reserved system key `$variable`. A node's `outputs["$variable"]` holds what that node set plus the default variables the worker exports for every run (`<nodeType>_<nodeId>.executionStatus`, `.durationMs`, ...), so it is present for every finished node. The orchestrator collects every ancestor's variables into `inputs["$variable"]`, omitted only when empty (root nodes). Details are in the commons, worker-starter and orchestration AGENTS.md files.
 
 #### Key versions
 

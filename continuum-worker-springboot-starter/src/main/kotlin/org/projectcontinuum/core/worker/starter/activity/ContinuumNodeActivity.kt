@@ -15,6 +15,7 @@ import org.projectcontinuum.core.commons.protocol.progress.ContinuumNodeActivity
 import org.projectcontinuum.core.commons.protocol.progress.NodeProgress
 import org.projectcontinuum.core.commons.protocol.progress.NodeProgressCallback
 import org.projectcontinuum.core.commons.protocol.progress.StageStatus
+import org.projectcontinuum.core.commons.utils.DefaultFlowVariables
 import org.projectcontinuum.core.commons.utils.FlowVariables
 import org.projectcontinuum.core.commons.utils.NodeInputReader
 import org.projectcontinuum.core.commons.utils.NodeOutputWriter
@@ -234,6 +235,8 @@ class ContinuumNodeActivity(
     node: ContinuumWorkflowModel.Node,
     inputs: Map<String, PortData>
   ): IContinuumNodeActivity.NodeActivityOutput {
+    val startTimestamp = System.currentTimeMillis()
+    val runStatistics = NodeRunStatistics()
     val workflowRunId = Activity.getExecutionContext().info.runId
     val nodeModel = node.data.nodeModel
 
@@ -256,14 +259,28 @@ class ContinuumNodeActivity(
     reportBusy(node.id)
 
     return try {
-      when {
-        processNodeClassNames.contains(nodeModel) -> executeProcessNode(node, inputs, progressCallback, executionStartTime)
-        triggerNodeClassNames.contains(nodeModel) -> executeTriggerNode(node, inputs, progressCallback, executionStartTime)
+      val nodeOutput = when {
+        processNodeClassNames.contains(nodeModel) ->
+          executeProcessNode(node, inputs, progressCallback, executionStartTime, runStatistics)
+        triggerNodeClassNames.contains(nodeModel) ->
+          executeTriggerNode(node, inputs, progressCallback, executionStartTime, runStatistics)
         else -> createErrorOutput(node.id, "Node model '$nodeModel' not found")
-      }.also { cancellation.rethrowIfCancelled() }
+      }
+      cancellation.rethrowIfCancelled()
+      withDefaultFlowVariables(
+        node = node,
+        nodeOutput = nodeOutput,
+        startTimestamp = startTimestamp,
+        runStatistics = runStatistics
+      )
     } catch (e: NodeRuntimeException) {
       cancellation.rethrowIfCancelled()
-      handleNodeException(node, e)
+      withDefaultFlowVariables(
+        node = node,
+        nodeOutput = handleNodeException(node, e),
+        startTimestamp = startTimestamp,
+        runStatistics = runStatistics
+      )
     } catch (e: Throwable) {
       // Report the cancellation to Temporal, not whatever the interrupted node threw on its way out
       cancellation.rethrowIfCancelled()
@@ -272,6 +289,12 @@ class ContinuumNodeActivity(
       heartbeatScheduler.shutdownNow()
       cancellation.close()
     }
+  }
+
+  /** Row counts gathered during one node run, for the default flow variables. Null until known. */
+  private class NodeRunStatistics {
+    var inputRowCounts: Map<String, Long>? = null
+    var outputRowCounts: Map<String, Long>? = null
   }
 
   /**
@@ -325,7 +348,8 @@ class ContinuumNodeActivity(
     node: ContinuumWorkflowModel.Node,
     inputs: Map<String, PortData>,
     progressCallback: NodeProgressCallback,
-    executionStartTime: AtomicLong
+    executionStartTime: AtomicLong,
+    runStatistics: NodeRunStatistics
   ): IContinuumNodeActivity.NodeActivityOutput {
     val workflowRunId = Activity.getExecutionContext().info.runId
     val nodeModel = node.data.nodeModel
@@ -334,6 +358,7 @@ class ContinuumNodeActivity(
     LOGGER.info("Downloading input files for node ${node.id} ($nodeModel)")
     val nodeInputs = prepareNodeInputs(node.id, FlowVariables.withoutSystemPorts(inputs))
     LOGGER.info("Input files downloaded for node ${node.id} ($nodeModel)")
+    runStatistics.inputRowCounts = countInputRows(nodeId = node.id, nodeInputs = nodeInputs)
 
     val nodeOutputWriter = NodeOutputWriter(cacheStoragePath.resolve("$workflowRunId/${node.id}"))
 
@@ -357,6 +382,7 @@ class ContinuumNodeActivity(
     LOGGER.info("Uploading output files for node ${node.id} ($nodeModel)")
     val nodeOutput = prepareNodeOutputs(node.id, nodeOutputWriter)
     LOGGER.info("Output files uploaded for node ${node.id} ($nodeModel)")
+    runStatistics.outputRowCounts = countOutputRows(nodeOutput = nodeOutput, nodeOutputWriter = nodeOutputWriter)
 
     return IContinuumNodeActivity.NodeActivityOutput(
       nodeId = node.id,
@@ -372,7 +398,8 @@ class ContinuumNodeActivity(
     node: ContinuumWorkflowModel.Node,
     inputs: Map<String, PortData>,
     progressCallback: NodeProgressCallback,
-    executionStartTime: AtomicLong
+    executionStartTime: AtomicLong,
+    runStatistics: NodeRunStatistics
   ): IContinuumNodeActivity.NodeActivityOutput {
     val workflowRunId = Activity.getExecutionContext().info.runId
     val nodeOutputWriter = NodeOutputWriter(cacheStoragePath.resolve("$workflowRunId/${node.id}"))
@@ -393,6 +420,7 @@ class ContinuumNodeActivity(
     checkFlowVariablesSize(node = node, flowVariables = emittedFlowVariables)
 
     val nodeOutput = prepareNodeOutputs(node.id, nodeOutputWriter)
+    runStatistics.outputRowCounts = countOutputRows(nodeOutput = nodeOutput, nodeOutputWriter = nodeOutputWriter)
 
     return IContinuumNodeActivity.NodeActivityOutput(
       nodeId = node.id,
@@ -455,6 +483,62 @@ class ContinuumNodeActivity(
   ): Map<String, PortData> {
     if (flowVariables.isEmpty()) return outputs
     return outputs + (IContinuumNodeActivity.NodeOutputSystemPort.VARIABLE.key to FlowVariables.toPortData(flowVariables))
+  }
+
+  /**
+   * Adds this run's [DefaultFlowVariables] (`<nodeType>_<nodeId>.executionStatus`, `.durationMs`, ...) to
+   * `$variable` of [nodeOutput], for successful and failed nodes alike. They are written over a node-set variable of
+   * the same name. Not counted against [maxFlowVariablesSizeBytes], which caps what the node sets itself.
+   */
+  private fun withDefaultFlowVariables(
+    node: ContinuumWorkflowModel.Node,
+    nodeOutput: IContinuumNodeActivity.NodeActivityOutput,
+    startTimestamp: Long,
+    runStatistics: NodeRunStatistics
+  ): IContinuumNodeActivity.NodeActivityOutput {
+    val errorPort = nodeOutput.outputs[IContinuumNodeActivity.NodeOutputSystemPort.ERROR.key]
+    val failed = errorPort != null
+    val defaultFlowVariables = DefaultFlowVariables.build(
+      prefix = DefaultFlowVariables.prefix(nodeModel = node.data.nodeModel, nodeId = node.id),
+      failed = failed,
+      errorMessage = errorPort?.data?.toString(),
+      startTimestamp = startTimestamp,
+      endTimestamp = System.currentTimeMillis(),
+      inputRowCounts = runStatistics.inputRowCounts,
+      outputRowCounts = if (failed) null else runStatistics.outputRowCounts
+    )
+    val ownFlowVariables = FlowVariables.extract(nodeOutput.outputs)
+    return nodeOutput.copy(
+      outputs = withFlowVariables(
+        outputs = nodeOutput.outputs,
+        flowVariables = ownFlowVariables + defaultFlowVariables
+      )
+    )
+  }
+
+  /** Rows per downloaded input port, read from the Parquet footers. A port whose count cannot be read is left out. */
+  private fun countInputRows(nodeId: String, nodeInputs: Map<String, NodeInputReader>): Map<String, Long> {
+    val inputRowCounts = LinkedHashMap<String, Long>()
+    nodeInputs.forEach { (portId, inputReader) ->
+      try {
+        inputRowCounts[portId] = inputReader.getRowCount()
+      } catch (e: Exception) {
+        LOGGER.warn("Cannot count the rows of input port '$portId' of node $nodeId: ${e.message}")
+      }
+    }
+    return inputRowCounts
+  }
+
+  /** Rows written per uploaded output port (system keys are not ports). */
+  private fun countOutputRows(
+    nodeOutput: Map<String, PortData>,
+    nodeOutputWriter: NodeOutputWriter
+  ): Map<String, Long> {
+    val outputRowCounts = LinkedHashMap<String, Long>()
+    FlowVariables.withoutSystemPorts(nodeOutput).keys.forEach { portId ->
+      nodeOutputWriter.getRowCount(portId)?.let { rowCount -> outputRowCounts[portId] = rowCount }
+    }
+    return outputRowCounts
   }
 
   // ==========================================================================

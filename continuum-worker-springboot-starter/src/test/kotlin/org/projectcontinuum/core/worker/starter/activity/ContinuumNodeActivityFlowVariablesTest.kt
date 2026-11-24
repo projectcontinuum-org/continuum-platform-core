@@ -23,6 +23,7 @@ import org.mockito.kotlin.doReturn
 import org.mockito.kotlin.mock
 import org.mockito.kotlin.never
 import org.mockito.kotlin.verify
+import org.mockito.kotlin.whenever
 import org.projectcontinuum.core.commons.activity.IContinuumNodeActivity
 import org.projectcontinuum.core.commons.activity.IContinuumNodeActivity.NodeOutputSystemPort
 import org.projectcontinuum.core.commons.annotation.ContinuumNode
@@ -42,10 +43,14 @@ import org.projectcontinuum.core.commons.workflow.IContinuumWorkflow
 import org.projectcontinuum.core.worker.starter.credential.CredentialFetcherService
 import org.springframework.context.ApplicationContext
 import software.amazon.awssdk.transfer.s3.S3TransferManager
+import software.amazon.awssdk.transfer.s3.model.CompletedFileUpload
 import software.amazon.awssdk.transfer.s3.model.DownloadFileRequest
+import software.amazon.awssdk.transfer.s3.model.FileUpload
+import software.amazon.awssdk.transfer.s3.model.UploadFileRequest
 import java.nio.file.Path
 import java.time.Duration
 import java.util.UUID
+import java.util.concurrent.CompletableFuture
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicReference
@@ -62,6 +67,7 @@ class ContinuumNodeActivityFlowVariablesTest {
     val receivedFlowVariables = AtomicReference<Map<String, Any>?>()
     val receivedDataPortIds = AtomicReference<Set<String>?>()
     var variablesToSet: Map<String, Any> = emptyMap()
+    var rowsToWrite: Map<String, Int> = emptyMap()
 
     override val inputPorts = emptyMap<String, ContinuumWorkflowModel.NodePort>()
     override val outputPorts = emptyMap<String, ContinuumWorkflowModel.NodePort>()
@@ -80,6 +86,11 @@ class ContinuumNodeActivityFlowVariablesTest {
       receivedFlowVariables.set(executionContext.inputFlowVariables)
       receivedDataPortIds.set(inputs.keys)
       executionContext.setFlowVariables(variables = variablesToSet)
+      rowsToWrite.forEach { (portId, rowCount) ->
+        nodeOutputWriter.createOutputPortWriter(portId).use { writer ->
+          (0 until rowCount).forEach { rowNumber -> writer.write(rowNumber = rowNumber.toLong(), row = mapOf("n" to rowNumber)) }
+        }
+      }
     }
   }
 
@@ -148,7 +159,13 @@ class ContinuumNodeActivityFlowVariablesTest {
   @TempDir
   lateinit var cacheDir: Path
 
-  private val s3TransferManager = mock<S3TransferManager>()
+  /** Uploads complete at once, so a node that writes output ports can finish. */
+  private val completedUpload: FileUpload = mock<FileUpload>().also { upload ->
+    whenever(upload.completionFuture()).thenReturn(CompletableFuture.completedFuture(mock<CompletedFileUpload>()))
+  }
+  private val s3TransferManager: S3TransferManager = mock<S3TransferManager>().also { transferManager ->
+    whenever(transferManager.uploadFile(any<UploadFileRequest>())).thenReturn(completedUpload)
+  }
   private val processNode = VariableProcessNode()
   private val triggerNode = VariableTriggerNode()
   private var testEnv: TestWorkflowEnvironment? = null
@@ -222,6 +239,18 @@ class ContinuumNodeActivityFlowVariablesTest {
   private fun variableInputs(variables: Map<String, Any>) =
     mapOf(NodeOutputSystemPort.VARIABLE.key to FlowVariables.toPortData(variables = variables))
 
+  /** Default variable prefixes of node `n1` of the two test node types. */
+  private val processPrefix = "variableProcessNode_n1"
+  private val triggerPrefix = "variableTriggerNode_n1"
+
+  /** The emitted flow variables without the defaults the framework adds under [prefix]. */
+  private fun nodeSetVariables(outputs: Map<String, PortData>, prefix: String) =
+    FlowVariables.extract(ports = outputs).filterKeys { name -> !name.startsWith("$prefix.") }
+
+  /** The defaults the framework exported under [prefix]. */
+  private fun defaultVariables(outputs: Map<String, PortData>, prefix: String) =
+    FlowVariables.extract(ports = outputs).filterKeys { name -> name.startsWith("$prefix.") }
+
   @Test
   fun `inherited variables reach the node and the variable key is never downloaded`() {
     startActivity()
@@ -239,16 +268,42 @@ class ContinuumNodeActivityFlowVariablesTest {
 
     val output = runActivity(node = workflowNode(processNode.metadata), inputs = variableInputs(mapOf("x" to 1)))
 
-    assertFalse(output.outputs.containsKey(NodeOutputSystemPort.VARIABLE.key), "outputs: ${output.outputs}")
+    assertEquals(emptyMap<String, Any>(), nodeSetVariables(outputs = output.outputs, prefix = processPrefix))
   }
 
   @Test
-  fun `no variables in and none set leaves the outputs exactly as before`() {
+  fun `a successful node exports its default variables even when it sets none`() {
     startActivity()
 
     val output = runActivity(node = workflowNode(processNode.metadata), inputs = emptyMap())
 
-    assertEquals(emptyMap<String, PortData>(), output.outputs)
+    val defaults = defaultVariables(outputs = output.outputs, prefix = processPrefix)
+    assertEquals(
+      setOf("executionStatus", "startTimestamp", "endTimestamp", "durationMs", "inputCount", "outputCount")
+        .map { "$processPrefix.$it" }.toSet(),
+      defaults.keys
+    )
+    assertEquals("SUCCESS", defaults["$processPrefix.executionStatus"])
+    val start = (defaults.getValue("$processPrefix.startTimestamp") as Number).toLong()
+    val end = (defaults.getValue("$processPrefix.endTimestamp") as Number).toLong()
+    assertTrue(end >= start, "end $end before start $start")
+    assertEquals(end - start, (defaults.getValue("$processPrefix.durationMs") as Number).toLong())
+    assertEquals(emptyMap<String, Long>(), defaults["$processPrefix.inputCount"])
+    assertEquals(emptyMap<String, Long>(), defaults["$processPrefix.outputCount"])
+    assertEquals(setOf(NodeOutputSystemPort.VARIABLE.key), output.outputs.keys, "no data port appears")
+  }
+
+  @Test
+  fun `output row counts are exported per port`() {
+    startActivity()
+    processNode.rowsToWrite = mapOf("left" to 3, "right" to 1)
+
+    val output = runActivity(node = workflowNode(processNode.metadata), inputs = emptyMap())
+
+    assertEquals(
+      mapOf("left" to 3L, "right" to 1L),
+      defaultVariables(outputs = output.outputs, prefix = processPrefix)["$processPrefix.outputCount"]
+    )
   }
 
   @Test
@@ -261,7 +316,7 @@ class ContinuumNodeActivityFlowVariablesTest {
     val variablePort = output.outputs.getValue(NodeOutputSystemPort.VARIABLE.key)
     assertEquals(PortDataStatus.SUCCESS, variablePort.status)
     assertEquals("application/json", variablePort.contentType)
-    assertEquals(mapOf("x" to 10, "z" to 3), FlowVariables.extract(ports = output.outputs))
+    assertEquals(mapOf("x" to 10, "z" to 3), nodeSetVariables(outputs = output.outputs, prefix = processPrefix))
   }
 
   @Test
@@ -274,8 +329,25 @@ class ContinuumNodeActivityFlowVariablesTest {
     val error = output.outputs[NodeOutputSystemPort.ERROR.key]
     assertEquals(PortDataStatus.FAILED, error?.status, "outputs: ${output.outputs}")
     assertTrue(error!!.data.toString().contains("max 16"), error.data.toString())
-    assertEquals(setOf(NodeOutputSystemPort.ERROR.key), output.outputs.keys)
+    assertEquals(setOf(NodeOutputSystemPort.ERROR.key, NodeOutputSystemPort.VARIABLE.key), output.outputs.keys)
     assertEquals(1, counting.attempts.get(), "the activity was retried")
+
+    // The rejected node-set variable is not passed on; the failure is described by the defaults.
+    assertEquals(emptyMap<String, Any>(), nodeSetVariables(outputs = output.outputs, prefix = processPrefix))
+    val defaults = defaultVariables(outputs = output.outputs, prefix = processPrefix)
+    assertEquals("FAILED", defaults["$processPrefix.executionStatus"])
+    assertEquals(error.data, defaults["$processPrefix.errorMessage"])
+    assertFalse(defaults.containsKey("$processPrefix.outputCount"), "a failed node has no output counts")
+  }
+
+  @Test
+  fun `the defaults are not counted against the size cap`() {
+    startActivity(maxFlowVariablesSizeBytes = 16)
+
+    val output = runActivity(node = workflowNode(processNode.metadata), inputs = emptyMap())
+
+    assertFalse(output.outputs.containsKey(NodeOutputSystemPort.ERROR.key), "outputs: ${output.outputs}")
+    assertEquals("SUCCESS", defaultVariables(outputs = output.outputs, prefix = processPrefix)["$processPrefix.executionStatus"])
   }
 
   @Test
@@ -288,7 +360,7 @@ class ContinuumNodeActivityFlowVariablesTest {
       inputs = variableInputs(mapOf("big" to "x".repeat(1000)))
     )
 
-    assertEquals(mapOf("a" to 1), FlowVariables.extract(ports = output.outputs))
+    assertEquals(mapOf("a" to 1), nodeSetVariables(outputs = output.outputs, prefix = processPrefix))
   }
 
   @Test
@@ -297,6 +369,9 @@ class ContinuumNodeActivityFlowVariablesTest {
 
     val output = runActivity(node = workflowNode(triggerNode.metadata), inputs = emptyMap())
 
-    assertEquals(mapOf("runLabel" to "nightly", "batch" to 1), FlowVariables.extract(ports = output.outputs))
+    assertEquals(mapOf("runLabel" to "nightly", "batch" to 1), nodeSetVariables(outputs = output.outputs, prefix = triggerPrefix))
+    val defaults = defaultVariables(outputs = output.outputs, prefix = triggerPrefix)
+    assertEquals("SUCCESS", defaults["$triggerPrefix.executionStatus"])
+    assertFalse(defaults.containsKey("$triggerPrefix.inputCount"), "a trigger node reads no inputs")
   }
 }

@@ -7,7 +7,8 @@ import org.projectcontinuum.core.commons.utils.FlowVariables
 /**
  * Collects the flow variables a node inherits from all of its ancestors, for [WorkflowDagExecutor].
  *
- * Every completed node's `outputs["$variable"]` holds only the variables that node set itself. The variables
+ * Every completed node's `outputs["$variable"]` holds only that node's own variables (what it set, plus the worker's
+ * default variables for its run), never the inherited ones. The variables
  * available after node P are its inherited ones overridden by its own:
  *
  * - `own(P)` = `outputs["$variable"]` of P (empty when P set none, or has not produced outputs)

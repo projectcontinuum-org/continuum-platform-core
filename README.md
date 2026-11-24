@@ -111,7 +111,7 @@ A click turned outcome.
 | 🔁 | **Indestructible Execution** | Workflows survive crashes, restarts, and infrastructure failures |
 | ⚡ | **Live Streaming Updates** | Watch your workflow execute step-by-step in real time |
 | 📊 | **Columnar Data Passing** | Parquet tables between nodes — fast, query-ready |
-| 🏷️ | **Flow Variables** | Nodes set small key/value variables (`executionContext.setFlowVariable(...)`) that every downstream node can read; they travel under the reserved `$variable` key, capped per node by `continuum.core.worker.flow-variables.max-size-bytes` (default 64 KiB) |
+| 🏷️ | **Flow Variables** | Nodes set small key/value variables (`executionContext.setFlowVariable(...)`) that every downstream node can read; they travel under the reserved `$variable` key, capped per node by `continuum.core.worker.flow-variables.max-size-bytes` (default 64 KiB). Every node also exports defaults such as `restNode_3.executionStatus`, `.durationMs` and `.outputCount` |
 | 🧪 | **AI / ML Ready** | Train models with Unsloth, run inference, all inside your flow |
 | 🐳 | **Self-Hostable** | Docker Compose up and you're running |
 
@@ -273,9 +273,9 @@ upgrading. Upgrading to **0.0.23**:
 - **Rebuild every feature worker against `continuumPlatformVersion=0.0.23` and deploy the workers before the
   orchestration service.** A worker built against 0.0.22 or older fails every node, because it cannot read the new
   `SCHEDULED` status.
-- **Flow variables need 0.0.23 on both sides.** Before any workflow sets flow variables, every worker that runs one
-  of its nodes must be 0.0.23, and so must the orchestration service. An older worker tries to download the
-  `$variable` key from S3 and the node fails. Workflows without flow variables work with any mix of versions.
+- **Every worker and the orchestration service must be 0.0.23: there is no mixed-version mode.** Every node now
+  exports default flow variables, so every workflow carries the `$variable` key. A worker older than 0.0.23 tries to
+  download that key from S3, so every node with an upstream node fails.
 
 Details: [`release_notes/RELEASE_NOTES_v0.0.23.md`](release_notes/RELEASE_NOTES_v0.0.23.md#upgrade-notes).
 

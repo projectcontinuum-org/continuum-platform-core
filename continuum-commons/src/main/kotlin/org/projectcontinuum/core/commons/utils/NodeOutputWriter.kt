@@ -23,6 +23,9 @@ class NodeOutputWriter(
     return outputPortWriter[portId]?.getTableSpec() ?: throw RuntimeException("No table spec for port $portId")
   }
 
+  /** Number of rows written to output port [portId], or null when no writer was created for it. */
+  fun getRowCount(portId: String): Long? = outputPortWriter[portId]?.getRowCount()
+
   /**
    * Creates the writer for output port [portId], stored as `output.{portId}.parquet`.
    *
@@ -49,6 +52,9 @@ class NodeOutputWriter(
     outputFilePath: Path
   ) : Closeable {
     private val spec = mutableSetOf<Map<String, String>>()
+
+    /** Rows written so far. */
+    private var rowCount = 0L
 
     private val dataRowToMapConverter = DataRowToMapConverter()
 
@@ -85,7 +91,11 @@ class NodeOutputWriter(
             data = row
           )
       )
+      rowCount++
     }
+
+    /** Number of rows written to this port. */
+    fun getRowCount(): Long = rowCount
 
     override fun close() {
       parquetWriter.close()

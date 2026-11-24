@@ -36,8 +36,9 @@ Conventions for the spec itself are in [CONVENTIONS.md](CONVENTIONS.md).
 - **Node outputs.** A node's outputs are `Map<portId, PortData>`. A produced port is
   `{status: SUCCESS, contentType: "application/parquet", tableSpec: [{name, contentType}...], data: "{remote}<runId>/<nodeId>/output.<port>.parquet"}`.
   A non-retriable node failure is the port `$error`: `{status: FAILED, contentType: "text/plain", tableSpec: [], data: "<message>"}`.
-  A node that set flow variables also has the system key `$variable`: `{status: SUCCESS, contentType: "application/json", tableSpec: [], data: {<name>: <value>, ...}}`,
-  holding only the variables that node set (not the inherited ones). It is absent when the node set none. Every key
+  Every finished node (failed ones too) also has the system key `$variable`: `{status: SUCCESS, contentType: "application/json", tableSpec: [], data: {<name>: <value>, ...}}`,
+  holding the variables that node set (not the inherited ones) plus the worker's defaults
+  `<nodeType>_<nodeId>.executionStatus|errorMessage|startTimestamp|endTimestamp|durationMs|inputCount|outputCount`. Every key
   starting with `$` is a system key, not a port: clients listing ports must skip them. So `PortData.data` is a string
   (tables, `$error`) or an object (`$variable`); the spec types it `[string, object]`.
   Parquet lives in S3/MinIO at `<bucket-base-path>/<runId>/<nodeId>/output.<port>.parquet`.
