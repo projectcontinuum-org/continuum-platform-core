@@ -7,22 +7,24 @@ import io.swagger.v3.oas.annotations.media.Schema
 @Schema(
   name = "PortData",
   description = "One output of a node. A produced port references its Parquet file in object storage; a failed node has " +
-    "the single port `\$error` whose `data` is the error message."
+    "the single port `\$error` whose `data` is the error message. The system key `\$variable`, present only when the " +
+    "node set flow variables, holds them as a JSON object in `data`."
 )
 data class PortData @JsonCreator constructor(
   @field:Schema(description = "Whether the port was produced (`SUCCESS`), produced with warnings (`WARNING`) or is the error of a failed node (`FAILED`).", example = "SUCCESS")
   @param:JsonProperty("status") val status: PortDataStatus,
   @field:Schema(
-    description = "Media type of `data`: `application/parquet` for a stored table, `text/plain` for the `\$error` message.",
+    description = "Media type of `data`: `application/parquet` for a stored table, `text/plain` for the `\$error` message, " +
+      "`application/json` for the `\$variable` flow variables.",
     type = "string",
     example = "application/parquet"
   )
   @param:JsonProperty("contentType") val contentType: Any,
-  @field:Schema(description = "Columns of the table: one `{name, contentType}` entry per column. Empty for `\$error`.")
+  @field:Schema(description = "Columns of the table: one `{name, contentType}` entry per column. Empty for `\$error` and `\$variable`.")
   @param:JsonProperty("tableSpec") val tableSpec: List<Map<String, String>>,
   @field:Schema(
     description = "For a table: its location, `{remote}<runId>/<nodeId>/output.<port>.parquet` (read it with the node " +
-      "output endpoint). For `\$error`: the error message.",
+      "output endpoint). For `\$error`: the error message. For `\$variable`: an object of flow variable names to values.",
     type = "string",
     example = "{remote}0b7c6f0a-2a55-4f43-9a36-0c8f4d2b1e77/normalize/output.data.parquet"
   )

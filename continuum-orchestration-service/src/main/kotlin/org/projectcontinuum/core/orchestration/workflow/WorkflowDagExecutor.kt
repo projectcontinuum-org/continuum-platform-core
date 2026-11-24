@@ -4,6 +4,7 @@ import org.projectcontinuum.core.commons.activity.IContinuumNodeActivity
 import org.projectcontinuum.core.commons.model.ContinuumWorkflowModel
 import org.projectcontinuum.core.commons.model.PortData
 import org.projectcontinuum.core.commons.model.PortDataStatus
+import org.projectcontinuum.core.commons.utils.FlowVariables
 import io.temporal.failure.ActivityFailure
 import io.temporal.failure.CanceledFailure
 import io.temporal.workflow.Async
@@ -144,6 +145,8 @@ class WorkflowDagExecutor(
    *
    * This method finds all edges connecting to the target node and maps
    * the source node's output port data to the target node's input ports.
+   * When any ancestor set flow variables, the variables the node inherits (see [FlowVariableMerger]) are added under
+   * the `$variable` system key; otherwise the map holds the data ports only, exactly as before flow variables existed.
    *
    * @param continuumWorkflow The workflow model containing edge definitions
    * @param node The node for which to gather inputs
@@ -161,7 +164,28 @@ class WorkflowDagExecutor(
     val nodeInputs = nodeParentEdges.associate { edge ->
       edge.targetHandle to nodeToOutputsMap[edge.source]!![edge.sourceHandle]!!
     }
-    return nodeInputs
+
+    val inheritedFlowVariables = FlowVariableMerger.collectInputVariables(
+      continuumWorkflow = continuumWorkflow,
+      node = node,
+      nodeToOutputsMap = nodeToOutputsMap
+    )
+    inheritedFlowVariables.conflicts.forEach { conflict ->
+      LOGGER.warn(
+        "Flow variable '{}' reaches node '{}' with different values from '{}' and '{}'; using the value from '{}' (lower input port)",
+        conflict.key,
+        conflict.targetNodeId,
+        conflict.keptFromNodeId,
+        conflict.ignoredFromNodeId,
+        conflict.keptFromNodeId
+      )
+    }
+    if (inheritedFlowVariables.variables.isEmpty()) {
+      return nodeInputs
+    }
+    return nodeInputs + (
+      IContinuumNodeActivity.NodeOutputSystemPort.VARIABLE.key to FlowVariables.toPortData(inheritedFlowVariables.variables)
+    )
   }
 
   /**

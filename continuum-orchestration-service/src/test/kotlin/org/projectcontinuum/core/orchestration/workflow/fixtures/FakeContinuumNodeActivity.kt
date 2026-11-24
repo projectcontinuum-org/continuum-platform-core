@@ -6,6 +6,7 @@ import org.projectcontinuum.core.commons.exception.PropertiesValidationException
 import org.projectcontinuum.core.commons.model.ContinuumWorkflowModel
 import org.projectcontinuum.core.commons.model.PortData
 import org.projectcontinuum.core.commons.model.PortDataStatus
+import org.projectcontinuum.core.commons.utils.FlowVariables
 import org.projectcontinuum.core.commons.utils.ValidationHelper
 import io.temporal.activity.Activity
 import org.projectcontinuum.core.commons.protocol.progress.ContinuumNodeActivitySignal
@@ -56,11 +57,21 @@ class FakeContinuumNodeActivity : IContinuumNodeActivity {
    */
   val registeredSchemas: MutableMap<String, Map<String, Any>> = ConcurrentHashMap()
 
+  /** Inputs the orchestrator sent, keyed by graph node id (last attempt wins). */
+  val receivedInputs: MutableMap<String, Map<String, PortData>> = ConcurrentHashMap()
+
+  /**
+   * Flow variables a node sets, keyed by graph node id. Like the real worker, the fake returns only these under
+   * `$variable` (never the inherited ones it received) and omits the key when there are none.
+   */
+  val flowVariablesToSet: MutableMap<String, Map<String, Any>> = ConcurrentHashMap()
+
   override fun run(
     node: ContinuumWorkflowModel.Node,
     inputs: Map<String, PortData>
   ): NodeActivityOutput {
     invokedNodeIds.add(node.id)
+    receivedInputs[node.id] = inputs
     // Mirror the real worker: report BUSY as soon as the activity starts
     Activity.getExecutionContext().workflowClient
       .newWorkflowStub(
@@ -115,6 +126,14 @@ class FakeContinuumNodeActivity : IContinuumNodeActivity {
     blockUntil[node.id]?.await(5, TimeUnit.SECONDS)
 
     errorOutputs[node.id]?.let { return NodeActivityOutput(node.id, it) }
-    return NodeActivityOutput(node.id, successOutputs[node.id] ?: emptyMap())
+    val dataOutputs = successOutputs[node.id] ?: emptyMap()
+    val ownFlowVariables = flowVariablesToSet[node.id].orEmpty()
+    if (ownFlowVariables.isEmpty()) {
+      return NodeActivityOutput(node.id, dataOutputs)
+    }
+    return NodeActivityOutput(
+      node.id,
+      dataOutputs + (IContinuumNodeActivity.NodeOutputSystemPort.VARIABLE.key to FlowVariables.toPortData(ownFlowVariables))
+    )
   }
 }

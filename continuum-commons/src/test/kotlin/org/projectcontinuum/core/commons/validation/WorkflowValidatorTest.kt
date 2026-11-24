@@ -97,4 +97,77 @@ class WorkflowValidatorTest {
     assertEquals(1, result.warnings.size)
     assertTrue(result.warnings.single().message.contains("skipped at run time"))
   }
+
+  @Test
+  fun `a node key starting with the reserved system prefix is an error in both modes`() {
+    for (mode in ValidationMode.values()) {
+      for (reservedKey in listOf("\$error", "\$variable", "\$foo")) {
+        val result = validator.validate(
+          nodes = listOf(node(key = reservedKey), node(key = "b")),
+          edges = listOf(edge(from = reservedKey, to = "b")),
+          mode = mode
+        )
+
+        val reservedKeyErrors = result.errors.filter { it.node == reservedKey && it.message.contains("reserved for system keys") }
+        assertEquals(1, reservedKeyErrors.size, "mode $mode, key $reservedKey: ${result.errors}")
+        assertFalse(
+          result.errors.any { it.message.contains("does not exist") },
+          "a reserved key must not also break its edges: ${result.errors}"
+        )
+      }
+    }
+  }
+
+  @Test
+  fun `edges using a reserved port id are errors without a duplicate missing-port error`() {
+    val result = validator.validate(
+      nodes = listOf(node(key = "a"), node(key = "b")),
+      edges = listOf(
+        GraphEdge(from = "a", fromPort = "\$variable", to = "b", toPort = "in"),
+        GraphEdge(from = "a", fromPort = "out", to = "b", toPort = "\$error")
+      ),
+      mode = ValidationMode.RUN
+    )
+    val text = result.errors.joinToString("\n") { it.message }
+
+    assertTrue(text.contains("source port '\$variable' starts with '\$'"), text)
+    assertTrue(text.contains("target port '\$error' starts with '\$'"), text)
+    assertFalse(text.contains("has no output port"), text)
+    assertFalse(text.contains("has no input port"), text)
+  }
+
+  @Test
+  fun `a submitted definition with reserved port ids is an error in run mode`() {
+    val embedded = step.copy(
+      inputs = mapOf("\$in" to table),
+      outputs = mapOf("\$variable" to table)
+    )
+
+    val result = validator.validate(
+      nodes = listOf(GraphNode(key = "a", nodeId = "org.test.Step", properties = mapOf("name" to "n"), embedded = embedded)),
+      edges = emptyList(),
+      mode = ValidationMode.RUN
+    )
+    val text = result.errors.joinToString("\n") { it.message }
+
+    assertTrue(text.contains("declares input port '\$in'"), text)
+    assertTrue(text.contains("declares output port '\$variable'"), text)
+  }
+
+  @Test
+  fun `a registered definition with reserved port ids is an error`() {
+    val legacyStep = step.copy(outputs = mapOf("\$legacy" to table))
+    val legacyValidator = WorkflowValidator { if (it == "org.test.Step") legacyStep else null }
+
+    val result = legacyValidator.validate(
+      nodes = listOf(node(key = "a")),
+      edges = emptyList(),
+      mode = ValidationMode.AUTHORING
+    )
+
+    assertTrue(
+      result.errors.any { it.message.contains("registered node 'org.test.Step' declares output port '\$legacy'") },
+      result.errors.toString()
+    )
+  }
 }

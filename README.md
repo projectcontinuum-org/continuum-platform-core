@@ -111,6 +111,7 @@ A click turned outcome.
 | 🔁 | **Indestructible Execution** | Workflows survive crashes, restarts, and infrastructure failures |
 | ⚡ | **Live Streaming Updates** | Watch your workflow execute step-by-step in real time |
 | 📊 | **Columnar Data Passing** | Parquet tables between nodes — fast, query-ready |
+| 🏷️ | **Flow Variables** | Nodes set small key/value variables (`executionContext.setFlowVariable(...)`) that every downstream node can read; they travel under the reserved `$variable` key, capped per node by `continuum.core.worker.flow-variables.max-size-bytes` (default 64 KiB) |
 | 🧪 | **AI / ML Ready** | Train models with Unsloth, run inference, all inside your flow |
 | 🐳 | **Self-Hostable** | Docker Compose up and you're running |
 
@@ -152,6 +153,7 @@ A click turned outcome.
 | **Engine** | [Temporal](https://temporal.io) | Durable execution, auto-retry, infinite scale |
 | **Events** | Kafka → MQTT over WebSockets | Real-time step-by-step workflow updates |
 | **Data** | Apache Parquet | Fast, columnar, query-ready inter-node data |
+| **Flow Variables** | `$variable` system key, JSON | Small key/value context collected from all ancestors, next to the data ports |
 | **Storage** | AWS S3 / MinIO | Open, portable, no vendor lock-in |
 | **Backend** | Kotlin + Spring Boot | Type-safe, clean, battle-tested |
 | **Resilience** | Temporal | Fails? Retries. Crashes? Recovers. Forever. |

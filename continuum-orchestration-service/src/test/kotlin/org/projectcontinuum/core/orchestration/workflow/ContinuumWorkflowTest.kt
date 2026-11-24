@@ -22,6 +22,7 @@ import org.projectcontinuum.core.commons.model.PortDataStatus
 import org.projectcontinuum.core.commons.model.WorkflowUpdateEvent
 import org.projectcontinuum.core.commons.protocol.progress.ContinuumNodeActivitySignal
 import org.projectcontinuum.core.commons.protocol.progress.NodeProgress
+import org.projectcontinuum.core.commons.utils.FlowVariables
 import org.projectcontinuum.core.commons.workflow.IContinuumWorkflow
 import org.projectcontinuum.core.orchestration.utils.StatusHelper
 import org.projectcontinuum.core.orchestration.workflow.fixtures.FakeContinuumNodeActivity
@@ -184,6 +185,103 @@ class ContinuumWorkflowTest {
       val dIndex = invoked.indexOf("D")
       assertTrue(dIndex > invoked.indexOf("B"))
       assertTrue(dIndex > invoked.indexOf("C"))
+    }
+  }
+
+  private val variableKey = IContinuumNodeActivity.NodeOutputSystemPort.VARIABLE.key
+
+  /** The flow variables [nodeId] received in `inputs["$variable"]`, or null when the key was absent. */
+  private fun receivedFlowVariables(fake: FakeContinuumNodeActivity, nodeId: String): Map<String, Any>? {
+    val inputs = fake.receivedInputs.getValue(nodeId)
+    if (!inputs.containsKey(variableKey)) return null
+    return FlowVariables.extract(inputs)
+  }
+
+  private fun runLinearThreeNode(env: Env): Map<String, Map<String, PortData>> {
+    listOf("A", "B", "C").forEach { id -> env.fakeNodeActivity.successOutputs[id] = mapOf("out-1" to samplePortData(id)) }
+    val model = WorkflowFixtures.loadWorkflow("/test-workflows/linear-3node.cwf.json")
+    val (_, future) = startWorkflow(env, model)
+    return future.get(10, TimeUnit.SECONDS)
+  }
+
+  @Test
+  fun `flow variables accumulate down a linear chain while each node returns only its own`() {
+    newEnv().use { env ->
+      env.fakeNodeActivity.flowVariablesToSet["A"] = mapOf("x" to 1)
+      env.fakeNodeActivity.flowVariablesToSet["B"] = mapOf("y" to 2)
+
+      val result = runLinearThreeNode(env)
+
+      assertEquals(null, receivedFlowVariables(env.fakeNodeActivity, "A"))
+      assertEquals(mapOf("x" to 1), receivedFlowVariables(env.fakeNodeActivity, "B"))
+      assertEquals(mapOf("x" to 1, "y" to 2), receivedFlowVariables(env.fakeNodeActivity, "C"))
+      assertEquals(mapOf("y" to 2), FlowVariables.extract(result.getValue("B")), "B stores only what it set")
+      assertFalse(result.getValue("C").containsKey(variableKey))
+      // Data ports are forwarded exactly as before
+      assertEquals(setOf("in-1", variableKey), env.fakeNodeActivity.receivedInputs.getValue("C").keys)
+    }
+  }
+
+  @Test
+  fun `a grandparent's flow variable passes through a node that sets none`() {
+    newEnv().use { env ->
+      env.fakeNodeActivity.flowVariablesToSet["A"] = mapOf("x" to 1)
+
+      val result = runLinearThreeNode(env)
+
+      assertEquals(mapOf("x" to 1), receivedFlowVariables(env.fakeNodeActivity, "C"))
+      assertFalse(result.getValue("B").containsKey(variableKey))
+    }
+  }
+
+  @Test
+  fun `a flow variable overridden down the chain reaches later nodes with the new value`() {
+    newEnv().use { env ->
+      env.fakeNodeActivity.flowVariablesToSet["A"] = mapOf("x" to 1)
+      env.fakeNodeActivity.flowVariablesToSet["B"] = mapOf("x" to 10)
+
+      runLinearThreeNode(env)
+
+      assertEquals(mapOf("x" to 1), receivedFlowVariables(env.fakeNodeActivity, "B"))
+      assertEquals(mapOf("x" to 10), receivedFlowVariables(env.fakeNodeActivity, "C"))
+    }
+  }
+
+  @Test
+  fun `fan-in keeps the flow variable from the lower input port and merges identical values`() {
+    newEnv().use { env ->
+      listOf("A", "B", "C", "D").forEach { id -> env.fakeNodeActivity.successOutputs[id] = mapOf("out-1" to samplePortData(id)) }
+      env.fakeNodeActivity.flowVariablesToSet["A"] = mapOf("shared" to "root")
+      env.fakeNodeActivity.flowVariablesToSet["B"] = mapOf("k" to "from-B", "same" to 5)
+      env.fakeNodeActivity.flowVariablesToSet["C"] = mapOf("k" to "from-C", "same" to 5)
+
+      val model = WorkflowFixtures.loadWorkflow("/test-workflows/diamond-4node.cwf.json")
+      val (_, future) = startWorkflow(env, model)
+      future.get(10, TimeUnit.SECONDS)
+
+      // D's in-1 is fed by B, in-2 by C: B is the lower port
+      assertEquals(
+        mapOf("shared" to "root", "k" to "from-B", "same" to 5),
+        receivedFlowVariables(env.fakeNodeActivity, "D")
+      )
+    }
+  }
+
+  @Test
+  fun `a workflow without flow variables sends and stores exactly the data ports`() {
+    newEnv().use { env ->
+      env.fakeNodeActivity.successOutputs["2"] = mapOf("output-1" to samplePortData("time"))
+      env.fakeNodeActivity.successOutputs["3"] =
+        mapOf("output-1" to samplePortData("part1"), "output-2" to samplePortData("part2"))
+
+      val model = WorkflowFixtures.loadWorkflow("/test-workflows/linear-2node.cwf.json")
+      val (_, future) = startWorkflow(env, model)
+      val result = future.get(10, TimeUnit.SECONDS)
+
+      assertEquals(emptySet(), env.fakeNodeActivity.receivedInputs.getValue("2").keys)
+      assertEquals(setOf("input-1"), env.fakeNodeActivity.receivedInputs.getValue("3").keys)
+      assertEquals(setOf("output-1"), result.getValue("2").keys)
+      assertEquals(setOf("output-1", "output-2"), result.getValue("3").keys)
     }
   }
 

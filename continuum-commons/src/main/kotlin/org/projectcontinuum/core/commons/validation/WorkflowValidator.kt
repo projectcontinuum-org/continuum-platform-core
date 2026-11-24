@@ -2,6 +2,7 @@ package org.projectcontinuum.core.commons.validation
 
 import com.fasterxml.jackson.annotation.JsonInclude
 import io.swagger.v3.oas.annotations.media.Schema
+import org.projectcontinuum.core.commons.activity.IContinuumNodeActivity.NodeOutputSystemPort
 import org.projectcontinuum.core.commons.model.ContinuumWorkflowModel
 import org.projectcontinuum.core.commons.utils.ValidationHelper
 
@@ -53,7 +54,9 @@ data class WorkflowValidationResult(val errors: List<WorkflowIssue>, val warning
 /**
  * The one workflow checker: unique node keys, registered node ids, edge endpoints and port names, no self or duplicate
  * edges, exactly one edge per input port, no cycles (Kahn's algorithm) and each node's properties against the
- * registered schema. Every problem is collected, not just the first, so a caller can fix them all in one pass.
+ * registered schema. Node keys and port ids must not start with `$` (reserved for system keys such as `$error` and
+ * `$variable`, see [NodeOutputSystemPort.isSystemPort]). Every problem is collected, not just the first, so a caller
+ * can fix them all in one pass.
  *
  * Everything about a node comes from [descriptors], never from the submitted workflow. A client-sent
  * `propertiesSchema` or port list is client-controlled; in [ValidationMode.RUN] a difference from the registered one
@@ -64,6 +67,12 @@ data class WorkflowValidationResult(val errors: List<WorkflowIssue>, val warning
  * orchestrator marks it SKIPPED at run time.
  */
 class WorkflowValidator(private val descriptors: NodeDescriptorSource) {
+
+  private companion object {
+    const val SYSTEM_PREFIX = NodeOutputSystemPort.SYSTEM_PORT_PREFIX
+    const val RESERVED_PREFIX_REASON =
+      "which is reserved for system keys such as \$error and \$variable. Rename it so it does not start with '$SYSTEM_PREFIX'."
+  }
 
   private class ResolvedNode(val key: String, val nodeId: String, val descriptor: ContinuumWorkflowModel.NodeData?)
 
@@ -105,6 +114,10 @@ class WorkflowValidator(private val descriptors: NodeDescriptorSource) {
         errors += WorkflowIssue(message = "Node key '$key' is used more than once. Every node needs a unique key.", node = key)
         return@forEachIndexed
       }
+      if (NodeOutputSystemPort.isSystemPort(key)) {
+        // Still registered below, so its edges do not also report "does not exist".
+        errors += WorkflowIssue(message = "Node key '$key' starts with '$SYSTEM_PREFIX', $RESERVED_PREFIX_REASON", node = key)
+      }
       val nodeId = node.nodeId
       if (nodeId.isNullOrBlank()) {
         errors += WorkflowIssue(message = "Node '$key' needs a nodeId.", node = key)
@@ -118,7 +131,11 @@ class WorkflowValidator(private val descriptors: NodeDescriptorSource) {
         errors += WorkflowIssue(unknownNodeMessage(key = key, nodeId = nodeId, mode = mode), node = key)
         return@forEachIndexed
       }
+      reportReservedPortIds(key = key, definition = descriptor, source = "registered node '$nodeId'", errors = errors)
       node.embedded?.let {
+        if (mode == ValidationMode.RUN) {
+          reportReservedPortIds(key = key, definition = it, source = "submitted node", errors = errors)
+        }
         warnOnEmbeddedDifference(
           key = key,
           nodeId = nodeId,
@@ -136,6 +153,29 @@ class WorkflowValidator(private val descriptors: NodeDescriptorSource) {
       )
     }
     return byKey
+  }
+
+  /** Reports every input/output port id of [definition] that uses the reserved system prefix. */
+  private fun reportReservedPortIds(
+    key: String,
+    definition: ContinuumWorkflowModel.NodeData,
+    source: String,
+    errors: MutableList<WorkflowIssue>
+  ) {
+    val reservedInputs = definition.inputs.orEmpty().keys.filter { NodeOutputSystemPort.isSystemPort(it) }
+    val reservedOutputs = definition.outputs.orEmpty().keys.filter { NodeOutputSystemPort.isSystemPort(it) }
+    reservedInputs.forEach { portId ->
+      errors += WorkflowIssue(
+        message = "Node '$key': the $source declares input port '$portId'. It starts with '$SYSTEM_PREFIX', $RESERVED_PREFIX_REASON",
+        node = key
+      )
+    }
+    reservedOutputs.forEach { portId ->
+      errors += WorkflowIssue(
+        message = "Node '$key': the $source declares output port '$portId'. It starts with '$SYSTEM_PREFIX', $RESERVED_PREFIX_REASON",
+        node = key
+      )
+    }
   }
 
   private fun unknownNodeMessage(key: String, nodeId: String, mode: ValidationMode) = when (mode) {
@@ -259,7 +299,23 @@ class WorkflowValidator(private val descriptors: NodeDescriptorSource) {
         errors += WorkflowIssue(message = "Edge $label: a node cannot connect to itself.", edge = label)
         ok = false
       }
-      source?.descriptor?.let { descriptor ->
+      val fromPortReserved = NodeOutputSystemPort.isSystemPort(edge.fromPort)
+      val toPortReserved = NodeOutputSystemPort.isSystemPort(edge.toPort)
+      if (fromPortReserved) {
+        errors += WorkflowIssue(
+          message = "Edge $label: source port '${edge.fromPort}' starts with '$SYSTEM_PREFIX', $RESERVED_PREFIX_REASON",
+          edge = label
+        )
+        ok = false
+      }
+      if (toPortReserved) {
+        errors += WorkflowIssue(
+          message = "Edge $label: target port '${edge.toPort}' starts with '$SYSTEM_PREFIX', $RESERVED_PREFIX_REASON",
+          edge = label
+        )
+        ok = false
+      }
+      source?.descriptor?.takeUnless { fromPortReserved }?.let { descriptor ->
         val outputs = descriptor.outputs.orEmpty().keys
         if (edge.fromPort !in outputs) {
           errors += WorkflowIssue(
@@ -270,7 +326,7 @@ class WorkflowValidator(private val descriptors: NodeDescriptorSource) {
           ok = false
         }
       }
-      target?.descriptor?.let { descriptor ->
+      target?.descriptor?.takeUnless { toPortReserved }?.let { descriptor ->
         val inputs = descriptor.inputs.orEmpty().keys
         if (edge.toPort !in inputs) {
           errors += WorkflowIssue(
