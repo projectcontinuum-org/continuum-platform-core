@@ -36,6 +36,21 @@ spring:
           content-type: application/json
           producer:
             use-native-encoding: true
+        # Built-in node registrations (the Loop), published at start-up like a worker's (Avro via the schema registry)
+        continuum-core-event-FeatureRegistration-output:
+          binder: main-kafka-cluster
+          destination: continuum-core-event-FeatureRegistration
+          content-type: application/json
+          producer:
+            use-native-encoding: true
+      kafka:
+        bindings:
+          continuum-core-event-FeatureRegistration-output:
+            producer:
+              configuration:
+                value.serializer: io.confluent.kafka.serializers.KafkaAvroSerializer
+                schema.registry.url: ${CONTINUUM_KAFKA_MAIN_SCHEMA_REGISTRY:http://localhost:38080}
+                specific.avro.reader: true
   temporal:
     namespace: ${TEMPORAL_NAMESPACE:default}
     connection:

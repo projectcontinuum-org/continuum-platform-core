@@ -29,6 +29,16 @@ dependencies {
 
     // Project dependencies
     implementation(project(":continuum-commons"))
+    // Loop conditions: the cel-java validator behind the continuum-commons LoopConditionValidator interface (brings
+    // protobuf-java 4.x and guava 33.x; only this service and the orchestration service depend on it)
+    implementation(project(":continuum-loop-condition"))
+    constraints {
+        // cel-java (above) raises protobuf-java to 4.x; keep protobuf-java-util (declared 3.25.x by Temporal's
+        // serviceclient) on the same version. A constraint, not a force: a higher requested version still wins.
+        implementation(libs.protobuf.java.util) {
+            because("protobuf-java-util must match protobuf-java 4.x that cel-java brings")
+        }
+    }
 
     // Swagger-UI Dependencies (springdoc 3.0.x = Spring Boot 4.0.x; version in gradle/libs.versions.toml)
     implementation(libs.springdoc.openapi.starter.webmvc.ui)

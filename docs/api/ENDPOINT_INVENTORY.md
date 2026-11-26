@@ -29,10 +29,26 @@ Conventions for the spec itself are in [CONVENTIONS.md](CONVENTIONS.md).
   `basePackages`: Spring only applies a scoped advice when a handler method was resolved.
 - **Run status.** `workflow_runs.status` is a free string: `PENDING` (inserted by the api-server at start), then the
   value the orchestration service publishes and the message-bridge upserts: `STARTED`, `RUNNING`, `FINISHED`, `FAILED`,
-  `CANCELLED`, `TERMINATED` (`ContinuumWorkflow.kt`, `WorkflowStatusReporter.publishUpdate`).
+  `CANCELLED`, `TERMINATED` (`ContinuumWorkflow.kt`, `WorkflowStatusReporter.publishUpdate`). The api-server also
+  writes `TERMINATED` (and `updated_at`) itself after Temporal has terminated a run (see the terminate section). A
+  run that executed to its end is `FINISHED` when no node or loop failed and `FAILED` when one did (Temporal fails
+  such a run too); a workflow-level error (for example task-queue resolution) is also `FAILED`.
 - **Node status** (`ContinuumWorkflowModel.NodeStatus`): ACTIVE, CONFIGURED, SCHEDULED, BUSY, SUCCESS, FAILED,
   CANCELLED, WARNING, PRE_PROCESSING, POST_PROCESSING, SKIPPED. **Edge status**: DELIVERED, BROKEN (null = source not
   finished). **Port data status**: SUCCESS, FAILED, WARNING.
+- **Workflow nodes and loops** (`WorkflowNode`, `NodeData`). `type` is the React Flow node type: `BaseNode` for
+  registered nodes, `Loop` for a loop box, whose `data.nodeModel` is `org.projectcontinuum.core.builtin.Loop`. A node
+  inside a loop has optional `parentNode` = id of its innermost loop, and its `position` is relative to that loop. The
+  loop's `data.collapsed` (optional boolean) is editor state. Both fields are omitted when unset, so loop-free
+  workflows are unchanged. Unknown properties of a node or its `data` (editor-only React Flow fields such as `extent`,
+  `style`, `zIndex`) are ignored, not rejected. The api-server stores and returns these fields as sent (start body,
+  `data.workflowSnapshot`, schedules). Start, validate and schedule creation check the loop structure and the loop's
+  CEL condition (see the start section). At run time the orchestration service repeats the loop's members while the
+  condition holds; a run's snapshot shows the loop's `data.status` (`BUSY`, then `SUCCESS`, `WARNING`, `FAILED` or
+  `SKIPPED`), `data.nodeProgress.message` (`Iteration k of max`, then the final message), the loop's display-only
+  `$variable` output and, when it failed, its `$error` text. The Loop's registry entry (`getContinuumNodeMetadata`,
+  search, the node tree under `Flow Control`, documentation) exists once the orchestration service has registered it
+  at start-up (retried for about two minutes when Kafka or the schema registry is not reachable yet).
 - **Node outputs.** A node's outputs are `Map<portId, PortData>`. A produced port is
   `{status: SUCCESS, contentType: "application/parquet", tableSpec: [{name, contentType}...], data: "{remote}<runId>/<nodeId>/output.<port>.parquet"}`.
   A non-retriable node failure is the port `$error`: `{status: FAILED, contentType: "text/plain", tableSpec: [], data: "<message>"}`.
@@ -61,12 +77,33 @@ is not part of the OpenAPI spec.
 - **Body.** `ContinuumWorkflowModel` (`id`, `name` required; `active`, `nodes`, `edges` default). `name` becomes the
   run's `workflowUri` and the `Continuum:WorkflowFileName` search attribute, so it must be a valid URI
   (`URI.create`). Node `propertiesSchema`, `inputs`, `outputs` from the body are ignored for validation: the registry
-  decides.
+  decides. Nodes may carry the optional loop fields `parentNode` and `data.collapsed` (see "Workflow nodes and loops");
+  unknown node fields are ignored.
 - **Validation.** Shared `WorkflowValidator`, `RUN` mode: unique node ids, every `data.nodeModel` registered, edge
   endpoints and ports exist, no self or duplicate edges, one edge per input port, no cycles, properties valid against
   the registered schema. Node ids, edge `sourceHandle`/`targetHandle` and the ports of the submitted or registered
   node definition must not start with `$` (reserved for system keys such as `$error` and `$variable`). All errors are
   collected.
+  - Loops (each one error, client-visible texts): `type: "Loop"` without the loop `nodeModel` or the reverse ("Node 'k':
+    type 'Loop' is only for the built-in loop ..." / "... needs type 'Loop', not '...'"); a `parentNode` that is not a
+    node ("... its parent 'p' is not a node of this workflow ...") or not a loop ("... is not a loop ..."); a parent chain
+    that is a cycle ("Node 'k': its parent chain 'k' -> 'L' -> 'k' is a cycle ..."); an edge whose source or target is
+    a loop ("Edge ...: 'L' is a loop. A loop has no ports; connect the nodes inside it instead.", `edge` set); a path
+    that leaves a loop and comes back through an outside node ("The edges leave loop 'L' and come back into it through
+    'Y'. ...", `node` = loop). Loop `properties` are checked against the registered Loop schema like any node
+    (`maxIterations` 1..10,000, `onLimit` `fail`/`stop-with-warning`, `onNonBooleanResult` `fail`/`treat-as-false`,
+    `check` `before`/`after`, `condition` 1..2,048 characters). A loop is never "not connected"; a loop without members
+    is a warning.
+  - Loop condition (one error per loop, `node` = loop, `property` = `condition`, only when the schema accepted the
+    property): the condition is checked as full CEL over `vars` by the cel-java validator; the message is
+    "Loop 'L': the condition <reason>: <CEL message> (column n)." with the reason of the first failing rule: `EMPTY`
+    "is empty", `TOO_LONG` "is longer than 2048 characters", `TOO_DEEP` "nests brackets deeper than 32 levels",
+    `SYNTAX` "is not a valid CEL expression", `CHECK_ERROR` "does not type-check" (unknown names or functions such as
+    `now()`, no matching overload), `NOT_BOOLEAN` "does not return true or false" (type neither `bool` nor `dyn`),
+    `INVALID_LITERAL` (bad regex, timestamp or duration literal), `REBOUND_NAME` (a macro or `cel.bind` re-binds an
+    enclosing name or `vars`). Warnings (never block): "Loop 'L': the condition reads no flow variable, so it never
+    changes; ..." (`property` = `condition`) and "Loop 'L': maxIterations N x M nodes inside may exceed the run history
+    limit ..." (`property` = `maxIterations`).
 - **200** `StartWorkflowResponse {workflowId, warnings[]}`. Warnings never block (nodes without edges, unconnected
   inputs, embedded definition differs from the registry).
 - **400** `ProblemDetail` titled "Invalid workflow" with `errors[]` and `warnings[]` (`WorkflowIssue`:
@@ -83,7 +120,7 @@ is not part of the OpenAPI spec.
 - **Purpose.** Dry run of the start checks for the editor. No row, no Temporal call.
 - **Callers.** None found yet (planned workbench use); intended for the workbench and AI agents.
 - **Identity.** Header accepted and passed on, but not used yet (planned partial run). Treated as user-scoped.
-- **Body.** Same as start.
+- **Body.** Same as start (including the optional loop fields).
 - **200** `WorkflowValidationResponse {valid, nodeCount, edgeCount, errors[], warnings[]}`. An invalid workflow is a
   200 with `valid: false`.
 - **400** malformed body only. **Idempotent**, no side effects.
@@ -102,10 +139,19 @@ is not part of the OpenAPI spec.
 - **Identity.** User-scoped; ownership is checked before any signal.
 - **Query.** `reason` optional free text.
 - **204** accepted. The service signals `notifyCancelling` / `notifyTerminating` immediately, then after a 5 s grace
-  period calls Temporal `cancel()` / `terminate(reason ?: "Terminated via API")` from a timer thread.
+  period calls Temporal `cancel()` / `terminate(reason ?: "Terminated via API")` from a timer thread
+  (`WorkflowStopScheduler`).
+- **Side effect of terminate.** Once Temporal's `terminate()` returns, `WorkflowService` sets the owner's row to
+  `TERMINATED` with `updated_at` = now (`WorkflowRunRepository.markTerminated`: only `status` and `updated_at`, only
+  when the row is not already `TERMINATED`). A run stuck retrying a workflow task never runs its signal handler, so
+  without this its record stayed `RUNNING`. A healthy run has normally already stored its own `TERMINATED` event, so
+  the row is not written again. If Temporal reports the run already ended, the row keeps the status it ended with. The
+  message-bridge never turns a `TERMINATED` row back: its upsert ignores a later non-`TERMINATED` event of the same run
+  id. Cancel has no such write: a run that cannot handle the cancellation stays `RUNNING` (Temporal keeps it open too).
 - **404** unknown, unowned, or already finished (Temporal not-found on the signal).
 - **Idempotency.** Repeating on a running workflow re-signals; on a finished one it is a 404. Final run status
-  `CANCELLED` / `TERMINATED` arrives over MQTT and in `workflow_runs`.
+  `CANCELLED` / `TERMINATED` arrives over MQTT and in `workflow_runs`. A terminate recorded by the api-server sends
+  no MQTT event (the workbench sets the viewer to `TERMINATED` itself after the 204).
 - **TODO:** a failure of the delayed hard stop is only logged; the caller already got 204.
 
 ### GET /api/v1/workflow-runs — page of run summaries from the database
@@ -229,6 +275,10 @@ and any other Temporal failure to 500. A delete that fails in Temporal keeps the
 - **Callers.** Orchestration `InitializeActivity` before dispatching nodes (no user header), system tests.
 - **Body.** JSON array of node ids. **200** `{nodeId: taskQueue}`; unknown ids are absent (the orchestrator retries).
   Not user-scoped. Read-only, idempotent.
+- **Built-in nodes.** The built-in Loop (`org.projectcontinuum.core.builtin.Loop`) is registered by the orchestration
+  service at its start-up with the marker task queue `$builtin` (no Temporal queue, no activity). Asked for it, this
+  endpoint returns `$builtin` like any stored queue; the orchestrator never asks, because a loop runs inside the
+  workflow.
 - **Internal?** Called by the orchestration service, but the workbench and tests use it too and it reveals nothing
   user-specific; kept public.
 

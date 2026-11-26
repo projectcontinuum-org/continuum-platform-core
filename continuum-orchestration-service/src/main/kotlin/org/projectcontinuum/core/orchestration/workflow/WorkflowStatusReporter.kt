@@ -36,6 +36,9 @@ class WorkflowStatusReporter(
    */
   private var terminalStatus: String? = null
 
+  /** The published progress never goes down, even when a loop resets its members between iterations. */
+  private val publishedProgress = MonotonicProgress()
+
   /** Pins all subsequent [publishUpdate] calls to the given status, overriding their argument. */
   fun pinTerminalStatus(status: String) {
     terminalStatus = status
@@ -58,6 +61,8 @@ class WorkflowStatusReporter(
     // Once a stop has been signalled, terminalStatus pins every subsequent event to the
     // latest known stopping/final status, regardless of what the caller passed in.
     val effectiveStatus = terminalStatus ?: status
+    // Recorded on replay too, so the highest value so far is the same after a worker restart.
+    val progressPercentage = currentRunningWorkflow()?.let { publishedProgress.next(rawPercentage = calculateProgressPercentage()) }
     // Check if the Workflow is being replayed - skip publishing during replay
     if (!WorkflowUnsafe.isReplaying()) {
       // A signal can arrive before start() has stored the workflow model (the API server sends notifyCancelling /
@@ -65,7 +70,7 @@ class WorkflowStatusReporter(
       // report yet, and throwing here would fail the workflow TASK, which Temporal retries forever, wedging the
       // run in RUNNING. The pinned terminal status is already stored, so the first real update carries it.
       val workflow = currentRunningWorkflow()
-      if (workflow == null) {
+      if (workflow == null || progressPercentage == null) {
         LOGGER.debug("Skipping status update '{}': the workflow model is not stored yet", effectiveStatus)
         return
       }
@@ -80,7 +85,7 @@ class WorkflowStatusReporter(
         jobId = Workflow.getInfo().workflowId,
         data = WorkflowUpdate(
           executionUUID = Workflow.getInfo().workflowId,
-          progressPercentage = calculateProgressPercentage(),
+          progressPercentage = progressPercentage,
           status = effectiveStatus,
           nodeToOutputsMap = nodeToOutputsMapWithErr,
           createdAtTimestampUtc = Workflow.getInfo().runStartedTimestampMillis,
@@ -103,24 +108,16 @@ class WorkflowStatusReporter(
   }
 
   /**
-   * Calculates the overall workflow progress percentage.
-   *
-   * Progress is the share of nodes that are done: succeeded, failed or skipped. Skipped nodes
-   * count because they will never run, so a run with skipped nodes still ends at 100%.
+   * The current share of done nodes (succeeded, failed or skipped; loop nodes not counted), see [WorkflowProgress].
+   * [publishUpdate] publishes the highest value so far, so a loop reset never makes progress go backwards.
    *
    * @return Progress percentage as an integer between 0 and 100
    */
-  fun calculateProgressPercentage(): Int {
-    val nodes = currentRunningWorkflow()?.nodes ?: emptyList()
-    if (nodes.isEmpty()) return 100
-    val skippedNodeCount = nodes.count { node ->
-      node.data.status == ContinuumWorkflowModel.NodeStatus.SKIPPED &&
-          !nodeToOutputsMap.containsKey(node.id) &&
-          !nodeErrorsMap.containsKey(node.id)
-    }
-    val doneNodeCount = nodeToOutputsMap.size + nodeErrorsMap.size + skippedNodeCount
-    return (doneNodeCount * 100) / nodes.size
-  }
+  fun calculateProgressPercentage(): Int = WorkflowProgress.percentage(
+    nodes = currentRunningWorkflow()?.nodes ?: emptyList(),
+    nodeToOutputsMap = nodeToOutputsMap,
+    nodeErrorsMap = nodeErrorsMap
+  )
 
   /**
    * Updates a node's status and animates/de-animates its incoming edges.

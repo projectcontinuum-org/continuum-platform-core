@@ -12,6 +12,7 @@ on:
       - 'continuum-cluster-manager/**'
       - 'continuum-credentials-server/**'
       - 'continuum-commons/**'
+      - 'continuum-loop-condition/**'
       - 'docs/api/**'
       - 'redocly.yaml'
       - 'gradle/**'
@@ -27,6 +28,7 @@ on:
       - 'continuum-cluster-manager/**'
       - 'continuum-credentials-server/**'
       - 'continuum-commons/**'
+      - 'continuum-loop-condition/**'
 
 concurrency:
   group: openapi-spec-check-${{ github.ref }}

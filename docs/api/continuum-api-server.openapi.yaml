@@ -1834,7 +1834,9 @@ paths:
 
         Stops one of the caller's runs without waiting for its nodes. The run is signalled at once (it reports `TERMINATED`),
         and 5 seconds later Temporal terminates it with `reason` (default "Terminated via API"); no code of the run executes
-        after that. Prefer `cancel` unless the run is stuck. On a finished run it is a 404.
+        after that. Once Temporal has terminated it, the run record says `TERMINATED`, with `updatedAt` as the end time, also
+        for a stuck run that could not handle the signal. A run that ended on its own within the 5 seconds keeps its status.
+        Prefer `cancel` unless the run is stuck. On a finished run it is a 404.
       operationId: terminateWorkflow
       parameters:
       - description: Workflow id returned by `POST /api/v1/workflow`.
@@ -2015,6 +2017,14 @@ components:
           - boolean
           - "null"
           description: Editor busy flag. Not used by the backend.
+          example: false
+        collapsed:
+          type:
+          - boolean
+          - "null"
+          description: "Loop nodes only: whether the editor shows the loop collapsed\
+            \ (members hidden). Editor state, not used by the backend. Absent on other\
+            \ nodes."
           example: false
         description:
           type: string
@@ -2583,6 +2593,14 @@ components:
           description: "Node id, unique in the workflow. Edges and node outputs refer\
             \ to it."
           example: normalize
+        parentNode:
+          type:
+          - string
+          - "null"
+          description: "Id of the innermost loop (`type: Loop`) this node is inside.\
+            \ `position` is then relative to that loop (React Flow `parentNode`).\
+            \ Absent for top-level nodes."
+          example: fetch-until-done
         position:
           $ref: "#/components/schemas/CanvasPosition"
           description: Position of the node in the editor canvas.
@@ -2597,7 +2615,8 @@ components:
           example: false
         type:
           type: string
-          description: React Flow node type. The workbench uses `BaseNode`.
+          description: "React Flow node type: `BaseNode` for registered nodes, `Loop`\
+            \ for a loop box (whose `data.nodeModel` is `org.projectcontinuum.core.builtin.Loop`)."
           example: BaseNode
         width:
           type: integer
@@ -2655,9 +2674,11 @@ components:
           type: string
           description: "Run status as last reported. `PENDING`: accepted, no event\
             \ yet. `STARTED`: the orchestrator picked it up. `RUNNING`: nodes are\
-            \ executing. `FINISHED`: every node is done (some may have failed or been\
-            \ skipped; see the node statuses). `FAILED`: the run failed. `CANCELLED`\
-            \ / `TERMINATED`: stopped through the API."
+            \ executing. `FINISHED`: every node is done and none failed (some may\
+            \ have been skipped; see the node statuses). `FAILED`: a node or loop\
+            \ failed, or the run itself failed. `CANCELLED` / `TERMINATED`: stopped\
+            \ through the API (`TERMINATED` is also recorded by the API server once\
+            \ Temporal has terminated the run)."
           enum:
           - PENDING
           - STARTED
@@ -2670,7 +2691,8 @@ components:
         updatedAt:
           type: string
           format: date-time
-          description: "When the last run event was stored (ISO-8601, UTC)."
+          description: "When the last run event was stored, or when the API server\
+            \ recorded a terminate (ISO-8601, UTC)."
           example: 2026-11-21T09:15:09.112Z
         workflowId:
           type: string
@@ -2758,9 +2780,11 @@ components:
           type: string
           description: "Run status as last reported. `PENDING`: accepted, no event\
             \ yet. `STARTED`: the orchestrator picked it up. `RUNNING`: nodes are\
-            \ executing. `FINISHED`: every node is done (some may have failed or been\
-            \ skipped; see the node statuses). `FAILED`: the run failed. `CANCELLED`\
-            \ / `TERMINATED`: stopped through the API."
+            \ executing. `FINISHED`: every node is done and none failed (some may\
+            \ have been skipped; see the node statuses). `FAILED`: a node or loop\
+            \ failed, or the run itself failed. `CANCELLED` / `TERMINATED`: stopped\
+            \ through the API (`TERMINATED` is also recorded by the API server once\
+            \ Temporal has terminated the run)."
           enum:
           - PENDING
           - STARTED
@@ -2773,7 +2797,8 @@ components:
         updatedAt:
           type: string
           format: date-time
-          description: "When the last run event was stored (ISO-8601, UTC)."
+          description: "When the last run event was stored, or when the API server\
+            \ recorded a terminate (ISO-8601, UTC)."
           example: 2026-11-21T09:15:09.112Z
         workflowId:
           type: string

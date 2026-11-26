@@ -183,7 +183,8 @@ cd docker && docker compose up -d
 | `continuum-worker-springboot-starter` | Library — Spring Boot auto-starter for building feature workers | — |
 | `continuum-gradle-plugin` | Convention plugins — `org.projectcontinuum.feature` / `org.projectcontinuum.worker` | — |
 | `continuum-api-server` | REST API — workflow CRUD, node registry, execution trigger | 8080 |
-| `continuum-orchestration-service` | Temporal workflow + activity implementation for DAG execution | — |
+| `continuum-orchestration-service` | Temporal workflow + activity implementation for DAG execution; registers the built-in nodes (the Loop) at start-up | — |
+| `continuum-loop-condition` | Library (not published) — cel-java validator and evaluator of the Loop condition (full CEL); used only by orchestration and api-server | — |
 | `continuum-message-bridge` | Kafka consumer → MQTT publisher bridge for browser real-time updates | 8081 |
 | `continuum-credentials-server` | AES-GCM encrypted credential storage (REST + embedded React UI) | 8083 |
 | `continuum-cluster-manager` | Kubernetes lifecycle manager for per-user workbench instances | — |
@@ -193,10 +194,13 @@ cd docker && docker compose up -d
 
 ```
 Browser (React Flow) → continuum-api-server (REST)
+    (at start-up the orchestration service registers the built-in Loop node like a worker, task queue $builtin)
     → Temporal workflow started (continuum-orchestration-service)
     → InitializeActivity: POST /api/v1/node-explorer/nodes/task-queues to api-server
-          resolves which task queue (= which worker) handles each node
+          resolves which task queue (= which worker) handles each node (loop nodes have no activity and are left out)
     → For each DAG node: IContinuumNodeActivity.run() dispatched to the resolved worker task queue
+          (a loop's members run once per iteration while its CEL condition holds; the condition is checked in the
+          workflow and its outcome recorded in history)
           Worker (feature repo): downloads input Parquet from MinIO → execute() → uploads output Parquet
     → Node sends progress signals → ContinuumWorkflow receives → publishes WorkflowUpdateEvent to Kafka
     → continuum-message-bridge consumes Kafka → publishes to Mosquitto MQTT
@@ -276,7 +280,9 @@ Flow variables (small JSON key/value pairs) travel beside the data ports under t
 | Temporal BOM | 1.28.0 (orchestration uses 1.35.0) |
 | AWS SDK BOM | 2.30.7 |
 | Spring Cloud | 2025.1.1 |
-| `platformVersion` | 0.0.12 (in `gradle.properties`) |
+| cel-java (`dev.cel:cel`) | 0.15.0 (`gradle/libs.versions.toml` alias `cel`; only in `continuum-loop-condition`, so only orchestration and api-server get it and its protobuf-java 4.36.2 / guava 33.7.2-jre; commons and workers stay on protobuf-java 3.25.x) |
+| protobuf-java-util (orchestration, api-server) | 4.36.2 (catalog `protobuf-java-util`, a dependency constraint in those two build files: matches the protobuf-java 4.36.2 that cel-java brings, instead of Temporal's 3.25.x; bump it together with cel-java's protobuf-java) |
+| `platformVersion` | 0.0.23 (in `gradle.properties`) |
 
 #### Infrastructure ports (docker-compose)
 
@@ -314,11 +320,12 @@ PRs that touch any `continuum-*` module or shared build files (`settings.gradle.
 - [continuum-worker-springboot-starter/AGENTS.md](continuum-worker-springboot-starter/AGENTS.md) — Spring Boot starter that wraps all workers: S3 I/O, Temporal activity, progress reporting, credential resolution
 - [continuum-orchestration-service/AGENTS.md](continuum-orchestration-service/AGENTS.md) — Temporal workflow + InitializeActivity; DAG parallel execution engine
 - [continuum-api-server/AGENTS.md](continuum-api-server/AGENTS.md) — REST API: workflow CRUD, node registry, execution trigger, DuckDB node output preview
+- [continuum-loop-condition/AGENTS.md](continuum-loop-condition/AGENTS.md) — cel-java Loop condition validator and evaluator behind the commons interfaces; dependency boundary for protobuf-java 4.x
 - [continuum-credentials-server/AGENTS.md](continuum-credentials-server/AGENTS.md) — AES-GCM encrypted credential store with embedded React UI
 - [continuum-cluster-manager/AGENTS.md](continuum-cluster-manager/AGENTS.md) — Kubernetes lifecycle manager for per-user workbench pods
 - [continuum-gradle-plugin/AGENTS.md](continuum-gradle-plugin/AGENTS.md) — convention plugins for feature modules and workers; @ContinuumNode annotation validator
 
 Modules without child AGENTS.md (minimal, self-contained):
 - `continuum-avro-schemas` — Avro schema definitions only; no logic
-- `continuum-message-bridge` — Kafka consumer → MQTT bridge; 10 files, all config/handler/entity
+- `continuum-message-bridge` — Kafka consumer → MQTT bridge; 10 files, all config/handler/entity. It also upserts `workflow_runs` from every run event (`WorkflowRunRepository.upsert`); a row that says `TERMINATED` ignores later non-`TERMINATED` events of the same run id, because the api-server writes that status itself for a terminated run that could not report it
 - `continuum-knime-base` — experimental KNIME compatibility layer; 2 files

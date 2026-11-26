@@ -5,6 +5,9 @@ import org.projectcontinuum.core.commons.model.ContinuumWorkflowModel
 import org.projectcontinuum.core.commons.model.PortData
 import org.projectcontinuum.core.commons.model.PortDataStatus
 import org.projectcontinuum.core.commons.utils.FlowVariables
+import org.projectcontinuum.core.orchestration.workflow.loop.NodeDispatchPayload
+import org.projectcontinuum.core.orchestration.workflow.loop.WorkflowLoops
+import org.projectcontinuum.core.orchestration.workflow.loop.WorkflowLoopsFactory
 import io.temporal.failure.ActivityFailure
 import io.temporal.failure.CanceledFailure
 import io.temporal.workflow.Async
@@ -15,11 +18,17 @@ import io.temporal.workflow.Workflow
  * Executes a Continuum workflow DAG by dispatching node activities in dependency order,
  * on behalf of a [ContinuumWorkflow].
  *
+ * Loops are run by [org.projectcontinuum.core.orchestration.workflow.loop.LoopRunner] through [WorkflowLoops]: on
+ * every pass the executor lets the loops advance (start, end or restart an iteration) and passes their readiness gate
+ * and carried variables on. A workflow without loops gets [WorkflowLoops.NONE] and takes exactly the old path.
+ *
  * @param statusReporter Used to keep node/edge animation state and Kafka status updates
  *   in sync as nodes start and complete.
+ * @param loopsFactory Builds the loop runner of a run (default: the process-wide factory).
  */
 class WorkflowDagExecutor(
-  private val statusReporter: WorkflowStatusReporter
+  private val statusReporter: WorkflowStatusReporter,
+  private val loopsFactory: () -> WorkflowLoopsFactory = { WorkflowLoopsFactory.current }
 ) {
 
   private val LOGGER = Workflow.getLogger(WorkflowDagExecutor::class.java)
@@ -51,31 +60,35 @@ class WorkflowDagExecutor(
     // Track running node promises for parallel execution
     val nodeExecutionPromises =
       mutableListOf<Pair<ContinuumWorkflowModel.Node, Promise<IContinuumNodeActivity.NodeActivityOutput>>>()
+    val loops = loopsFactory().create(
+      workflow = continuumWorkflow,
+      nodeToOutputsMap = nodeToOutputsMap,
+      nodeErrorsMap = nodeErrorsMap,
+      setNodeStatus = { node, status -> statusReporter.setNodeAnimationAndStatus(node = node, nodeStatus = status) }
+    )
 
     do {
       // Find nodes ready to execute (all parents have completed)
-      markUnrunnableNodesSkipped(
-        continuumWorkflow = continuumWorkflow,
-        nodeToOutputsMap = nodeToOutputsMap,
-        nodeErrorsMap = nodeErrorsMap
-      )
+      advanceLoops(continuumWorkflow = continuumWorkflow, loops = loops, nodeToOutputsMap = nodeToOutputsMap, nodeErrorsMap = nodeErrorsMap)
       val nodesToExecute = NodeReadiness.getReadyNodes(
         continuumWorkflow = continuumWorkflow,
         nodeOutputMap = nodeToOutputsMap,
-        nodeErrorsMap = nodeErrorsMap
+        nodeErrorsMap = nodeErrorsMap,
+        loopGate = loops.gate()
       )
       LOGGER.info("Nodes to execute: ${nodesToExecute.map { it.id }}")
 
       // Start each ready node as an async activity
       val morePromises = nodesToExecute.map { node ->
         // Gather inputs from parent nodes' outputs
-        val nodeInputs = getNodeInputs(continuumWorkflow, node, nodeToOutputsMap)
+        val nodeInputs = getNodeInputs(continuumWorkflow, node, nodeToOutputsMap, loops)
         // Mark node as scheduled and animate incoming edges; the activity reports BUSY once it starts
         statusReporter.setNodeAnimationAndStatus(node = node, nodeStatus = ContinuumWorkflowModel.NodeStatus.SCHEDULED)
         // Start the activity asynchronously, catching ActivityFailure to treat it as a node error
         Pair(node, Async.function {
           try {
-            nodeIdToActivityMap[node.id]!!.run(node, nodeInputs)
+            // Workers never see the loop fields (parentNode, collapsed): see NodeDispatchPayload
+            nodeIdToActivityMap[node.id]!!.run(NodeDispatchPayload.of(node = node), nodeInputs)
           } catch (e: ActivityFailure) {
             if (e.cause is CanceledFailure) {
               // The activity was cancelled as part of workflow cancellation/termination
@@ -126,17 +139,19 @@ class WorkflowDagExecutor(
         nodeExecutionPromises.removeAll { it.first.id == nodeOutput.nodeId }
       }
       LOGGER.info("NodeExecutionPromises size: ${nodeExecutionPromises.size}")
-      markUnrunnableNodesSkipped(
+      val loopsChanged = advanceLoops(
         continuumWorkflow = continuumWorkflow,
+        loops = loops,
         nodeToOutputsMap = nodeToOutputsMap,
         nodeErrorsMap = nodeErrorsMap
       )
       val hasReadyNodes = NodeReadiness.getReadyNodes(
         continuumWorkflow = continuumWorkflow,
         nodeOutputMap = nodeToOutputsMap,
-        nodeErrorsMap = nodeErrorsMap
+        nodeErrorsMap = nodeErrorsMap,
+        loopGate = loops.gate()
       ).isNotEmpty()
-    } while (hasReadyNodes || nodeExecutionPromises.isNotEmpty())
+    } while (hasReadyNodes || nodeExecutionPromises.isNotEmpty() || loopsChanged)
     LOGGER.info("All nodes executed----------------------------------")
   }
 
@@ -156,7 +171,8 @@ class WorkflowDagExecutor(
   private fun getNodeInputs(
     continuumWorkflow: ContinuumWorkflowModel,
     node: ContinuumWorkflowModel.Node,
-    nodeToOutputsMap: Map<String, Map<String, PortData>>
+    nodeToOutputsMap: Map<String, Map<String, PortData>>,
+    loops: WorkflowLoops
   ): Map<String, PortData> {
     // Get all edges where this node is the target
     val nodeParentEdges = continuumWorkflow.getParentEdges(node)
@@ -168,7 +184,9 @@ class WorkflowDagExecutor(
     val inheritedFlowVariables = FlowVariableMerger.collectInputVariables(
       continuumWorkflow = continuumWorkflow,
       node = node,
-      nodeToOutputsMap = nodeToOutputsMap
+      nodeToOutputsMap = nodeToOutputsMap,
+      loopTopology = loops.topology,
+      carriedByLoopId = loops.carriedByLoopId()
     )
     inheritedFlowVariables.conflicts.forEach { conflict ->
       LOGGER.warn(
@@ -189,18 +207,45 @@ class WorkflowDagExecutor(
   }
 
   /**
+   * Marks the nodes that can never run SKIPPED and lets the loops start, end or restart iterations, until neither
+   * changes anything (a skipped node can settle a loop's input, a finished loop can settle a node's input). Returns
+   * true when a loop changed. Without loops this is exactly one skip pass.
+   */
+  private fun advanceLoops(
+    continuumWorkflow: ContinuumWorkflowModel,
+    loops: WorkflowLoops,
+    nodeToOutputsMap: Map<String, Map<String, PortData>>,
+    nodeErrorsMap: Map<String, Map<String, PortData>>
+  ): Boolean {
+    var loopsChanged = false
+    do {
+      markUnrunnableNodesSkipped(
+        continuumWorkflow = continuumWorkflow,
+        nodeToOutputsMap = nodeToOutputsMap,
+        nodeErrorsMap = nodeErrorsMap,
+        loops = loops
+      )
+      val changedNow = loops.advance()
+      loopsChanged = loopsChanged || changedNow
+    } while (changedNow)
+    return loopsChanged
+  }
+
+  /**
    * Marks every node that can never run as SKIPPED, then publishes each finished edge's status:
    * DELIVERED, or BROKEN so the workbench can draw a broken wire. The caller publishes the update.
    */
   private fun markUnrunnableNodesSkipped(
     continuumWorkflow: ContinuumWorkflowModel,
     nodeToOutputsMap: Map<String, Map<String, PortData>>,
-    nodeErrorsMap: Map<String, Map<String, PortData>>
+    nodeErrorsMap: Map<String, Map<String, PortData>>,
+    loops: WorkflowLoops
   ) {
     val nodesToSkip = NodeReadiness.getNodesToSkip(
       continuumWorkflow = continuumWorkflow,
       nodeOutputMap = nodeToOutputsMap,
-      nodeErrorsMap = nodeErrorsMap
+      nodeErrorsMap = nodeErrorsMap,
+      loopGate = loops.gate()
     )
     nodesToSkip.forEach { node ->
       LOGGER.info("Skipping node {}", node.id)
@@ -209,7 +254,8 @@ class WorkflowDagExecutor(
     NodeReadiness.getEdgeStatuses(
       continuumWorkflow = continuumWorkflow,
       nodeOutputMap = nodeToOutputsMap,
-      nodeErrorsMap = nodeErrorsMap
+      nodeErrorsMap = nodeErrorsMap,
+      loopGate = loops.gate()
     ).forEach { (edge, edgeStatus) ->
       statusReporter.setEdgeStatus(edge = edge, edgeStatus = edgeStatus)
     }

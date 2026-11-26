@@ -2,6 +2,7 @@ package org.projectcontinuum.core.api.server.mcp
 
 import org.projectcontinuum.core.api.server.service.NodeExplorerService
 import org.projectcontinuum.core.commons.model.ContinuumWorkflowModel
+import org.projectcontinuum.core.commons.model.LoopNode
 import org.springframework.stereotype.Component
 import java.security.SecureRandom
 
@@ -9,7 +10,8 @@ import java.security.SecureRandom
  * Turns a compact workflow spec into a complete ContinuumWorkflowModel, the content of a .cwf file. The spec is checked
  * with WorkflowSpecValidator first; nothing is built when it has errors. Each node gets the registry NodeData with the
  * spec properties merged over the defaults, the React Flow fields the editor and API expect, and a left-to-right layout
- * by dependency depth.
+ * by dependency depth ([WorkflowSpecLayout]). A loop (the built-in loop nodeId) becomes a box of type `Loop` that holds
+ * the nodes whose `parent` names it; it is listed before them, and their positions are relative to it.
  */
 @Component
 class WorkflowSpecBuilder(
@@ -18,10 +20,10 @@ class WorkflowSpecBuilder(
 ) {
 
     companion object {
-        const val NODE_WIDTH = 224
-        const val NODE_HEIGHT = 100
-        const val X_STEP = 330.0
-        const val Y_STEP = 160.0
+        const val NODE_WIDTH = WorkflowSpecLayout.NODE_WIDTH
+        const val NODE_HEIGHT = WorkflowSpecLayout.NODE_HEIGHT
+        const val X_STEP = WorkflowSpecLayout.X_STEP
+        const val Y_STEP = WorkflowSpecLayout.Y_STEP
         private val random = SecureRandom()
 
         fun fileName(name: String): String {
@@ -45,29 +47,20 @@ class WorkflowSpecBuilder(
         val specNodes = nodes.orEmpty()
         val specEdges = edges.orEmpty()
         val metadata = specNodes.map { it.nodeId!! }.distinct().associateWith { nodeExplorerService.getNodeMetadata(it)!! }
-        val depths = depths(specNodes.map { it.key!! }, specEdges)
-        val rowsUsed = mutableMapOf<Int, Int>()
+        val specNodesByKey = specNodes.associateBy { it.key!! }
+        val layout = WorkflowSpecLayout(
+            keys = specNodes.map { it.key!! },
+            parentByKey = specNodes.mapNotNull { node -> node.parent?.let { parent -> node.key!! to parent } }.toMap(),
+            loopKeys = specNodes.filter { node -> LoopNodeSpec.isLoop(nodeId = node.nodeId) }.map { it.key!! }.toSet(),
+            edges = specEdges.map { edge -> edge.from!! to edge.to!! }
+        ).compute()
 
-        val workflowNodes = specNodes.map { node ->
-            val key = node.key!!
-            val depth = depths.getValue(key)
-            val row = rowsUsed.merge(depth, 1, Int::plus)!! - 1
-            val position = ContinuumWorkflowModel.Position(x = depth * X_STEP, y = row * Y_STEP)
-            val data = metadata.getValue(node.nodeId!!)
-            val properties = buildMap<String, Any> {
-                putAll(data.properties)
-                node.properties.orEmpty().forEach { (k, v) -> if (v == null) remove(k) else put(k, v) }
-            }
-            ContinuumWorkflowModel.Node(
-                id = key,
-                type = "BaseNode",
-                position = position,
-                data = data.copy(properties = properties),
-                width = NODE_WIDTH,
-                height = NODE_HEIGHT,
-                selected = false,
-                positionAbsolute = position,
-                dragging = false
+        // Parent-first order: React Flow needs every loop before its members.
+        val workflowNodes = layout.orderedKeys.map { key ->
+            workflowNode(
+                specNode = specNodesByKey.getValue(key),
+                registered = metadata.getValue(specNodesByKey.getValue(key).nodeId!!),
+                placement = layout.placements.getValue(key)
             )
         }
         val workflowEdges = specEdges.map { edge ->
@@ -96,24 +89,37 @@ class WorkflowSpecBuilder(
         )
     }
 
-    /** Longest-path depth of every key from a root; the graph is known to be acyclic. */
-    private fun depths(keys: List<String>, edges: List<McpWorkflowSpecEdge>): Map<String, Int> {
-        val depth = keys.associateWith { 0 }.toMutableMap()
-        val indegree = keys.associateWith { 0 }.toMutableMap()
-        val outgoing = keys.associateWith { mutableListOf<String>() }
-        for (edge in edges) {
-            outgoing.getValue(edge.from!!).add(edge.to!!)
-            indegree[edge.to] = indegree.getValue(edge.to) + 1
+    /**
+     * One node of the built workflow: the registry [registered] data with the spec properties merged over the
+     * defaults (a null value removes the default). A loop gets type `Loop`, its box size and `collapsed = false`; a
+     * member gets `parentNode` and a position relative to its loop.
+     */
+    private fun workflowNode(
+        specNode: McpWorkflowSpecNode,
+        registered: ContinuumWorkflowModel.NodeData,
+        placement: WorkflowSpecLayout.Placement
+    ): ContinuumWorkflowModel.Node {
+        val properties = buildMap<String, Any> {
+            putAll(registered.properties)
+            specNode.properties.orEmpty().forEach { (k, v) -> if (v == null) remove(k) else put(k, v) }
         }
-        val queue = ArrayDeque(keys.filter { indegree[it] == 0 })
-        while (queue.isNotEmpty()) {
-            val key = queue.removeFirst()
-            for (next in outgoing.getValue(key)) {
-                depth[next] = maxOf(depth.getValue(next), depth.getValue(key) + 1)
-                indegree[next] = indegree.getValue(next) - 1
-                if (indegree[next] == 0) queue.addLast(next)
-            }
+        val isLoop = LoopNodeSpec.isLoop(nodeId = specNode.nodeId)
+        val data = if (isLoop) {
+            registered.copy(properties = properties, collapsed = false)
+        } else {
+            registered.copy(properties = properties)
         }
-        return depth
+        return ContinuumWorkflowModel.Node(
+            id = specNode.key!!,
+            type = if (isLoop) LoopNode.NODE_TYPE else "BaseNode",
+            position = placement.position,
+            data = data,
+            width = placement.width,
+            height = placement.height,
+            selected = false,
+            positionAbsolute = placement.absolutePosition,
+            dragging = false,
+            parentNode = specNode.parent
+        )
     }
 }

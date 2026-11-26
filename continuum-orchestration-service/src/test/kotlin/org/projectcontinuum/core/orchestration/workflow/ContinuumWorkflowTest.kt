@@ -17,6 +17,7 @@ import org.mockito.kotlin.whenever
 import org.projectcontinuum.core.commons.activity.IContinuumNodeActivity
 import org.projectcontinuum.core.commons.constant.TaskQueues
 import org.projectcontinuum.core.commons.model.ContinuumWorkflowModel
+import org.projectcontinuum.core.commons.model.ExecutionStatus
 import org.projectcontinuum.core.commons.model.PortData
 import org.projectcontinuum.core.commons.model.PortDataStatus
 import org.projectcontinuum.core.commons.model.WorkflowUpdateEvent
@@ -410,6 +411,44 @@ class ContinuumWorkflowTest {
       val details = appFailure.details.get(0, Map::class.java) as Map<String, Map<*, *>>
       assertTrue(details.getValue("nodeErrors").containsKey("3"))
       assertTrue(details.getValue("nodeToOutputsMap").containsKey("2"))
+    }
+  }
+
+  @Test
+  fun `a run with a failed node publishes FAILED as its final status and sets the failed search attribute`() {
+    newEnv().use { env ->
+      val events = captureStatusEvents()
+      env.fakeNodeActivity.successOutputs["2"] = mapOf("output-1" to samplePortData("time"))
+      env.fakeNodeActivity.errorOutputs["3"] = mapOf(IContinuumNodeActivity.NodeOutputSystemPort.ERROR.key to samplePortData("boom"))
+      val workflowId = "test-${UUID.randomUUID()}"
+
+      val model = WorkflowFixtures.loadWorkflow("/test-workflows/linear-2node.cwf.json")
+      val (_, future) = startWorkflow(env = env, model = model, workflowId = workflowId)
+      assertFailsWith<ExecutionException> { future.get(10, TimeUnit.SECONDS) }
+
+      val publishedStatuses = events.map { event -> event.workflowStatus }
+      assertEquals("FAILED", publishedStatuses.last(), "published: $publishedStatuses")
+      assertFalse("FINISHED" in publishedStatuses, "a failed run is never published FINISHED: $publishedStatuses")
+      val searchAttributes = env.client.newUntypedWorkflowStub(workflowId).describe().typedSearchAttributes
+      assertEquals(ExecutionStatus.WORKFLOW_EXECUTION_FAILED.value, searchAttributes.get(IContinuumWorkflow.WORKFLOW_STATUS))
+    }
+  }
+
+  @Test
+  fun `a run whose nodes all succeed publishes FINISHED and sets the completed search attribute`() {
+    newEnv().use { env ->
+      val events = captureStatusEvents()
+      env.fakeNodeActivity.successOutputs["2"] = mapOf("output-1" to samplePortData("time"))
+      env.fakeNodeActivity.successOutputs["3"] = mapOf("output-1" to samplePortData("done"))
+      val workflowId = "test-${UUID.randomUUID()}"
+
+      val model = WorkflowFixtures.loadWorkflow("/test-workflows/linear-2node.cwf.json")
+      val (_, future) = startWorkflow(env = env, model = model, workflowId = workflowId)
+      future.get(10, TimeUnit.SECONDS)
+
+      assertEquals("FINISHED", events.last().workflowStatus)
+      val searchAttributes = env.client.newUntypedWorkflowStub(workflowId).describe().typedSearchAttributes
+      assertEquals(ExecutionStatus.WORKFLOW_EXECUTION_COMPLETED.value, searchAttributes.get(IContinuumWorkflow.WORKFLOW_STATUS))
     }
   }
 

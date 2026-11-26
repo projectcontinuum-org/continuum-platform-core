@@ -49,6 +49,17 @@ dependencies {
     implementation("io.temporal:temporal-kotlin")
     implementation("io.temporal:temporal-spring-boot-starter")
 
+    // Loop conditions: the cel-java parser (and later the evaluator) behind the continuum-commons interfaces. This
+    // module and continuum-api-server are the only ones that get cel-java (and with it protobuf-java 4.x, guava 33.x).
+    implementation(project(":continuum-loop-condition"))
+    constraints {
+        // cel-java (above) raises protobuf-java to 4.x; keep protobuf-java-util (declared 3.25.x by Temporal's
+        // serviceclient) on the same version. A constraint, not a force: a higher requested version still wins.
+        implementation(libs.protobuf.java.util) {
+            because("protobuf-java-util must match protobuf-java 4.x that cel-java brings")
+        }
+    }
+
     // Test dependencies
     testImplementation("org.springframework.boot:spring-boot-starter-test")
     testImplementation("org.jetbrains.kotlin:kotlin-test-junit5")
@@ -57,6 +68,8 @@ dependencies {
     testImplementation("org.mockito.kotlin:mockito-kotlin:5.3.1")
     testImplementation("org.springframework.cloud:spring-cloud-stream-test-support")
     testImplementation("org.springframework.cloud:spring-cloud-stream-test-binder")
+    // spike.CelInWorkflowSpikeTest calls cel-java directly (in-workflow evaluation + replay regression test)
+    testImplementation(libs.cel)
 }
 
 dependencyManagement {

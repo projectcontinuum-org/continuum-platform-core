@@ -80,13 +80,26 @@ class WorkflowExecutionSnapshotToDbSyncHandlerTest {
     )
   }
 
+  private val upsertSql: String = WorkflowRunRepository::class.java.getMethod(
+    "upsert", String::class.java, String::class.java, String::class.java, String::class.java, String::class.java,
+    String::class.java, Int::class.javaPrimitiveType, String::class.java, String::class.java, Instant::class.java
+  ).getAnnotation(org.springframework.data.jdbc.repository.query.Query::class.java).value
+
+  /** The SQL with every run of whitespace folded to one space, so a re-wrapped query still matches. */
+  private val normalizedUpsertSql: String = upsertSql.replace(Regex("\\s+"), " ")
+
   @Test
   fun `the upsert keeps an already recorded run id when a later event has none`() {
-    val sql = WorkflowRunRepository::class.java.getMethod(
-      "upsert", String::class.java, String::class.java, String::class.java, String::class.java, String::class.java,
-      String::class.java, Int::class.javaPrimitiveType, String::class.java, String::class.java, Instant::class.java
-    ).getAnnotation(org.springframework.data.jdbc.repository.query.Query::class.java).value
+    assertTrue(upsertSql.contains("run_id = COALESCE(EXCLUDED.run_id, workflow_runs.run_id)"), upsertSql)
+  }
 
-    assertTrue(sql.contains("run_id = COALESCE(EXCLUDED.run_id, workflow_runs.run_id)"), sql)
+  @Test
+  fun `a late event of a terminated run never turns its record back to running`() {
+    // The api-server records TERMINATED itself for a run that could not report it; an event the run published before
+    // the terminate can still arrive. Only a TERMINATED event, or an event of another run id, may update such a row.
+    val guard = "WHERE workflow_runs.status <> 'TERMINATED' OR EXCLUDED.status = 'TERMINATED' " +
+      "OR EXCLUDED.run_id <> workflow_runs.run_id;"
+
+    assertTrue(normalizedUpsertSql.contains(guard), normalizedUpsertSql)
   }
 }

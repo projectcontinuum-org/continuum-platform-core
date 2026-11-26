@@ -4,6 +4,7 @@ import org.projectcontinuum.core.commons.protocol.progress.NodeProgress
 import com.fasterxml.jackson.annotation.JsonCreator
 import com.fasterxml.jackson.annotation.JsonIgnore
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties
+import com.fasterxml.jackson.annotation.JsonInclude
 import com.fasterxml.jackson.annotation.JsonProperty
 import io.swagger.v3.oas.annotations.media.Schema
 
@@ -95,11 +96,23 @@ data class ContinuumWorkflowModel @JsonCreator constructor(
     BROKEN
   }
 
+  /**
+   * A node of the workflow. Unknown properties are ignored, so editor-only React Flow fields (`extent`, `expandParent`,
+   * `style`, `zIndex`, ...) never break a start or a dispatch.
+   *
+   * [parentNode] and [NodeData.collapsed] are omitted from the JSON when null, so a workflow without loops serializes
+   * exactly as before and a worker built on an older commons never sees them.
+   */
+  @JsonIgnoreProperties(ignoreUnknown = true)
   @Schema(name = "WorkflowNode", description = "A node of the workflow: an instance of a registered node type with its properties and editor layout.")
   data class Node @JsonCreator constructor(
     @field:Schema(description = "Node id, unique in the workflow. Edges and node outputs refer to it.", example = "normalize")
     @param:JsonProperty("id") val id: String,
-    @field:Schema(description = "React Flow node type. The workbench uses `BaseNode`.", example = "BaseNode")
+    @field:Schema(
+      description = "React Flow node type: `BaseNode` for registered nodes, `Loop` for a loop box (whose `data.nodeModel` " +
+        "is `org.projectcontinuum.core.builtin.Loop`).",
+      example = "BaseNode"
+    )
     @param:JsonProperty("type") val type: String,
     @field:Schema(description = "Position of the node in the editor canvas.")
     @param:JsonProperty("position") val position: Position,
@@ -114,7 +127,16 @@ data class ContinuumWorkflowModel @JsonCreator constructor(
     @field:Schema(description = "Absolute canvas position (React Flow). Not used by the backend.", requiredMode = Schema.RequiredMode.NOT_REQUIRED, nullable = true)
     @param:JsonProperty("positionAbsolute") val positionAbsolute: Position? = null,
     @field:Schema(description = "Whether the node is being dragged in the editor. Not used by the backend.", requiredMode = Schema.RequiredMode.NOT_REQUIRED, nullable = true, example = "false")
-    @param:JsonProperty("dragging") val dragging: Boolean? = null
+    @param:JsonProperty("dragging") val dragging: Boolean? = null,
+    @field:Schema(
+      description = "Id of the innermost loop (`type: Loop`) this node is inside. `position` is then relative to that " +
+        "loop (React Flow `parentNode`). Absent for top-level nodes.",
+      requiredMode = Schema.RequiredMode.NOT_REQUIRED,
+      nullable = true,
+      example = "fetch-until-done"
+    )
+    @field:JsonInclude(JsonInclude.Include.NON_NULL)
+    @param:JsonProperty("parentNode") val parentNode: String? = null
   )
 
   @Schema(name = "CanvasPosition", description = "A point on the editor canvas, in pixels.")
@@ -131,6 +153,7 @@ data class ContinuumWorkflowModel @JsonCreator constructor(
       "properties and runtime state. When a workflow is started or validated, `inputs`, `outputs` and `propertiesSchema` " +
       "come from the node registry; the copies in the request are only compared (a difference is a warning)."
   )
+  @JsonIgnoreProperties(ignoreUnknown = true)
   data class NodeData @JsonCreator constructor(
     @field:Schema(description = "Node type id; the same as `nodeModel` for registered nodes.", requiredMode = Schema.RequiredMode.NOT_REQUIRED, nullable = true, example = "org.projectcontinuum.feature.base.analytics.node.TextNormalizerNodeModel")
     @param:JsonProperty("id") val id: String? = null,
@@ -170,7 +193,16 @@ data class ContinuumWorkflowModel @JsonCreator constructor(
     @field:Schema(description = "Latest progress reported by the worker during a run.", requiredMode = Schema.RequiredMode.NOT_REQUIRED, nullable = true)
     @param:JsonProperty("nodeProgress") var nodeProgress: NodeProgress? = null,
     @field:Schema(description = "Per-node override of the Temporal activity retry policy.", requiredMode = Schema.RequiredMode.NOT_REQUIRED, nullable = true)
-    @param:JsonProperty("retryOptions") val retryOptions: RetryOptionsConfig? = null
+    @param:JsonProperty("retryOptions") val retryOptions: RetryOptionsConfig? = null,
+    @field:Schema(
+      description = "Loop nodes only: whether the editor shows the loop collapsed (members hidden). Editor state, not " +
+        "used by the backend. Absent on other nodes.",
+      requiredMode = Schema.RequiredMode.NOT_REQUIRED,
+      nullable = true,
+      example = "false"
+    )
+    @field:JsonInclude(JsonInclude.Include.NON_NULL)
+    @param:JsonProperty("collapsed") val collapsed: Boolean? = null
   )
 
   /**

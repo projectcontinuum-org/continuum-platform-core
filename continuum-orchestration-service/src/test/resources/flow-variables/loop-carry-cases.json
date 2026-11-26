@@ -1,0 +1,1090 @@
+{
+  "about": "Loop-carried flow variables: the shared case list of the orchestration service's FlowVariableMerger and LoopCarriedVariables (continuum-platform-core) and the workbench's FlowVariables.ts. The workbench copies this file verbatim; change the Kotlin rule, the TypeScript rule and this file together.",
+  "format": {
+    "nodes": "id; loop: true for a loop box; parent: the loop the node is directly inside; inputs: declared input port ids in order (absent = none). Every node has one output port 'out'.",
+    "edges": "source.out -> target.targetHandle",
+    "steps": "One snapshot each. carried: loop id -> variables carried into this iteration (empty before the first). own: node id -> the variables the node itself set in this snapshot (a missing node set none). expectInherited: node id -> the variables it receives. expectCarriedAfter: loop id -> its carried set after this iteration. expectConditionVariablesBefore: loop id -> what its condition reads with 'carried' as given. expectConditionVariablesAfter: loop id -> what its condition reads at the end of its iteration, that is with only that loop's carried set replaced by its expectCarriedAfter (an enclosing loop's carried set changes only when the enclosing loop's own iteration ends)."
+  },
+  "cases": [
+    {
+      "id": "carried-value-overrides-outside-value",
+      "description": "A member sets page=2 in iteration 1. In iteration 2 the entry member fetch sees page=2 and hasMore from the carried set, overriding seed's page=1. parse (not an entry member) sees the carried values only through fetch, so fetch's own page=3 wins. write, after the loop, inherits the iteration's values through parse.",
+      "nodes": [
+        {
+          "id": "seed"
+        },
+        {
+          "id": "L",
+          "loop": true
+        },
+        {
+          "id": "fetch",
+          "parent": "L",
+          "inputs": [
+            "in"
+          ]
+        },
+        {
+          "id": "parse",
+          "parent": "L",
+          "inputs": [
+            "in"
+          ]
+        },
+        {
+          "id": "write",
+          "inputs": [
+            "in"
+          ]
+        }
+      ],
+      "edges": [
+        {
+          "source": "seed",
+          "target": "fetch",
+          "targetHandle": "in"
+        },
+        {
+          "source": "fetch",
+          "target": "parse",
+          "targetHandle": "in"
+        },
+        {
+          "source": "parse",
+          "target": "write",
+          "targetHandle": "in"
+        }
+      ],
+      "steps": [
+        {
+          "label": "iteration 1",
+          "carried": {
+            "L": {}
+          },
+          "own": {
+            "seed": {
+              "page": 1,
+              "hasMore": true
+            },
+            "fetch": {
+              "page": 2
+            },
+            "parse": {
+              "hasMore": true
+            }
+          },
+          "expectInherited": {
+            "seed": {},
+            "fetch": {
+              "page": 1,
+              "hasMore": true
+            },
+            "parse": {
+              "page": 2,
+              "hasMore": true
+            },
+            "write": {
+              "page": 2,
+              "hasMore": true
+            }
+          },
+          "expectCarriedAfter": {
+            "L": {
+              "page": 2,
+              "hasMore": true
+            }
+          },
+          "expectConditionVariablesBefore": {
+            "L": {
+              "page": 1,
+              "hasMore": true
+            }
+          },
+          "expectConditionVariablesAfter": {
+            "L": {
+              "page": 2,
+              "hasMore": true
+            }
+          }
+        },
+        {
+          "label": "iteration 2",
+          "carried": {
+            "L": {
+              "page": 2,
+              "hasMore": true
+            }
+          },
+          "own": {
+            "seed": {
+              "page": 1,
+              "hasMore": true
+            },
+            "fetch": {
+              "page": 3
+            },
+            "parse": {
+              "hasMore": false
+            }
+          },
+          "expectInherited": {
+            "fetch": {
+              "page": 2,
+              "hasMore": true
+            },
+            "parse": {
+              "page": 3,
+              "hasMore": true
+            },
+            "write": {
+              "page": 3,
+              "hasMore": false
+            }
+          },
+          "expectCarriedAfter": {
+            "L": {
+              "page": 3,
+              "hasMore": false
+            }
+          },
+          "expectConditionVariablesBefore": {
+            "L": {
+              "page": 2,
+              "hasMore": true
+            }
+          },
+          "expectConditionVariablesAfter": {
+            "L": {
+              "page": 3,
+              "hasMore": false
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "name-clash-later-member-in-run-order-wins",
+      "description": "fetch and parse both set x. parse runs after fetch (edge fetch -> parse), so parse's value is carried, although parse is listed first in nodes.",
+      "nodes": [
+        {
+          "id": "seed"
+        },
+        {
+          "id": "L",
+          "loop": true
+        },
+        {
+          "id": "parse",
+          "parent": "L",
+          "inputs": [
+            "in"
+          ]
+        },
+        {
+          "id": "fetch",
+          "parent": "L",
+          "inputs": [
+            "in"
+          ]
+        },
+        {
+          "id": "write",
+          "inputs": [
+            "in"
+          ]
+        }
+      ],
+      "edges": [
+        {
+          "source": "seed",
+          "target": "fetch",
+          "targetHandle": "in"
+        },
+        {
+          "source": "fetch",
+          "target": "parse",
+          "targetHandle": "in"
+        },
+        {
+          "source": "parse",
+          "target": "write",
+          "targetHandle": "in"
+        }
+      ],
+      "steps": [
+        {
+          "label": "iteration 1",
+          "carried": {
+            "L": {}
+          },
+          "own": {
+            "fetch": {
+              "x": "fetch",
+              "y": 1
+            },
+            "parse": {
+              "x": "parse"
+            }
+          },
+          "expectInherited": {
+            "fetch": {},
+            "parse": {
+              "x": "fetch",
+              "y": 1
+            },
+            "write": {
+              "x": "parse",
+              "y": 1
+            }
+          },
+          "expectCarriedAfter": {
+            "L": {
+              "x": "parse",
+              "y": 1
+            }
+          },
+          "expectConditionVariablesAfter": {
+            "L": {
+              "x": "parse",
+              "y": 1
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "name-clash-between-parallel-members-follows-nodes-order",
+      "description": "a and b run side by side (no edge between them) and both set x. Run order ties are broken by the nodes list, which lists b before a, so a's value is carried.",
+      "nodes": [
+        {
+          "id": "seed"
+        },
+        {
+          "id": "L",
+          "loop": true
+        },
+        {
+          "id": "b",
+          "parent": "L",
+          "inputs": [
+            "in"
+          ]
+        },
+        {
+          "id": "a",
+          "parent": "L",
+          "inputs": [
+            "in"
+          ]
+        }
+      ],
+      "edges": [
+        {
+          "source": "seed",
+          "target": "b",
+          "targetHandle": "in"
+        },
+        {
+          "source": "seed",
+          "target": "a",
+          "targetHandle": "in"
+        }
+      ],
+      "steps": [
+        {
+          "label": "iteration 1",
+          "carried": {
+            "L": {}
+          },
+          "own": {
+            "b": {
+              "x": "b"
+            },
+            "a": {
+              "x": "a"
+            }
+          },
+          "expectInherited": {
+            "a": {},
+            "b": {}
+          },
+          "expectCarriedAfter": {
+            "L": {
+              "x": "a"
+            }
+          },
+          "expectConditionVariablesAfter": {
+            "L": {
+              "x": "a"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "variable-set-once-stays-carried",
+      "description": "fetch sets token only in iteration 1. It stays in the carried set after iteration 2, where only page changes.",
+      "nodes": [
+        {
+          "id": "seed"
+        },
+        {
+          "id": "L",
+          "loop": true
+        },
+        {
+          "id": "fetch",
+          "parent": "L",
+          "inputs": [
+            "in"
+          ]
+        }
+      ],
+      "edges": [
+        {
+          "source": "seed",
+          "target": "fetch",
+          "targetHandle": "in"
+        }
+      ],
+      "steps": [
+        {
+          "label": "iteration 1",
+          "carried": {
+            "L": {}
+          },
+          "own": {
+            "fetch": {
+              "token": "t1",
+              "page": 1
+            }
+          },
+          "expectInherited": {
+            "fetch": {}
+          },
+          "expectCarriedAfter": {
+            "L": {
+              "token": "t1",
+              "page": 1
+            }
+          }
+        },
+        {
+          "label": "iteration 2",
+          "carried": {
+            "L": {
+              "token": "t1",
+              "page": 1
+            }
+          },
+          "own": {
+            "fetch": {
+              "page": 2
+            }
+          },
+          "expectInherited": {
+            "fetch": {
+              "token": "t1",
+              "page": 1
+            }
+          },
+          "expectCarriedAfter": {
+            "L": {
+              "token": "t1",
+              "page": 2
+            }
+          },
+          "expectConditionVariablesAfter": {
+            "L": {
+              "token": "t1",
+              "page": 2
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "nested-loops-outer-carried-reaches-inner-entry-member",
+      "description": "seed -> O[ a -> I[ b -> c ] -> d ] -> e, in outer iteration 2 and inner iteration 3. a is the entry member of O and gets O's carried set. b is the entry member of I only: it sees O's carried values through a, then I's carried set on top (I's shared wins). c, d and e see them through their parents.",
+      "nodes": [
+        {
+          "id": "seed"
+        },
+        {
+          "id": "O",
+          "loop": true
+        },
+        {
+          "id": "a",
+          "parent": "O",
+          "inputs": [
+            "in"
+          ]
+        },
+        {
+          "id": "I",
+          "loop": true,
+          "parent": "O"
+        },
+        {
+          "id": "b",
+          "parent": "I",
+          "inputs": [
+            "in"
+          ]
+        },
+        {
+          "id": "c",
+          "parent": "I",
+          "inputs": [
+            "in"
+          ]
+        },
+        {
+          "id": "d",
+          "parent": "O",
+          "inputs": [
+            "in"
+          ]
+        },
+        {
+          "id": "e",
+          "inputs": [
+            "in"
+          ]
+        }
+      ],
+      "edges": [
+        {
+          "source": "seed",
+          "target": "a",
+          "targetHandle": "in"
+        },
+        {
+          "source": "a",
+          "target": "b",
+          "targetHandle": "in"
+        },
+        {
+          "source": "b",
+          "target": "c",
+          "targetHandle": "in"
+        },
+        {
+          "source": "c",
+          "target": "d",
+          "targetHandle": "in"
+        },
+        {
+          "source": "d",
+          "target": "e",
+          "targetHandle": "in"
+        }
+      ],
+      "steps": [
+        {
+          "label": "outer iteration 2, inner iteration 3",
+          "carried": {
+            "O": {
+              "o": "outer",
+              "shared": "O"
+            },
+            "I": {
+              "i": "inner",
+              "shared": "I"
+            }
+          },
+          "own": {
+            "seed": {
+              "s": 1,
+              "shared": "seed"
+            },
+            "a": {
+              "a": 1
+            },
+            "b": {
+              "b": 1
+            },
+            "c": {
+              "c": 1
+            },
+            "d": {
+              "d": 1
+            }
+          },
+          "expectInherited": {
+            "a": {
+              "s": 1,
+              "shared": "O",
+              "o": "outer"
+            },
+            "b": {
+              "s": 1,
+              "shared": "I",
+              "o": "outer",
+              "a": 1,
+              "i": "inner"
+            },
+            "c": {
+              "s": 1,
+              "shared": "I",
+              "o": "outer",
+              "a": 1,
+              "i": "inner",
+              "b": 1
+            },
+            "d": {
+              "s": 1,
+              "shared": "I",
+              "o": "outer",
+              "a": 1,
+              "i": "inner",
+              "b": 1,
+              "c": 1
+            },
+            "e": {
+              "s": 1,
+              "shared": "I",
+              "o": "outer",
+              "a": 1,
+              "i": "inner",
+              "b": 1,
+              "c": 1,
+              "d": 1
+            }
+          },
+          "expectCarriedAfter": {
+            "O": {
+              "o": "outer",
+              "shared": "O",
+              "a": 1,
+              "b": 1,
+              "c": 1,
+              "d": 1
+            },
+            "I": {
+              "i": "inner",
+              "shared": "I",
+              "b": 1,
+              "c": 1
+            }
+          },
+          "expectConditionVariablesBefore": {
+            "O": {
+              "s": 1,
+              "shared": "O",
+              "o": "outer"
+            },
+            "I": {
+              "s": 1,
+              "shared": "I",
+              "o": "outer",
+              "a": 1,
+              "i": "inner"
+            }
+          },
+          "expectConditionVariablesAfter": {
+            "O": {
+              "s": 1,
+              "shared": "O",
+              "o": "outer",
+              "a": 1,
+              "b": 1,
+              "c": 1,
+              "d": 1
+            },
+            "I": {
+              "s": 1,
+              "shared": "I",
+              "o": "outer",
+              "a": 1,
+              "i": "inner",
+              "b": 1,
+              "c": 1
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "nested-loops-entry-member-of-both-loops",
+      "description": "seed -> O[ I[ b ] -> d ]. b is the entry member of both loops: the outer carried set is applied first, then the inner one, so I's k wins. d is not an entry member and sees the values through b.",
+      "nodes": [
+        {
+          "id": "seed"
+        },
+        {
+          "id": "O",
+          "loop": true
+        },
+        {
+          "id": "I",
+          "loop": true,
+          "parent": "O"
+        },
+        {
+          "id": "b",
+          "parent": "I",
+          "inputs": [
+            "in"
+          ]
+        },
+        {
+          "id": "d",
+          "parent": "O",
+          "inputs": [
+            "in"
+          ]
+        }
+      ],
+      "edges": [
+        {
+          "source": "seed",
+          "target": "b",
+          "targetHandle": "in"
+        },
+        {
+          "source": "b",
+          "target": "d",
+          "targetHandle": "in"
+        }
+      ],
+      "steps": [
+        {
+          "label": "outer iteration 2, inner iteration 2",
+          "carried": {
+            "O": {
+              "k": "O",
+              "o": 1
+            },
+            "I": {
+              "k": "I",
+              "i": 1
+            }
+          },
+          "own": {
+            "seed": {
+              "k": "seed"
+            },
+            "d": {
+              "done": true
+            }
+          },
+          "expectInherited": {
+            "b": {
+              "k": "I",
+              "o": 1,
+              "i": 1
+            },
+            "d": {
+              "k": "I",
+              "o": 1,
+              "i": 1
+            }
+          },
+          "expectCarriedAfter": {
+            "O": {
+              "k": "O",
+              "o": 1,
+              "done": true
+            },
+            "I": {
+              "k": "I",
+              "i": 1
+            }
+          },
+          "expectConditionVariablesAfter": {
+            "O": {
+              "k": "O",
+              "o": 1,
+              "done": true
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "entry-member-without-outside-parent",
+      "description": "gen has no input, so it is an entry member with nothing from outside: it gets only the carried set. The condition before an iteration reads only the carried set, because no edge enters the loop.",
+      "nodes": [
+        {
+          "id": "L",
+          "loop": true
+        },
+        {
+          "id": "gen",
+          "parent": "L"
+        },
+        {
+          "id": "use",
+          "parent": "L",
+          "inputs": [
+            "in"
+          ]
+        }
+      ],
+      "edges": [
+        {
+          "source": "gen",
+          "target": "use",
+          "targetHandle": "in"
+        }
+      ],
+      "steps": [
+        {
+          "label": "iteration 2",
+          "carried": {
+            "L": {
+              "n": 1
+            }
+          },
+          "own": {
+            "gen": {
+              "n": 2
+            }
+          },
+          "expectInherited": {
+            "gen": {
+              "n": 1
+            },
+            "use": {
+              "n": 2
+            }
+          },
+          "expectCarriedAfter": {
+            "L": {
+              "n": 2
+            }
+          },
+          "expectConditionVariablesBefore": {
+            "L": {
+              "n": 1
+            }
+          },
+          "expectConditionVariablesAfter": {
+            "L": {
+              "n": 2
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "several-outside-parents-earliest-entry-member-then-lowest-port-wins",
+      "description": "Three outside parents set the same names and feed two entry members of loop L. What the condition reads is ordered by the target member's run order in the loop (entryA before entryB), then by the target's input port index (entryA declares 'second' before 'first'), and the first value per name wins; the edge order, the source ids and the port names do not decide. So page comes from omega (entryA, port index 0), x from zeta (entryA, port index 1) over alpha (entryB), and y, set only by alpha, is still read.",
+      "nodes": [
+        {
+          "id": "alpha"
+        },
+        {
+          "id": "zeta"
+        },
+        {
+          "id": "omega"
+        },
+        {
+          "id": "L",
+          "loop": true
+        },
+        {
+          "id": "entryA",
+          "parent": "L",
+          "inputs": [
+            "second",
+            "first"
+          ]
+        },
+        {
+          "id": "entryB",
+          "parent": "L",
+          "inputs": [
+            "in"
+          ]
+        }
+      ],
+      "edges": [
+        {
+          "source": "alpha",
+          "target": "entryB",
+          "targetHandle": "in"
+        },
+        {
+          "source": "zeta",
+          "target": "entryA",
+          "targetHandle": "first"
+        },
+        {
+          "source": "omega",
+          "target": "entryA",
+          "targetHandle": "second"
+        }
+      ],
+      "steps": [
+        {
+          "label": "iteration 1",
+          "carried": {
+            "L": {}
+          },
+          "own": {
+            "alpha": {
+              "page": 2,
+              "x": "a",
+              "y": true
+            },
+            "zeta": {
+              "page": 3,
+              "x": "z"
+            },
+            "omega": {
+              "page": 1
+            }
+          },
+          "expectInherited": {
+            "entryA": {
+              "page": 1,
+              "x": "z"
+            },
+            "entryB": {
+              "page": 2,
+              "x": "a",
+              "y": true
+            }
+          },
+          "expectCarriedAfter": {
+            "L": {}
+          },
+          "expectConditionVariablesBefore": {
+            "L": {
+              "page": 1,
+              "x": "z",
+              "y": true
+            }
+          },
+          "expectConditionVariablesAfter": {
+            "L": {
+              "page": 1,
+              "x": "z",
+              "y": true
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "node-after-finished-loop-gets-last-iteration-carried-set",
+      "description": "seed (page=1) -> L[ fetch ] -> write. fetch sets token=t1, page=2, hasMore=true in iteration 1, only hasMore=true in iteration 2 and only hasMore=false in iteration 3, where the condition turns false and the loop finishes. write inherits through fetch, so it gets the set carried into the last iteration with fetch's last own values on top: page=2 and token=t1 from iteration 1 (not seed's page=1), hasMore=false. The step's 'carried' of the last iteration is what the finished loop stores as its display $variable.",
+      "nodes": [
+        {
+          "id": "seed"
+        },
+        {
+          "id": "L",
+          "loop": true
+        },
+        {
+          "id": "fetch",
+          "parent": "L",
+          "inputs": [
+            "in"
+          ]
+        },
+        {
+          "id": "write",
+          "inputs": [
+            "in"
+          ]
+        }
+      ],
+      "edges": [
+        {
+          "source": "seed",
+          "target": "fetch",
+          "targetHandle": "in"
+        },
+        {
+          "source": "fetch",
+          "target": "write",
+          "targetHandle": "in"
+        }
+      ],
+      "steps": [
+        {
+          "label": "iteration 1",
+          "carried": {
+            "L": {}
+          },
+          "own": {
+            "seed": {
+              "page": 1
+            },
+            "fetch": {
+              "token": "t1",
+              "page": 2,
+              "hasMore": true
+            }
+          },
+          "expectInherited": {
+            "fetch": {
+              "page": 1
+            }
+          },
+          "expectCarriedAfter": {
+            "L": {
+              "token": "t1",
+              "page": 2,
+              "hasMore": true
+            }
+          },
+          "expectConditionVariablesAfter": {
+            "L": {
+              "page": 2,
+              "token": "t1",
+              "hasMore": true
+            }
+          }
+        },
+        {
+          "label": "iteration 2",
+          "carried": {
+            "L": {
+              "token": "t1",
+              "page": 2,
+              "hasMore": true
+            }
+          },
+          "own": {
+            "seed": {
+              "page": 1
+            },
+            "fetch": {
+              "hasMore": true
+            }
+          },
+          "expectInherited": {
+            "fetch": {
+              "page": 2,
+              "token": "t1",
+              "hasMore": true
+            }
+          },
+          "expectCarriedAfter": {
+            "L": {
+              "token": "t1",
+              "page": 2,
+              "hasMore": true
+            }
+          },
+          "expectConditionVariablesAfter": {
+            "L": {
+              "page": 2,
+              "token": "t1",
+              "hasMore": true
+            }
+          }
+        },
+        {
+          "label": "iteration 3, the last: the loop finishes and write runs",
+          "carried": {
+            "L": {
+              "token": "t1",
+              "page": 2,
+              "hasMore": true
+            }
+          },
+          "own": {
+            "seed": {
+              "page": 1
+            },
+            "fetch": {
+              "hasMore": false
+            }
+          },
+          "expectInherited": {
+            "fetch": {
+              "page": 2,
+              "token": "t1",
+              "hasMore": true
+            },
+            "write": {
+              "page": 2,
+              "token": "t1",
+              "hasMore": false
+            }
+          },
+          "expectCarriedAfter": {
+            "L": {
+              "token": "t1",
+              "page": 2,
+              "hasMore": false
+            }
+          },
+          "expectConditionVariablesAfter": {
+            "L": {
+              "page": 2,
+              "token": "t1",
+              "hasMore": false
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "loop-free-workflow-is-unchanged",
+      "description": "Without loops the rule is the plain fan-in merge: every node inherits its ancestors' variables, a node's own value winning over what it inherited.",
+      "nodes": [
+        {
+          "id": "seed"
+        },
+        {
+          "id": "A",
+          "inputs": [
+            "in"
+          ]
+        },
+        {
+          "id": "B",
+          "inputs": [
+            "in"
+          ]
+        }
+      ],
+      "edges": [
+        {
+          "source": "seed",
+          "target": "A",
+          "targetHandle": "in"
+        },
+        {
+          "source": "A",
+          "target": "B",
+          "targetHandle": "in"
+        }
+      ],
+      "steps": [
+        {
+          "label": "single run",
+          "carried": {},
+          "own": {
+            "seed": {
+              "x": 1
+            },
+            "A": {
+              "y": 2,
+              "x": 5
+            }
+          },
+          "expectInherited": {
+            "seed": {},
+            "A": {
+              "x": 1
+            },
+            "B": {
+              "x": 5,
+              "y": 2
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

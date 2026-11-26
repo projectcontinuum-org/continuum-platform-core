@@ -11,14 +11,16 @@ import java.time.Instant
 import java.util.UUID
 
 /**
- * Values of `workflow_runs.status`: `PENDING` from the API server, the rest from the orchestration service's run events.
+ * Values of `workflow_runs.status`: `PENDING` from the API server, the rest from the orchestration service's run events,
+ * except that the API server also writes `TERMINATED` once Temporal has terminated a run (see `WorkflowService`).
  * The `allowableValues` of the `status` fields below repeat the list, because annotation arguments must be literals.
  */
 object WorkflowRunStatusValues {
   const val DESCRIPTION =
     "Run status as last reported. `PENDING`: accepted, no event yet. `STARTED`: the orchestrator picked it up. " +
-      "`RUNNING`: nodes are executing. `FINISHED`: every node is done (some may have failed or been skipped; see the " +
-      "node statuses). `FAILED`: the run failed. `CANCELLED` / `TERMINATED`: stopped through the API."
+      "`RUNNING`: nodes are executing. `FINISHED`: every node is done and none failed (some may have been skipped; " +
+      "see the node statuses). `FAILED`: a node or loop failed, or the run itself failed. `CANCELLED` / `TERMINATED`: " +
+      "stopped through the API (`TERMINATED` is also recorded by the API server once Temporal has terminated the run)."
 }
 
 @Schema(
@@ -42,7 +44,7 @@ data class WorkflowRunSummary(
   val status: String,
   @field:Schema(description = "When the run was accepted (ISO-8601, UTC).", example = "2026-11-21T09:15:02.481Z")
   val createdAt: Instant,
-  @field:Schema(description = "When the last run event was stored (ISO-8601, UTC).", example = "2026-11-21T09:15:09.112Z")
+  @field:Schema(description = "When the last run event was stored, or when the API server recorded a terminate (ISO-8601, UTC).", example = "2026-11-21T09:15:09.112Z")
   val updatedAt: Instant
 ) {
   companion object {
@@ -90,7 +92,7 @@ data class WorkflowRunResponse(
   val data: WorkflowRunDataResponse,
   @field:Schema(description = "When the run was accepted (ISO-8601, UTC).", example = "2026-11-21T09:15:02.481Z")
   val createdAt: Instant,
-  @field:Schema(description = "When the last run event was stored (ISO-8601, UTC).", example = "2026-11-21T09:15:09.112Z")
+  @field:Schema(description = "When the last run event was stored, or when the API server recorded a terminate (ISO-8601, UTC).", example = "2026-11-21T09:15:09.112Z")
   val updatedAt: Instant
 ) {
   companion object {

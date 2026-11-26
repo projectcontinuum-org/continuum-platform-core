@@ -141,7 +141,9 @@ sent. Repeating it on a running workflow signals again; on a finished one it is 
     description = """
 Stops one of the caller's runs without waiting for its nodes. The run is signalled at once (it reports `TERMINATED`),
 and 5 seconds later Temporal terminates it with `reason` (default "Terminated via API"); no code of the run executes
-after that. Prefer `cancel` unless the run is stuck. On a finished run it is a 404."""
+after that. Once Temporal has terminated it, the run record says `TERMINATED`, with `updatedAt` as the end time, also
+for a stuck run that could not handle the signal. A run that ended on its own within the 5 seconds keeps its status.
+Prefer `cancel` unless the run is stuck. On a finished run it is a 404."""
   )
   @ApiResponse(responseCode = "204", description = "Termination requested.")
   @ApiResponse(
