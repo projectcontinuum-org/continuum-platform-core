@@ -31,8 +31,8 @@ internal class WorkflowSpecLayout(
     const val NODE_HEIGHT = 100
     const val X_STEP = 330.0
     const val Y_STEP = 160.0
-    const val LOOP_SIDE_PADDING = 40
-    const val LOOP_HEADER_HEIGHT = 60
+    const val LOOP_SIDE_PADDING = 60
+    const val LOOP_HEADER_HEIGHT = 110
     const val LOOP_MIN_WIDTH = 520
     const val LOOP_MIN_HEIGHT = 320
 

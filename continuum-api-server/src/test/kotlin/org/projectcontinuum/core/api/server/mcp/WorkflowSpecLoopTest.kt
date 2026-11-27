@@ -162,7 +162,7 @@ class WorkflowSpecLoopTest {
     assertNull(nodesById.getValue("write").parentNode)
     assertEquals(
       listOf("fetch", "parse", "append").map { memberId -> nodesById.getValue(memberId).position.x },
-      listOf(40.0, 370.0, 700.0),
+      listOf(60.0, 390.0, 720.0),
       "members are laid out left to right by depth inside the box"
     )
     assertEquals(
@@ -178,13 +178,13 @@ class WorkflowSpecLoopTest {
     val loop = nodesById.getValue("L")
     val write = nodesById.getValue("write")
 
-    // 40 px padding, members at 0 / 330 / 660 inside the content, the last one 224 px wide, 40 px padding
-    assertEquals(40 + 660 + WorkflowSpecLayout.NODE_WIDTH + 40, loop.width)
+    // 60 px padding, members at 0 / 330 / 660 inside the content, the last one 224 px wide, 60 px padding
+    assertEquals(60 + 660 + WorkflowSpecLayout.NODE_WIDTH + 60, loop.width)
     assertEquals(WorkflowSpecLayout.LOOP_MIN_HEIGHT, loop.height)
     assertEquals(330.0, loop.position.x)
     assertTrue(write.position.x >= loop.position.x + loop.width, "write at ${write.position.x}, loop ends at ${loop.position.x + loop.width}")
-    assertEquals(loop.position.x + 40.0, nodesById.getValue("fetch").positionAbsolute!!.x)
-    assertEquals(loop.position.y + 60.0, nodesById.getValue("fetch").positionAbsolute!!.y)
+    assertEquals(loop.position.x + 60.0, nodesById.getValue("fetch").positionAbsolute!!.x)
+    assertEquals(loop.position.y + 110.0, nodesById.getValue("fetch").positionAbsolute!!.y)
   }
 
   @Test
