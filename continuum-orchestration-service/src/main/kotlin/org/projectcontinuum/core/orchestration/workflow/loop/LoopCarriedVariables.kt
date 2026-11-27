@@ -27,4 +27,5 @@ internal object LoopCarriedVariables {
     loopTopology.topologicalOrder(loopId = loopId)
       .mapNotNull { memberId -> nodeToOutputsMap[memberId] }
       .fold(initial = previouslyCarried) { carried, memberOutputs -> carried + FlowVariables.extract(memberOutputs) }
+      .minus(FlowVariables.ITERATION)
 }

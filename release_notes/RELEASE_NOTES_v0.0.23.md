@@ -361,5 +361,6 @@ These endpoints had no caller left in the workbench, the orchestration service, 
     ```
   - It only reports. Nothing is paused, changed or deleted. Fix each reported schedule (delete it and create it again with valid properties), or pause it with `POST /api/v1/workflow/schedule/{id}/pause`.
   - The response lists `invalid` schedules (every run fails), `unregisteredOnly` schedules, and `failedToCheck` ids. `unregisteredOnly` means the only problem is a node type that is not registered: its worker may not be up yet, or the node type was removed. `failedToCheck` means the registry could not be read; call again.
+- **Read-only `iteration` flow variable in loops.** Every node inside a loop, and the loop's condition, now get `iteration`: the number of the running iteration (1 in the first). Nested nodes see their innermost loop's count; in a condition it is the iteration that just ended (0 before the first). A value a node sets under `iteration` is ignored and never carried; nodes after the loop do not get it. A workflow that already sets its own `iteration` variable inside a loop will see the loop's value instead.
 
 **Full Changelog**: https://github.com/projectcontinuum-org/continuum-platform-core/compare/release/0.0.22...main

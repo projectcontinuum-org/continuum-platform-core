@@ -88,6 +88,11 @@ on the first pass reads the variables that reach the loop from outside. Nodes af
 the last iteration: what its first members received (a variable set only in an earlier iteration included) plus what
 the members set in it. After a run, the loop shows the variables carried into its last iteration.
 
+Every member and the condition also get a read-only flow variable `iteration`, the number of the running iteration
+(1 in the first). In the condition it is the iteration that just ended (0 in a `before` check on the first pass), so
+`vars["iteration"] < 5` works. Nested members see their innermost loop's count. A value a node sets under this name is ignored,
+and nodes after the loop do not get it.
+
 ## When a run fails
 
 The loop fails the run, with a message naming the loop and the iteration, when:

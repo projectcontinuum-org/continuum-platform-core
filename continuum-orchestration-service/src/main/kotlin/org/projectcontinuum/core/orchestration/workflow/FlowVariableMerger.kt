@@ -176,7 +176,8 @@ internal object FlowVariableMerger {
       availableByNodeId[nodeId]?.let { memoized -> return memoized }
       val ancestorNode = nodesById[nodeId]
       val inherited = if (ancestorNode == null) emptyMap() else inherited(node = ancestorNode).variables
-      val own = FlowVariables.extract(nodeToOutputsMap[nodeId].orEmpty())
+      // `iteration` is the orchestrator's read-only variable: what a node sets under that name is never inherited
+      val own = FlowVariables.extract(nodeToOutputsMap[nodeId].orEmpty()) - FlowVariables.ITERATION
       val result = inherited + own
       availableByNodeId[nodeId] = result
       return result

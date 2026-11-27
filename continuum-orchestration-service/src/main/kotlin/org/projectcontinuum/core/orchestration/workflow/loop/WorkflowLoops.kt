@@ -16,6 +16,9 @@ interface WorkflowLoops {
 
   fun carriedByLoopId(): Map<String, Map<String, Any>>
 
+  /** The running iteration of the innermost loop around [nodeId], or null when it is not inside an iterating loop. */
+  fun iterationOf(nodeId: String): Int?
+
   /** Starts, ends and restarts loops; true when anything changed (new nodes may be ready). */
   fun advance(): Boolean
 
@@ -23,6 +26,7 @@ interface WorkflowLoops {
     override val topology: LoopTopology = LoopTopology.NONE
     override fun gate(): LoopReadinessGate = LoopReadinessGate.NONE
     override fun carriedByLoopId(): Map<String, Map<String, Any>> = emptyMap()
+    override fun iterationOf(nodeId: String): Int? = null
     override fun advance(): Boolean = false
   }
 }
@@ -63,6 +67,7 @@ class WorkflowLoopsFactory(
       override val topology: LoopTopology = topology
       override fun gate(): LoopReadinessGate = runner.gate()
       override fun carriedByLoopId(): Map<String, Map<String, Any>> = runner.carriedByLoopId()
+      override fun iterationOf(nodeId: String): Int? = runner.iterationOf(nodeId = nodeId)
       override fun advance(): Boolean = runner.advance()
     }
   }

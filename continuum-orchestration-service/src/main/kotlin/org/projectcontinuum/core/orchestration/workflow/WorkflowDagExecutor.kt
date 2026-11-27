@@ -203,11 +203,17 @@ class WorkflowDagExecutor(
         conflict.keptFromNodeId
       )
     }
-    if (inheritedFlowVariables.variables.isEmpty()) {
+    val iteration = loops.iterationOf(nodeId = node.id)
+    val variables = if (iteration == null) {
+      inheritedFlowVariables.variables
+    } else {
+      inheritedFlowVariables.variables + (FlowVariables.ITERATION to iteration)
+    }
+    if (variables.isEmpty()) {
       return nodeInputs
     }
     return nodeInputs + (
-      IContinuumNodeActivity.NodeOutputSystemPort.VARIABLE.key to FlowVariables.toPortData(inheritedFlowVariables.variables)
+      IContinuumNodeActivity.NodeOutputSystemPort.VARIABLE.key to FlowVariables.toPortData(variables)
     )
   }
 

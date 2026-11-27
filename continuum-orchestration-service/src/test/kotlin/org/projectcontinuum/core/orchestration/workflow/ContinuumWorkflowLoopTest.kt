@@ -217,6 +217,27 @@ class ContinuumWorkflowLoopTest {
   }
 
   @Test
+  fun `members and the condition get the read-only iteration variable, which a member cannot override or carry`() {
+    val evaluator = ScriptedLoopConditionEvaluator(decide = { variables, _ ->
+      if (FlowVariables.valuesEqual(first = variables[FlowVariables.ITERATION], second = 3)) LoopConditionOutcome.False else LoopConditionOutcome.True
+    })
+    LoopRunHarness(evaluator = evaluator).use { harness ->
+      harness.fakeNodeActivity.flowVariablesToSet["append"] = mapOf(FlowVariables.ITERATION to 99)
+
+      val result = harness.run(workflow = LoopFixtures.pagingWorkflow())
+
+      assertTrue(result.succeeded, "run failed: ${result.failure}")
+      val fetchIterations = harness.fakeNodeActivity.receivedInputsByInvocation.getValue("fetch")
+        .map { inputs -> FlowVariables.extract(inputs)[FlowVariables.ITERATION] }
+      assertTrue(FlowVariables.valuesEqual(first = listOf(1, 2, 3), second = fetchIterations), "fetch saw $fetchIterations")
+      val conditionIterations = evaluator.seenVariables.map { variables -> variables[FlowVariables.ITERATION] }
+      assertTrue(FlowVariables.valuesEqual(first = listOf(1, 2, 3), second = conditionIterations), "condition read $conditionIterations")
+      val writeVariables = FlowVariables.extract(harness.fakeNodeActivity.receivedInputs.getValue("write"))
+      assertNull(writeVariables[FlowVariables.ITERATION], "a node after the loop gets no iteration")
+    }
+  }
+
+  @Test
   fun `the node after a finished loop gets the last iteration's carried variables, also those set only in iteration 1`() {
     val workflow = LoopWorkflowBuilder()
       .source(id = "seed")
@@ -245,7 +266,7 @@ class ContinuumWorkflowLoopTest {
       val displayedCarried = FlowVariables.extract(harness.lastOutputs(nodeId = "L")!!)
       val expectedDisplayedCarried = mapOf("token" to "t1", "page" to 2, "hasMore" to true)
       assertTrue(FlowVariables.valuesEqual(first = expectedDisplayedCarried, second = displayedCarried), "loop \$variable: $displayedCarried")
-      val fetchInLastIteration = FlowVariables.extract(harness.fakeNodeActivity.receivedInputsByInvocation.getValue("fetch").last())
+      val fetchInLastIteration = FlowVariables.extract(harness.fakeNodeActivity.receivedInputsByInvocation.getValue("fetch").last()) - FlowVariables.ITERATION
       val seedVariables = mapOf("page" to 1)
       assertTrue(
         FlowVariables.valuesEqual(first = seedVariables + displayedCarried, second = fetchInLastIteration),

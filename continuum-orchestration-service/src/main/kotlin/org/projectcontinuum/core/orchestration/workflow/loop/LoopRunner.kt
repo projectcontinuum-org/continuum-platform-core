@@ -3,6 +3,7 @@ package org.projectcontinuum.core.orchestration.workflow.loop
 import org.projectcontinuum.core.commons.model.ContinuumWorkflowModel.NodeStatus
 import org.projectcontinuum.core.commons.validation.loop.CompiledLoopCondition
 import org.projectcontinuum.core.commons.validation.loop.LoopConditionEvaluator
+import org.projectcontinuum.core.commons.utils.FlowVariables
 import org.projectcontinuum.core.orchestration.workflow.FlowVariableMerger
 
 /**
@@ -74,6 +75,13 @@ class LoopRunner(
     states.values
       .filter { state -> state.passesCarriedVariablesOn }
       .associate { state -> state.loopId to state.carriedIntoIteration }
+
+  /** The running iteration of the innermost loop around [nodeId], or null when that loop is not iterating. */
+  fun iterationOf(nodeId: String): Int? {
+    val loopId = context.topology.innermostLoopOf(nodeId = nodeId) ?: return null
+    val state = stateOf(loopId = loopId)
+    return if (state.phase == LoopPhase.ITERATING) state.iteration else null
+  }
 
   /** Starts, ends and restarts loops until nothing changes; true when anything changed. */
   fun advance(): Boolean {
@@ -194,7 +202,7 @@ class LoopRunner(
       nodeToOutputsMap = context.nodeToOutputsMap,
       loopTopology = context.topology,
       carriedByLoopId = carriedByLoopId() + (state.loopId to carriedAfter)
-    ).variables
+    ).variables + (FlowVariables.ITERATION to state.iteration)
     val outcome = conditionCheck.evaluate(
       evaluator = evaluator(),
       compiled = state.compiledCondition!!,
