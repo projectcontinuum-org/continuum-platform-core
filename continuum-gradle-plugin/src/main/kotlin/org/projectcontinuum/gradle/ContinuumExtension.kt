@@ -28,6 +28,9 @@ abstract class ContinuumExtension {
     /** Jackson module version */
     abstract val jacksonVersion: Property<String>
 
+    /** Kotlin version the Spring BOM-managed Kotlin artifacts (compiler, scripting, stdlib) are aligned to */
+    abstract val kotlinVersion: Property<String>
+
     /** Whether to configure Maven Central publishing via JReleaser */
     abstract val publishToMavenCentral: Property<Boolean>
 

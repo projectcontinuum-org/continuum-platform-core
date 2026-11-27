@@ -30,6 +30,7 @@ object ContinuumFeatureBase {
     const val DEFAULT_TEMPORAL_VERSION = "1.28.0"
     const val DEFAULT_AWS_SDK_VERSION = "2.30.7"
     const val DEFAULT_JACKSON_VERSION = "3.1.2"
+    const val DEFAULT_KOTLIN_VERSION = "2.2.21"
     const val DEFAULT_JIB_FROM_IMAGE = "eclipse-temurin:21-jre"
 
     /**
@@ -49,6 +50,7 @@ object ContinuumFeatureBase {
             awsSdkVersion.convention(DEFAULT_AWS_SDK_VERSION)
             jacksonVersion.convention(DEFAULT_JACKSON_VERSION)
             publishToMavenCentral.convention(true)
+            kotlinVersion.convention(DEFAULT_KOTLIN_VERSION)
             jibFromImage.convention(DEFAULT_JIB_FROM_IMAGE)
             // jibToImage is intentionally left unset — no inferred default. Worker plugins
             // only apply the jib plugin and configure container builds when it's set.
@@ -105,6 +107,12 @@ object ContinuumFeatureBase {
         val springCloudVer = ext.springCloudVersion.get()
 //        val hadoopVer = ext.hadoopVersion.get()
         val isKotlin = ext.useKotlin.get()
+
+        // The Spring Boot BOM manages kotlin-compiler-embeddable and friends at an older Kotlin version than the
+        // scripting jars features pull in; mixing them breaks Kotlin scripting at runtime (NoSuchMethodError).
+        if (isKotlin) {
+            project.extensions.extraProperties["kotlin.version"] = ext.kotlinVersion.get()
+        }
 
         // Import BOMs via Spring dependency management
         project.extensions.configure<DependencyManagementExtension> {
