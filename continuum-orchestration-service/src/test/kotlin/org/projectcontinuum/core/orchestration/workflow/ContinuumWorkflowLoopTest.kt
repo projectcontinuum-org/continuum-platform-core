@@ -217,6 +217,21 @@ class ContinuumWorkflowLoopTest {
   }
 
   @Test
+  fun `every update carries the history event count and the Temporal limit`() {
+    LoopRunHarness(evaluator = ScriptedLoopConditionEvaluator.whileTrue(name = "hasMore")).use { harness ->
+      harness.fakeNodeActivity.flowVariablesByInvocation["fetch"] = hasMoreFor(true, false)
+
+      val result = harness.run(workflow = LoopFixtures.pagingWorkflow())
+
+      assertTrue(result.succeeded, "run failed: ${result.failure}")
+      val counts = harness.events.map { event -> event.data.historyEventCount }
+      assertTrue(counts.all { count -> count != null && count > 0 }, "counts: $counts")
+      assertTrue(counts.last()!! > counts.first()!!, "the count grows during the run: $counts")
+      assertTrue(harness.events.all { event -> event.data.historyEventLimit == 51_200L })
+    }
+  }
+
+  @Test
   fun `members and the condition get the read-only iteration variable, which a member cannot override or carry`() {
     val evaluator = ScriptedLoopConditionEvaluator(decide = { variables, _ ->
       if (FlowVariables.valuesEqual(first = variables[FlowVariables.ITERATION], second = 3)) LoopConditionOutcome.False else LoopConditionOutcome.True

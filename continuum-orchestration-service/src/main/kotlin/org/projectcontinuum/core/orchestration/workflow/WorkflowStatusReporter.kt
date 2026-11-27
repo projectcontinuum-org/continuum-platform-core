@@ -95,7 +95,9 @@ class WorkflowStatusReporter(
           workflowType = Workflow.getInfo().workflowType,
           workflowUri = workflow.name,
           scheduleId = ContinuumScheduleContext.get(),
-          runId = Workflow.getInfo().runId
+          runId = Workflow.getInfo().runId,
+          historyEventCount = Workflow.getInfo().historyLength,
+          historyEventLimit = WorkflowUpdate.HISTORY_EVENT_LIMIT
         )
       )
 
