@@ -7,12 +7,15 @@ import org.projectcontinuum.core.commons.validation.loop.LoopConditionIssueCode
 /**
  * Literal arguments that can be checked before a run: a regex given as a string literal (`matches`, the regex
  * functions), and `timestamp("...")` / `duration("...")` with a literal. A bad one would fail every run, so it is a
- * validation error. Uses cel-java's own literal validators on the shared environment.
+ * validation error. Uses cel-java's own literal validators from the same environment as parsing and checking.
  */
 internal object CelLiteralChecks {
 
-  fun check(checkedAst: CelAbstractSyntaxTree): LoopConditionCheckResult.Invalid? {
-    val validationResult = LoopCelEnvironment.shared.literalValidator.validate(checkedAst)
+  fun check(
+    checkedAst: CelAbstractSyntaxTree,
+    environment: LoopCelEnvironment
+  ): LoopConditionCheckResult.Invalid? {
+    val validationResult = environment.literalValidator.validate(checkedAst)
     if (!validationResult.hasError()) return null
     val firstIssue = validationResult.errors.first()
     val offset = validationResult.source.getLocationOffset(firstIssue.sourceLocation).orElse(null)

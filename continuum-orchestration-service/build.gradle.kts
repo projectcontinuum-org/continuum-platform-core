@@ -49,7 +49,7 @@ dependencies {
     implementation("io.temporal:temporal-kotlin")
     implementation("io.temporal:temporal-spring-boot-starter")
 
-    // Loop conditions: the cel-java parser (and later the evaluator) behind the continuum-commons interfaces. This
+    // Loop conditions: the cel-java validator and evaluator behind the continuum-commons interfaces. This
     // module and continuum-api-server are the only ones that get cel-java (and with it protobuf-java 4.x, guava 33.x).
     implementation(project(":continuum-loop-condition"))
     constraints {

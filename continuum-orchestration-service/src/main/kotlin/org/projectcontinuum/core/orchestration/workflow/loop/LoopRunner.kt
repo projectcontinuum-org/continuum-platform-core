@@ -1,6 +1,7 @@
 package org.projectcontinuum.core.orchestration.workflow.loop
 
 import org.projectcontinuum.core.commons.model.ContinuumWorkflowModel.NodeStatus
+import org.projectcontinuum.core.commons.validation.loop.CompiledLoopCondition
 import org.projectcontinuum.core.commons.validation.loop.LoopConditionEvaluator
 import org.projectcontinuum.core.orchestration.workflow.FlowVariableMerger
 
@@ -34,6 +35,8 @@ class LoopRunner(
 ) {
 
   private val states = LinkedHashMap<String, LoopRunState>()
+  private val startResultsByLoopId = mutableMapOf<String, LoopStartCheck.Result>()
+  private val compiledConditionsByLoop = mutableMapOf<CompiledConditionKey, CompiledLoopCondition>()
   private val probe = LoopIterationProbe(context = context)
   private val reset = LoopReset(context = context)
   private val publisher = LoopStatusPublisher(context = context)
@@ -42,6 +45,8 @@ class LoopRunner(
     /** A loop with no node to run finishes at once with this warning, like the validator's "has no nodes inside it". */
     const val NO_NODE_TO_RUN_MESSAGE = "The loop has no nodes inside it to run; it ran no iteration"
   }
+
+  private data class CompiledConditionKey(val loopId: String, val condition: String)
 
   private fun stateOf(loopId: String): LoopRunState = states.getOrPut(loopId) { LoopRunState(loopId = loopId) }
 
@@ -103,7 +108,10 @@ class LoopRunner(
       LoopInputState.READY -> Unit
     }
     val properties = context.node(nodeId = state.loopId).data.properties
-    val settings = when (val checked = startCheck.check(loopId = state.loopId, properties = properties)) {
+    val checked = startResultsByLoopId.getOrPut(state.loopId) {
+      startCheck.check(loopId = state.loopId, properties = properties)
+    }
+    val settings = when (checked) {
       is LoopStartCheck.Result.Rejected -> {
         fail(state = state, message = checked.message, maxIterations = 1)
         return true
@@ -115,7 +123,10 @@ class LoopRunner(
       finishWithoutIterations(state = state, status = NodeStatus.WARNING, message = NO_NODE_TO_RUN_MESSAGE)
       return true
     }
-    state.compiledCondition = evaluator().compile(text = settings.condition)
+    val key = CompiledConditionKey(loopId = state.loopId, condition = settings.condition)
+    state.compiledCondition = compiledConditionsByLoop.getOrPut(key) {
+      evaluator().compile(text = settings.condition)
+    }
     if (settings.check == ConditionCheckTiming.AFTER) {
       beginIteration(state = state, iteration = 1, carried = emptyMap())
       return true

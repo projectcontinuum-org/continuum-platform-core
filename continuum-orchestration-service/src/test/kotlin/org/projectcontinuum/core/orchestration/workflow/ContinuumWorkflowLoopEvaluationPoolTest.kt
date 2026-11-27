@@ -59,7 +59,11 @@ class ContinuumWorkflowLoopEvaluationPoolTest {
         assertEquals(NodeStatus.SUCCESS, loop.data.status)
         assertEquals("Finished after 1 iterations", loop.data.nodeProgress?.message)
         val history = harness.executionHistory(workflowId = fast.workflowId)
-        assertEquals(1, markersIn(history = history), "only the real outcome is recorded")
+        assertEquals(
+          expected = 2,
+          actual = markersIn(history = history),
+          message = "the start verdict and real outcome are recorded"
+        )
         assertTrue(workflowTaskRetriesIn(history = history) >= 1, "the turned-away check failed its workflow task, which Temporal retried")
         assertTrue(warnings.any { warning -> warning.contains(fast.workflowId) && warning.contains("nothing is recorded and the workflow task is retried") }, "$warnings")
         harness.replay(history = history)
@@ -91,7 +95,11 @@ class ContinuumWorkflowLoopEvaluationPoolTest {
         assertTrue(result.succeeded, "run failed: ${result.failure}")
         assertEquals(NodeStatus.SUCCESS, harness.lastPublished(nodeId = "L").data.status)
         val history = harness.executionHistory(workflowId = result.workflowId)
-        assertEquals(1, markersIn(history = history), "the check on the stopped threads left no marker")
+        assertEquals(
+          expected = 2,
+          actual = markersIn(history = history),
+          message = "the start verdict and completed outcome are recorded"
+        )
         assertTrue(workflowTaskRetriesIn(history = history) >= 1, "the workflow task was retried")
         assertEquals(2, runnerCalls.get(), "the retried workflow task checked the condition again")
         harness.replay(history = history)

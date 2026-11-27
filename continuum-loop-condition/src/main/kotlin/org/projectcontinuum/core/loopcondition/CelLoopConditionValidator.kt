@@ -67,7 +67,9 @@ class CelLoopConditionValidator internal constructor(
       is ConditionResultTypeRule.Verdict.Rejected -> return Analysis.Rejected(issue = verdict.issue)
       is ConditionResultTypeRule.Verdict.Accepted -> verdict.resultType
     }
-    CelLiteralChecks.check(checkedAst = checkedAst)?.let { literalIssue -> return Analysis.Rejected(issue = literalIssue) }
+    CelLiteralChecks.check(checkedAst = checkedAst, environment = environment)?.let { literalIssue ->
+      return Analysis.Rejected(issue = literalIssue)
+    }
     ReboundNameRule.check(checkedAst = checkedAst)?.let { reboundIssue -> return Analysis.Rejected(issue = reboundIssue) }
     return Analysis.Accepted(
       checkedAst = checkedAst,

@@ -3,22 +3,29 @@ package org.projectcontinuum.core.orchestration.workflow
 import io.temporal.api.enums.v1.EventType
 import org.junit.jupiter.api.Test
 import org.projectcontinuum.core.commons.model.ContinuumWorkflowModel.NodeStatus
+import org.projectcontinuum.core.commons.validation.loop.LoopConditionCheckResult
+import org.projectcontinuum.core.commons.validation.loop.LoopConditionIssueCode
+import org.projectcontinuum.core.commons.validation.loop.LoopConditionValidator
 import org.projectcontinuum.core.commons.validation.loop.LoopConditionOutcome
 import org.projectcontinuum.core.loopcondition.CelLoopConditionEvaluator
+import org.projectcontinuum.core.loopcondition.LoopConditionValidators
 import org.projectcontinuum.core.orchestration.config.LoopConditionEngineConfig
 import org.projectcontinuum.core.orchestration.workflow.fixtures.LoopFixtures
 import org.projectcontinuum.core.orchestration.workflow.fixtures.LoopRunHarness
 import org.projectcontinuum.core.orchestration.workflow.fixtures.ScriptedLoopConditionEvaluator
 import org.projectcontinuum.core.orchestration.workflow.loop.LoopConditionEvaluators
+import org.projectcontinuum.core.orchestration.workflow.loop.LoopStartCheck
+import org.projectcontinuum.core.orchestration.workflow.loop.LoopStartCheckRecorder
 import org.projectcontinuum.core.orchestration.workflow.loop.TimeBoxedConditionEvaluationRunner
+import org.projectcontinuum.core.orchestration.workflow.loop.WorkflowLoopsFactory
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 /**
  * Loops with the real cel-java evaluator: a full-CEL condition drives the paging loop, the recorded history replays
- * without non-determinism, and a replay uses the recorded condition outcomes even when the installed evaluator would
- * now decide differently. The replay uses the harness's environment, whose data converter knows the Kotlin model
- * classes, as the orchestrator's does.
+ * without non-determinism, and a replay uses recorded start verdicts and condition outcomes even when the installed
+ * validator or evaluator would now decide differently. The replay uses the harness's environment, whose data converter
+ * knows the Kotlin model classes, as the orchestrator's does.
  */
 class ContinuumWorkflowLoopReplayTest {
 
@@ -43,10 +50,40 @@ class ContinuumWorkflowLoopReplayTest {
       assertEquals(NodeStatus.SUCCESS, harness.lastPublished(nodeId = "L").data.status)
       val history = harness.executionHistory(workflowId = result.workflowId)
       val sideEffects = history.events.count { event -> event.eventType == EventType.EVENT_TYPE_MARKER_RECORDED }
-      assertEquals(3, sideEffects, "one recorded outcome per condition check")
+      assertEquals(
+        expected = 4,
+        actual = sideEffects,
+        message = "one recorded start verdict and one outcome per condition check"
+      )
       assertEquals(0, history.events.count { event -> event.eventType == EventType.EVENT_TYPE_WORKFLOW_TASK_FAILED })
 
       harness.replay(history = history)
+    }
+  }
+
+  @Test
+  fun `a replay uses the recorded loop-start verdict after the validator changes`() {
+    val originalFactory = WorkflowLoopsFactory.current
+    try {
+      WorkflowLoopsFactory.current = factoryWithStartValidator(
+        validator = LoopConditionValidators.default
+      )
+      LoopRunHarness(evaluator = CelLoopConditionEvaluator()).use { harness ->
+        val result = runPagingLoop(harness = harness)
+        val history = harness.executionHistory(workflowId = result.workflowId)
+
+        WorkflowLoopsFactory.current = factoryWithStartValidator(
+          validator = {
+            LoopConditionCheckResult.Invalid(
+              code = LoopConditionIssueCode.SYNTAX,
+              message = "the expression is no longer accepted"
+            )
+          }
+        )
+        harness.replay(history = history)
+      }
+    } finally {
+      WorkflowLoopsFactory.current = originalFactory
     }
   }
 
@@ -142,7 +179,11 @@ class ContinuumWorkflowLoopReplayTest {
         assertTrue(error.contains("LIMIT_EXCEEDED") && error.contains("took longer than 200 ms to evaluate"), error)
         val history = harness.executionHistory(workflowId = result.workflowId)
         assertEquals(0, history.events.count { event -> event.eventType == EventType.EVENT_TYPE_WORKFLOW_TASK_FAILED })
-        assertEquals(1, history.events.count { event -> event.eventType == EventType.EVENT_TYPE_MARKER_RECORDED }, "the outcome is recorded once")
+        assertEquals(
+          expected = 2,
+          actual = history.events.count { event -> event.eventType == EventType.EVENT_TYPE_MARKER_RECORDED },
+          message = "the start verdict and outcome are recorded"
+        )
         harness.replay(history = history)
       }
     }
@@ -169,4 +210,13 @@ class ContinuumWorkflowLoopReplayTest {
      */
     const val STRICT_DEADLOCK_DETECTION_MILLIS = 500L
   }
+
+  private fun factoryWithStartValidator(
+    validator: LoopConditionValidator
+  ): WorkflowLoopsFactory = WorkflowLoopsFactory(
+    startCheck = LoopStartCheck(
+      validator = validator,
+      recorder = LoopStartCheckRecorder.TEMPORAL
+    )
+  )
 }

@@ -5,7 +5,7 @@
 springdoc = "3.0.3"
 # swagger-core version that springdoc above is built against (springdoc-openapi parent POM `swagger-api.version`)
 swagger = "2.2.47"
-# Google cel-java: loop condition parser and evaluator (continuum-loop-condition only; it brings protobuf-java 4.x and
+# Google cel-java: loop condition validator and evaluator (continuum-loop-condition only; it brings protobuf-java 4.x and
 # guava 33.x, so nothing that feature workers depend on may use it)
 cel = "0.15.0"
 # protobuf-java-util for the two services that get cel-java (orchestration-service, api-server): cel-java raises

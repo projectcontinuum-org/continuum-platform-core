@@ -174,13 +174,24 @@ class ContinuumWorkflowLoopTest {
       loopProperties = mapOf("maxIterations" to 3, "onLimit" to "stop-with-warning"),
       loopId = "I"
     )
-    LoopRunHarness(evaluator = ScriptedLoopConditionEvaluator(decide = { _, _ -> LoopConditionOutcome.True })).use { harness ->
+    val evaluator = ScriptedLoopConditionEvaluator(decide = { _, _ -> LoopConditionOutcome.True })
+    LoopRunHarness(evaluator = evaluator).use { harness ->
       val result = harness.run(workflow = workflow)
 
       assertTrue(result.succeeded, "run failed: ${result.failure}")
       assertEquals(2, harness.fakeNodeActivity.invocationCount.getValue("a").get())
       assertEquals(6, harness.fakeNodeActivity.invocationCount.getValue("b").get())
       assertEquals(1, harness.fakeNodeActivity.invocationCount.getValue("after").get())
+      assertEquals(
+        expected = 2,
+        actual = evaluator.compiledTexts.size,
+        message = "each loop condition is compiled once for the workflow run"
+      )
+      assertEquals(
+        expected = 10,
+        actual = sideEffectMarkers(harness = harness, workflowId = result.workflowId),
+        message = "each loop start is recorded once"
+      )
     }
   }
 
@@ -265,7 +276,11 @@ class ContinuumWorkflowLoopTest {
       assertEquals(NodeStatus.WARNING, loop.data.status)
       assertEquals("The loop has no nodes inside it to run; it ran no iteration", loop.data.nodeProgress?.message)
       assertTrue(evaluator.seenVariables.isEmpty(), "the condition is never checked")
-      assertEquals(0, sideEffectMarkers(harness = harness, workflowId = result.workflowId))
+      assertEquals(
+        expected = 1,
+        actual = sideEffectMarkers(harness = harness, workflowId = result.workflowId),
+        message = "the start verdict is recorded"
+      )
       assertEquals("FINISHED", harness.events.last().data.status)
     }
   }
@@ -282,7 +297,11 @@ class ContinuumWorkflowLoopTest {
       assertTrue(result.succeeded, "run failed: ${result.failure}")
       assertEquals(NodeStatus.WARNING, harness.lastPublished(nodeId = "O").data.status)
       assertEquals(NodeStatus.SKIPPED, harness.lastPublished(nodeId = "I").data.status)
-      assertEquals(0, sideEffectMarkers(harness = harness, workflowId = result.workflowId))
+      assertEquals(
+        expected = 1,
+        actual = sideEffectMarkers(harness = harness, workflowId = result.workflowId),
+        message = "the outer start verdict is recorded once"
+      )
     }
   }
 
@@ -310,7 +329,11 @@ class ContinuumWorkflowLoopTest {
       assertEquals(6, harness.fakeNodeActivity.invocationCount.getValue("a").get())
       assertEquals(NodeStatus.WARNING, harness.lastPublished(nodeId = "O").data.status)
       assertEquals(NodeStatus.WARNING, harness.lastPublished(nodeId = "I").data.status)
-      assertEquals(6, sideEffectMarkers(harness = harness, workflowId = result.workflowId), "only the outer condition is checked")
+      assertEquals(
+        expected = 8,
+        actual = sideEffectMarkers(harness = harness, workflowId = result.workflowId),
+        message = "the two start verdicts are recorded once, with one marker per outer condition check"
+      )
     }
   }
 
@@ -337,7 +360,11 @@ class ContinuumWorkflowLoopTest {
       assertEquals(NodeStatus.SKIPPED, harness.lastPublished(nodeId = "after").data.status)
       assertNull(harness.fakeNodeActivity.invocationCount["unfed"])
       assertTrue(evaluator.seenVariables.isEmpty(), "the condition is never checked")
-      assertEquals(0, sideEffectMarkers(harness = harness, workflowId = result.workflowId))
+      assertEquals(
+        expected = 1,
+        actual = sideEffectMarkers(harness = harness, workflowId = result.workflowId),
+        message = "the start verdict is recorded"
+      )
     }
   }
 
@@ -443,7 +470,11 @@ class ContinuumWorkflowLoopTest {
       val markers = harness.history(workflowId = result.workflowId).eventsList.count { event ->
         event.eventType == EventType.EVENT_TYPE_MARKER_RECORDED && event.markerRecordedEventAttributes.markerName == "SideEffect"
       }
-      assertEquals(3, markers)
+      assertEquals(
+        expected = 4,
+        actual = markers,
+        message = "one start verdict plus one marker per condition check"
+      )
     }
   }
 

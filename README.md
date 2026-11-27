@@ -117,6 +117,10 @@ A click turned outcome.
 | 🧪 | **AI / ML Ready** | Train models with Unsloth, run inference, all inside your flow |
 | 🐳 | **Self-Hostable** | Docker Compose up and you're running |
 
+**Operator note:** the api-server schedules the hard stop for cancel and terminate requests in an in-memory timer,
+5 seconds after signaling Temporal. If the api-server restarts in that interval, the pending stop and terminate
+recording are lost; reissue the request after the server is available. The stop scheduler is not durable across restarts.
+
 ---
 
 ## 🧱 How It Works
@@ -244,6 +248,15 @@ git lfs pull
 ```
 
 CI checkouts that build modules use `actions/checkout` with `lfs: true` for the same reason.
+
+### Backend tests
+
+The message-bridge tests include a PostgreSQL integration test for the run-record upsert guard. Docker must be
+available to run it:
+
+```bash
+./gradlew :continuum-message-bridge:test
+```
 
 ### API documentation (OpenAPI)
 

@@ -29,7 +29,10 @@ interface WorkflowLoops {
 
 /** Builds the [WorkflowLoops] of a run. The production collaborators are the defaults; tests replace single ones. */
 class WorkflowLoopsFactory(
-  private val startCheck: LoopStartCheck = LoopStartCheck(validator = LoopConditionValidators.default),
+  private val startCheck: LoopStartCheck = LoopStartCheck(
+    validator = LoopConditionValidators.default,
+    recorder = LoopStartCheckRecorder.TEMPORAL
+  ),
   private val conditionCheck: LoopConditionCheck = LoopConditionCheck(recorder = ConditionOutcomeRecorder.TEMPORAL),
   private val historyGuard: () -> LoopHistoryGuard = { LoopHistoryGuard() }
 ) {
