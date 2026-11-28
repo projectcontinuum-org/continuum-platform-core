@@ -23,7 +23,12 @@ data class McpWorkflowSpecNode(
         description = "Property values to set. Keys must exist in the node's propertiesSchema; unset properties keep the node defaults.",
         required = false
     )
-    val properties: Map<String, Any?>? = null
+    val properties: Map<String, Any?>? = null,
+    @field:McpToolParam(
+        description = "Key of the loop this node is inside (innermost loop). Omit for top-level nodes. Never set on edges.",
+        required = false
+    )
+    val parent: String? = null
 )
 
 @JsonIgnoreProperties(ignoreUnknown = true)

@@ -4,6 +4,7 @@ import org.projectcontinuum.core.commons.activity.IContinuumNodeActivity
 import org.projectcontinuum.core.commons.activity.IInitializeActivity
 import org.projectcontinuum.core.commons.constant.TaskQueues
 import org.projectcontinuum.core.commons.model.ContinuumWorkflowModel
+import org.projectcontinuum.core.commons.model.LoopNode
 import io.temporal.activity.ActivityOptions
 import io.temporal.common.RetryOptions
 import io.temporal.failure.ApplicationFailure
@@ -59,7 +60,8 @@ class WorkflowActivityInitializer {
    *
    * Queries the [IInitializeActivity] to resolve each node type's task queue, then creates a
    * dedicated [IContinuumNodeActivity] stub per DAG node instance (keyed by [ContinuumWorkflowModel.Node.id],
-   * not the node type) routed to the correct task queue, with per-node retry overrides applied.
+   * not the node type) routed to the correct task queue, with per-node retry overrides applied. Loop nodes
+   * ([LoopNode.isLoop]) are left out: they run inside the workflow and have no activity.
    *
    * @param continuumWorkflow The workflow model containing the nodes to initialize
    * @return Map of node instance IDs to their configured activity stubs
@@ -68,10 +70,12 @@ class WorkflowActivityInitializer {
   fun initializeNodeActivityStubs(
     continuumWorkflow: ContinuumWorkflowModel
   ): Map<String, IContinuumNodeActivity> {
-    val uniqueNodeIds = continuumWorkflow.nodes.map { it.data.id!! }.toSet()
+    // A loop runs inside this workflow and has no activity, so it gets neither a task queue nor a stub.
+    val nodesWithActivity = continuumWorkflow.nodes.filterNot { node -> LoopNode.isLoop(node = node) }
+    val uniqueNodeIds = nodesWithActivity.map { it.data.id!! }.toSet()
     val nodeTypeToTaskQueueMap = initializeActivity.getNodeTaskQueue(uniqueNodeIds)
 
-    val activityMap = continuumWorkflow.nodes.mapNotNull { node ->
+    val activityMap = nodesWithActivity.mapNotNull { node ->
       val taskQueue = nodeTypeToTaskQueueMap[node.data.id!!] ?: return@mapNotNull null
       val nodeRetryOptions = buildNodeRetryOptions(node.data.retryOptions)
       val activityStub = Workflow.newActivityStub(
@@ -86,9 +90,9 @@ class WorkflowActivityInitializer {
       node.id to activityStub
     }.toMap()
 
-    if (activityMap.size != continuumWorkflow.nodes.size) {
+    if (activityMap.size != nodesWithActivity.size) {
       throw ApplicationFailure.newNonRetryableFailure(
-        "Failed to initialize activities for all nodes. Expected ${continuumWorkflow.nodes.size} but got ${activityMap.size}",
+        "Failed to initialize activities for all nodes. Expected ${nodesWithActivity.size} but got ${activityMap.size}",
         "InitializationFailed"
       )
     }

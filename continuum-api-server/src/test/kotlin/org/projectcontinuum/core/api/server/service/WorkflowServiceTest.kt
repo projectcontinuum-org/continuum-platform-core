@@ -4,6 +4,7 @@ import io.temporal.api.common.v1.WorkflowExecution
 import io.temporal.client.WorkflowClient
 import io.temporal.client.WorkflowNotFoundException
 import io.temporal.client.WorkflowOptions
+import io.temporal.client.WorkflowStub
 import io.temporal.workflow.Functions
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
@@ -11,7 +12,9 @@ import org.junit.jupiter.api.assertThrows
 import org.mockito.Mockito
 import org.mockito.kotlin.any
 import org.mockito.kotlin.argumentCaptor
+import org.mockito.kotlin.doThrow
 import org.mockito.kotlin.eq
+import org.mockito.kotlin.inOrder
 import org.mockito.kotlin.mock
 import org.mockito.kotlin.never
 import org.mockito.kotlin.times
@@ -24,6 +27,7 @@ import org.projectcontinuum.core.api.server.repository.jpa.WorkflowRunRepository
 import org.projectcontinuum.core.commons.model.ContinuumWorkflowModel
 import org.projectcontinuum.core.commons.model.PortData
 import org.projectcontinuum.core.commons.workflow.IContinuumWorkflow
+import java.time.Instant
 import kotlin.test.assertEquals
 import kotlin.test.assertSame
 import kotlin.test.assertTrue
@@ -43,8 +47,16 @@ class WorkflowServiceTest {
     service = WorkflowService(
       workflowClient = workflowClient,
       workflowRunRepository = workflowRunRepository,
-      nodeExplorerService = nodeExplorerService
+      nodeExplorerService = nodeExplorerService,
+      stopScheduler = immediateStopScheduler
     )
+  }
+
+  /** Runs the delayed hard stop at once, on the calling thread, and remembers the grace period it was given. */
+  private val scheduledStopDelays = mutableListOf<Long>()
+  private val immediateStopScheduler = WorkflowStopScheduler { delayMillis, stop ->
+    scheduledStopDelays += delayMillis
+    stop()
   }
 
   @Test
@@ -93,6 +105,74 @@ class WorkflowServiceTest {
     service.terminateWorkflow("alice", "run-1", "stuck")
 
     verify(stub).notifyTerminating("stuck")
+  }
+
+  // --- terminate: the run record reaches TERMINATED even when the run cannot handle the signal ---
+
+  /**
+   * An owned, running workflow whose signal is accepted by Temporal but never handled, like a run that keeps
+   * retrying a workflow task: nothing in the run publishes a final status, so only the API server can record it.
+   */
+  private fun stuckOwnedRun(workflowId: String, ownedBy: String): WorkflowStub {
+    val typedStub: IContinuumWorkflow = mock()
+    val untypedStub: WorkflowStub = mock()
+    whenever(workflowRunRepository.existsByWorkflowIdAndOwnedBy(workflowId, ownedBy)).thenReturn(true)
+    whenever(workflowClient.newWorkflowStub(eq(IContinuumWorkflow::class.java), eq(workflowId))).thenReturn(typedStub)
+    whenever(workflowClient.newUntypedWorkflowStub(workflowId)).thenReturn(untypedStub)
+    return untypedStub
+  }
+
+  @Test
+  fun `terminating a run that never handles the signal records it as terminated once Temporal has stopped it`() {
+    val untypedStub = stuckOwnedRun(workflowId = "run-1", ownedBy = "alice")
+    val before = Instant.now()
+
+    service.terminateWorkflow(ownedBy = "alice", workflowId = "run-1", reason = "stuck")
+
+    assertEquals(listOf(WorkflowService.STOP_SIGNAL_GRACE_PERIOD_MS), scheduledStopDelays)
+    val terminatedAt = argumentCaptor<Instant>()
+    val order = inOrder(untypedStub, workflowRunRepository)
+    order.verify(untypedStub).terminate("stuck")
+    order.verify(workflowRunRepository).markTerminated(
+      workflowId = eq("run-1"),
+      ownedBy = eq("alice"),
+      terminatedAt = terminatedAt.capture()
+    )
+    assertTrue(!terminatedAt.firstValue.isBefore(before), "the end time is when the terminate was confirmed")
+  }
+
+  @Test
+  fun `a run that ended before the hard stop keeps the status it ended with`() {
+    val untypedStub = stuckOwnedRun(workflowId = "run-1", ownedBy = "alice")
+    val alreadyEnded = WorkflowNotFoundException(WorkflowExecution.newBuilder().setWorkflowId("run-1").build(), null, null)
+    doThrow(alreadyEnded).whenever(untypedStub).terminate("Terminated via API")
+
+    service.terminateWorkflow(ownedBy = "alice", workflowId = "run-1", reason = null)
+
+    verify(untypedStub).terminate("Terminated via API")
+    verify(workflowRunRepository, never()).markTerminated(workflowId = any(), ownedBy = any(), terminatedAt = any())
+  }
+
+  @Test
+  fun `terminate of another owner's workflow never touches the run record`() {
+    whenever(workflowRunRepository.existsByWorkflowIdAndOwnedBy("run-1", "mallory")).thenReturn(false)
+
+    assertThrows<WorkflowNotFoundException> {
+      service.terminateWorkflow(ownedBy = "mallory", workflowId = "run-1", reason = "because")
+    }
+
+    assertTrue(scheduledStopDelays.isEmpty(), "no hard stop may be scheduled for a run the caller does not own")
+    verify(workflowRunRepository, never()).markTerminated(workflowId = any(), ownedBy = any(), terminatedAt = any())
+  }
+
+  @Test
+  fun `cancel still only requests the Temporal cancellation and leaves the status to the run`() {
+    val untypedStub = stuckOwnedRun(workflowId = "run-1", ownedBy = "alice")
+
+    service.cancelWorkflow(ownedBy = "alice", workflowId = "run-1", reason = "no longer needed")
+
+    verify(untypedStub).cancel()
+    verify(workflowRunRepository, never()).markTerminated(workflowId = any(), ownedBy = any(), terminatedAt = any())
   }
 
   // --- startWorkflow: the Temporal run id is recorded right after the start ---

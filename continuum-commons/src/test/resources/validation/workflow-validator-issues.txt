@@ -1,0 +1,86 @@
+== broken AUTHORING
+E|null|null|null|Node #1 needs a non-empty key.
+E|a|null|null|Node key 'a' is used more than once. Every node needs a unique key.
+E|$x|null|null|Node key '$x' starts with '$', which is reserved for system keys such as $error and $variable. Rename it so it does not start with '$'.
+E|noid|null|null|Node 'noid' needs a nodeId.
+E|ghost|null|null|Node 'ghost': no registered node with id 'org.test.Missing'. Use the full node id exactly as returned by searchContinuumNodes or listContinuumNodeCategories.
+E|legacy|null|null|Node 'legacy': the registered node 'org.test.Legacy' declares input port '$in'. It starts with '$', which is reserved for system keys such as $error and $variable. Rename it so it does not start with '$'.
+E|legacy|null|null|Node 'legacy': the registered node 'org.test.Legacy' declares output port '$legacy'. It starts with '$', which is reserved for system keys such as $error and $variable. Rename it so it does not start with '$'.
+E|emb|null|extra|Node 'emb': unknown property 'extra'. Known properties: width, name.
+E|emb|null|name|Node 'emb': required property 'name' has no value. Set it in properties.
+E|emb|null|width|Node 'emb' properties: /width: string found, integer expected
+E|b|null|name|Node 'b': required property 'name' has no value. Set it in properties.
+E|L|null|condition|Loop 'L': the condition is not a valid CEL expression: boom.
+E|b|null|null|Node 'b': type 'Loop' is only for the built-in loop (nodeId 'org.projectcontinuum.core.builtin.Loop'), but this node has nodeId 'org.test.Step'. Use type 'BaseNode' for registered nodes.
+E|m2|null|null|Node 'm2': its parent 'nowhere' is not a node of this workflow. Set parent to the key of the loop the node is inside, or remove it.
+E|null|null.out -> a.in|null|Edge #1 (null.out -> a.in) needs from, fromPort, to and toPort.
+E|null|a.out -> L.in|null|Edge a.out -> L.in: 'L' is a loop. A loop has no ports; connect the nodes inside it instead.
+E|null|zz.out -> qq.in|null|Edge zz.out -> qq.in: source node key 'zz' does not exist. Node keys: a, $x, noid, ghost, legacy, emb, b, L, m1, m2, E, big, bm, lonely.
+E|null|zz.out -> qq.in|null|Edge zz.out -> qq.in: target node key 'qq' does not exist. Node keys: a, $x, noid, ghost, legacy, emb, b, L, m1, m2, E, big, bm, lonely.
+E|null|a.out -> a.in|null|Edge a.out -> a.in: a node cannot connect to itself.
+E|null|a.$variable -> b.$error|null|Edge a.$variable -> b.$error: source port '$variable' starts with '$', which is reserved for system keys such as $error and $variable. Rename it so it does not start with '$'.
+E|null|a.$variable -> b.$error|null|Edge a.$variable -> b.$error: target port '$error' starts with '$', which is reserved for system keys such as $error and $variable. Rename it so it does not start with '$'.
+E|null|a.nope -> b.in|null|Edge a.nope -> b.in: 'org.test.Step' has no output port 'nope'. Output ports: out.
+E|null|a.out -> b.in|null|Edge a.out -> b.in: input port 'in' of node 'b' is already fed by a.nope. Each input port takes exactly one edge.
+E|null|a.out -> b.in|null|Edge a.out -> b.in is listed more than once.
+E|null|null|null|The edges contain a cycle through nodes '$x', 'emb'. A workflow must be a directed acyclic graph.
+W|emb|null|null|Node 'emb': the submitted propertiesSchema and input ports differ from the registered node 'org.test.Step'. The registered definition was used for validation; reopen the workflow to refresh the node.
+W|E|null|condition|Loop 'E': the condition reads no flow variable, so it never changes; the loop runs until maxIterations and then follows onLimit.
+W|a|null|null|Node 'a' is not connected to any other node.
+W|a|null|null|Node 'a': input port 'in' has no incoming edge. The node may fail if it needs this input.
+W|noid|null|null|Node 'noid' is not connected to any other node.
+W|ghost|null|null|Node 'ghost' is not connected to any other node.
+W|legacy|null|null|Node 'legacy': input port '$in' has no incoming edge. The node may fail if it needs this input.
+W|b|null|null|Node 'b' is not connected to any other node.
+W|b|null|null|Node 'b': input port 'in' has no incoming edge. The node may fail if it needs this input.
+W|m2|null|null|Node 'm2' is not connected to any other node.
+W|bm|null|null|Node 'bm' is not connected to any other node.
+W|bm|null|null|Node 'bm': input port 'in' has no incoming edge. The node may fail if it needs this input.
+W|lonely|null|null|Node 'lonely' is not connected to any other node.
+W|E|null|null|Loop 'E' has no nodes inside it.
+W|big|null|maxIterations|Loop 'big': maxIterations 10000 x 1 nodes inside may exceed the run history limit (about 3636 iterations with 1 nodes inside). The run stops with an error when the history is nearly full.
+== collapsed AUTHORING
+E|L|null|null|The edges leave loop 'L' and come back into it through 'outside'. A node outside a loop cannot run between its iterations; move 'outside' into 'L' or remove one of the edges.
+== broken RUN
+E|null|null|null|Node #1 needs a non-empty key.
+E|a|null|null|Node key 'a' is used more than once. Every node needs a unique key.
+E|$x|null|null|Node key '$x' starts with '$', which is reserved for system keys such as $error and $variable. Rename it so it does not start with '$'.
+E|noid|null|null|Node 'noid' needs a nodeId.
+E|ghost|null|null|Node 'ghost': no registered node with id 'org.test.Missing'. Its ports and properties cannot be checked, so the workflow is not started. Check the id, or wait until the worker that provides this node has registered.
+E|legacy|null|null|Node 'legacy': the registered node 'org.test.Legacy' declares input port '$in'. It starts with '$', which is reserved for system keys such as $error and $variable. Rename it so it does not start with '$'.
+E|legacy|null|null|Node 'legacy': the registered node 'org.test.Legacy' declares output port '$legacy'. It starts with '$', which is reserved for system keys such as $error and $variable. Rename it so it does not start with '$'.
+E|emb|null|null|Node 'emb': the submitted node declares input port '$in'. It starts with '$', which is reserved for system keys such as $error and $variable. Rename it so it does not start with '$'.
+E|emb|null|width|Node 'emb' properties: /width: string found, integer expected
+E|emb|null|name|Node 'emb' properties: /name: must be at least 1 characters long
+E|b|null|name|Node 'b' properties: /: required property 'name' not found
+E|L|null|condition|Loop 'L': the condition is not a valid CEL expression: boom.
+E|b|null|null|Node 'b': type 'Loop' is only for the built-in loop (nodeId 'org.projectcontinuum.core.builtin.Loop'), but this node has nodeId 'org.test.Step'. Use type 'BaseNode' for registered nodes.
+E|m2|null|null|Node 'm2': its parent 'nowhere' is not a node of this workflow. Set parent to the key of the loop the node is inside, or remove it.
+E|null|null.out -> a.in|null|Edge #1 (null.out -> a.in) needs from, fromPort, to and toPort.
+E|null|a.out -> L.in|null|Edge a.out -> L.in: 'L' is a loop. A loop has no ports; connect the nodes inside it instead.
+E|null|zz.out -> qq.in|null|Edge zz.out -> qq.in: source node key 'zz' does not exist. Node keys: a, $x, noid, ghost, legacy, emb, b, L, m1, m2, E, big, bm, lonely.
+E|null|zz.out -> qq.in|null|Edge zz.out -> qq.in: target node key 'qq' does not exist. Node keys: a, $x, noid, ghost, legacy, emb, b, L, m1, m2, E, big, bm, lonely.
+E|null|a.out -> a.in|null|Edge a.out -> a.in: a node cannot connect to itself.
+E|null|a.$variable -> b.$error|null|Edge a.$variable -> b.$error: source port '$variable' starts with '$', which is reserved for system keys such as $error and $variable. Rename it so it does not start with '$'.
+E|null|a.$variable -> b.$error|null|Edge a.$variable -> b.$error: target port '$error' starts with '$', which is reserved for system keys such as $error and $variable. Rename it so it does not start with '$'.
+E|null|a.nope -> b.in|null|Edge a.nope -> b.in: 'org.test.Step' has no output port 'nope'. Output ports: out.
+E|null|a.out -> b.in|null|Edge a.out -> b.in: input port 'in' of node 'b' is already fed by a.nope. Each input port takes exactly one edge.
+E|null|a.out -> b.in|null|Edge a.out -> b.in is listed more than once.
+E|null|null|null|The edges contain a cycle through nodes '$x', 'emb'. A workflow must be a directed acyclic graph.
+W|emb|null|null|Node 'emb': the submitted propertiesSchema and input ports differ from the registered node 'org.test.Step'. The registered definition was used for validation; reopen the workflow to refresh the node.
+W|E|null|condition|Loop 'E': the condition reads no flow variable, so it never changes; the loop runs until maxIterations and then follows onLimit.
+W|a|null|null|Node 'a' is not connected to any other node.
+W|a|null|null|Node 'a': input port 'in' has no incoming edge. The node is skipped at run time, so nodes that depend on it do not run.
+W|noid|null|null|Node 'noid' is not connected to any other node.
+W|ghost|null|null|Node 'ghost' is not connected to any other node.
+W|legacy|null|null|Node 'legacy': input port '$in' has no incoming edge. The node is skipped at run time, so nodes that depend on it do not run.
+W|b|null|null|Node 'b' is not connected to any other node.
+W|b|null|null|Node 'b': input port 'in' has no incoming edge. The node is skipped at run time, so nodes that depend on it do not run.
+W|m2|null|null|Node 'm2' is not connected to any other node.
+W|bm|null|null|Node 'bm' is not connected to any other node.
+W|bm|null|null|Node 'bm': input port 'in' has no incoming edge. The node is skipped at run time, so nodes that depend on it do not run.
+W|lonely|null|null|Node 'lonely' is not connected to any other node.
+W|E|null|null|Loop 'E' has no nodes inside it.
+W|big|null|maxIterations|Loop 'big': maxIterations 10000 x 1 nodes inside may exceed the run history limit (about 3636 iterations with 1 nodes inside). The run stops with an error when the history is nearly full.
+== collapsed RUN
+E|L|null|null|The edges leave loop 'L' and come back into it through 'outside'. A node outside a loop cannot run between its iterations; move 'outside' into 'L' or remove one of the edges.

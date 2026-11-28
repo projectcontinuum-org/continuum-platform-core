@@ -58,6 +58,12 @@ class FakeContinuumNodeActivity : IContinuumNodeActivity {
    */
   val registeredSchemas: MutableMap<String, Map<String, Any>> = ConcurrentHashMap()
 
+  /** The node the orchestrator sent, keyed by graph node id (last attempt wins). */
+  val receivedNodes: MutableMap<String, ContinuumWorkflowModel.Node> = ConcurrentHashMap()
+
+  /** Inputs of every run of a node, in call order, keyed by graph node id. */
+  val receivedInputsByInvocation: MutableMap<String, MutableList<Map<String, PortData>>> = ConcurrentHashMap()
+
   /** Inputs the orchestrator sent, keyed by graph node id (last attempt wins). */
   val receivedInputs: MutableMap<String, Map<String, PortData>> = ConcurrentHashMap()
 
@@ -66,6 +72,19 @@ class FakeContinuumNodeActivity : IContinuumNodeActivity {
    * `$variable` (never the inherited ones it received) and omits the key when there are none.
    */
   val flowVariablesToSet: MutableMap<String, Map<String, Any>> = ConcurrentHashMap()
+
+  /**
+   * Flow variables per invocation, keyed by graph node id: the n-th run of a node (1-based, counted by
+   * [invocationCount]) sets entry n-1; runs past the end of the list set the last entry. Takes precedence over
+   * [flowVariablesToSet]. Loop tests use it to change what a member sets from one iteration to the next.
+   */
+  val flowVariablesByInvocation: MutableMap<String, List<Map<String, Any>>> = ConcurrentHashMap()
+
+  /** The run (1-based) in which a node returns an `$error` output instead of succeeding, keyed by graph node id. */
+  val errorOnInvocation: MutableMap<String, Int> = ConcurrentHashMap()
+
+  /** How often each node has been run (activity retries not counted twice: one count per call of [run]). */
+  val invocationCount: MutableMap<String, AtomicInteger> = ConcurrentHashMap()
 
   /**
    * When true, every returned output also carries the [DefaultFlowVariables] the real worker exports for each run,
@@ -124,6 +143,9 @@ class FakeContinuumNodeActivity : IContinuumNodeActivity {
     inputs: Map<String, PortData>
   ): NodeActivityOutput {
     invokedNodeIds.add(node.id)
+    val invocation = invocationCount.computeIfAbsent(node.id) { AtomicInteger(0) }.incrementAndGet()
+    receivedInputsByInvocation.computeIfAbsent(node.id) { Collections.synchronizedList(mutableListOf()) }.add(inputs)
+    receivedNodes[node.id] = node
     receivedInputs[node.id] = inputs
     // Mirror the real worker: report BUSY as soon as the activity starts
     Activity.getExecutionContext().workflowClient
@@ -179,8 +201,26 @@ class FakeContinuumNodeActivity : IContinuumNodeActivity {
     blockUntil[node.id]?.await(5, TimeUnit.SECONDS)
 
     errorOutputs[node.id]?.let { return NodeActivityOutput(node.id, it) }
+    if (errorOnInvocation[node.id] == invocation) {
+      return NodeActivityOutput(
+        node.id,
+        mapOf(
+          IContinuumNodeActivity.NodeOutputSystemPort.ERROR.key to PortData(
+            status = PortDataStatus.FAILED,
+            contentType = "text/plain",
+            tableSpec = emptyList(),
+            data = "Scripted failure of '${node.id}' in run $invocation"
+          )
+        )
+      )
+    }
     val dataOutputs = successOutputs[node.id] ?: emptyMap()
-    val ownFlowVariables = flowVariablesToSet[node.id].orEmpty()
+    val scriptedPerInvocation = flowVariablesByInvocation[node.id]
+    val ownFlowVariables = if (scriptedPerInvocation.isNullOrEmpty()) {
+      flowVariablesToSet[node.id].orEmpty()
+    } else {
+      scriptedPerInvocation[minOf(invocation, scriptedPerInvocation.size) - 1]
+    }
     if (ownFlowVariables.isEmpty()) {
       return NodeActivityOutput(node.id, dataOutputs)
     }

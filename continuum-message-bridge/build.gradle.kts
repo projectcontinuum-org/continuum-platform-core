@@ -60,6 +60,8 @@ dependencies {
     testImplementation("org.mockito.kotlin:mockito-kotlin:5.3.1")
     testImplementation("org.springframework.cloud:spring-cloud-stream-test-support")
     testImplementation("org.springframework.cloud:spring-cloud-stream-test-binder")
+    testImplementation("org.testcontainers:junit-jupiter:1.21.3")
+    testImplementation("org.testcontainers:postgresql:1.21.3")
 }
 
 dependencyManagement {

@@ -1,6 +1,7 @@
 package org.projectcontinuum.core.orchestration.workflow.fixtures
 
 import org.projectcontinuum.core.commons.activity.IInitializeActivity
+import java.util.Collections
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 
@@ -19,7 +20,11 @@ class FakeInitializeActivity(
   private val gate: CountDownLatch? = null
 ) : IInitializeActivity {
 
+  /** Every node id set this activity was asked to resolve, in call order (retries included). */
+  val requestedNodeIds: MutableList<Set<String>> = Collections.synchronizedList(mutableListOf())
+
   override fun getNodeTaskQueue(nodeIds: Set<String>): Map<String, String> {
+    requestedNodeIds.add(nodeIds.toSet())
     gate?.await(30, TimeUnit.SECONDS)
     val ids = if (dropOneNode) nodeIds.drop(1) else nodeIds.toList()
     return ids.associateWith { taskQueueForAllNodes }

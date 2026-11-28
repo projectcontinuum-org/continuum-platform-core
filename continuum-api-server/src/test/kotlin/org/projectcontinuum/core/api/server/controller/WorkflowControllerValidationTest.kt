@@ -13,6 +13,7 @@ import org.projectcontinuum.core.api.server.entity.jpa.WorkflowRunEntity
 import org.projectcontinuum.core.api.server.exception.ApiExceptionHandler
 import org.projectcontinuum.core.api.server.repository.jpa.WorkflowRunRepository
 import org.projectcontinuum.core.api.server.service.NodeExplorerService
+import org.projectcontinuum.core.api.server.service.TimerWorkflowStopScheduler
 import org.projectcontinuum.core.api.server.service.WorkflowService
 import org.projectcontinuum.core.commons.model.ContinuumWorkflowModel
 import org.springframework.beans.factory.annotation.Autowired
@@ -30,7 +31,7 @@ import org.springframework.test.web.servlet.result.MockMvcResultMatchers.status
  * only Temporal, the DB and the node registry lookup are mocked.
  */
 @WebMvcTest(WorkflowController::class)
-@Import(WorkflowService::class, ApiExceptionHandler::class)
+@Import(WorkflowService::class, TimerWorkflowStopScheduler::class, ApiExceptionHandler::class)
 class WorkflowControllerValidationTest {
 
   @Autowired

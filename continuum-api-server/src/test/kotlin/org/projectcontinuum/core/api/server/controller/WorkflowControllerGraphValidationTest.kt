@@ -14,8 +14,12 @@ import org.projectcontinuum.core.api.server.entity.jpa.WorkflowRunEntity
 import org.projectcontinuum.core.api.server.exception.ApiExceptionHandler
 import org.projectcontinuum.core.api.server.repository.jpa.WorkflowRunRepository
 import org.projectcontinuum.core.api.server.service.NodeExplorerService
+import org.projectcontinuum.core.api.server.service.TimerWorkflowStopScheduler
 import org.projectcontinuum.core.api.server.service.WorkflowService
 import org.projectcontinuum.core.commons.model.ContinuumWorkflowModel
+import org.projectcontinuum.core.commons.model.LoopNode
+import tools.jackson.module.kotlin.jacksonObjectMapper
+import org.projectcontinuum.core.commons.node.builtin.LoopNodeDescriptor
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest
 import org.springframework.context.annotation.Import
@@ -32,7 +36,7 @@ import org.springframework.test.web.servlet.result.MockMvcResultMatchers.status
  * `workflow_runs` row behind and never reach Temporal.
  */
 @WebMvcTest(WorkflowController::class)
-@Import(WorkflowService::class, ApiExceptionHandler::class)
+@Import(WorkflowService::class, TimerWorkflowStopScheduler::class, ApiExceptionHandler::class)
 class WorkflowControllerGraphValidationTest {
 
   @Autowired
@@ -65,7 +69,48 @@ class WorkflowControllerGraphValidationTest {
         )
       )
     )
+    whenever(nodeExplorerService.getNodeMetadata(LoopNode.NODE_MODEL)).thenReturn(LoopNodeDescriptor.nodeData)
   }
+
+  private fun loopNode(id: String, conditionJson: String = "\"vars[\\\"hasMore\\\"] == true\"") = """
+    {"id": "$id", "type": "Loop", "position": {"x": 0, "y": 0}, "width": 520, "height": 320, "selected": false,
+     "data": {"title": "Loop", "description": "", "nodeModel": "${LoopNode.NODE_MODEL}", "collapsed": false,
+              "properties": {"condition": $conditionJson, "maxIterations": 50, "onLimit": "fail",
+                             "onNonBooleanResult": "fail", "check": "after"}}}
+  """.trimIndent()
+
+  /** s -> X1 inside loop L, with [condition] as the loop's condition. */
+  private fun loopWorkflowWithCondition(condition: String) = workflow(
+    nodes = listOf(
+      node(id = "s", model = "org.test.Source"),
+      loopNode(id = "L", conditionJson = jacksonObjectMapper().writeValueAsString(condition)),
+      memberNode(id = "X1", parent = "L")
+    ),
+    edges = listOf(edge(source = "s", sourceHandle = "out", target = "X1", targetHandle = "in"))
+  )
+
+  private fun memberNode(id: String, parent: String) = """
+    {"id": "$id", "type": "BaseNode", "parentNode": "$parent", "extent": "parent", "position": {"x": 40, "y": 60},
+     "width": 1, "height": 1, "selected": false,
+     "data": {"title": "t", "description": "", "nodeModel": "org.test.Step", "properties": {"width": 1}}}
+  """.trimIndent()
+
+  /** s -> X1 -> Y -> X2 with X1 and X2 inside loop L and Y outside: a path that leaves the loop and comes back. */
+  private val loopReentryWorkflow
+    get() = workflow(
+      nodes = listOf(
+        node(id = "s", model = "org.test.Source"),
+        loopNode(id = "L"),
+        memberNode(id = "X1", parent = "L"),
+        node(id = "Y", model = "org.test.Step"),
+        memberNode(id = "X2", parent = "L")
+      ),
+      edges = listOf(
+        edge(source = "s", sourceHandle = "out", target = "X1", targetHandle = "in"),
+        edge(source = "X1", sourceHandle = "out", target = "Y", targetHandle = "in"),
+        edge(source = "Y", sourceHandle = "out", target = "X2", targetHandle = "in")
+      )
+    )
 
   private fun node(id: String, model: String, properties: String = """{"width": 1}""") = """
     {"id": "$id", "type": "default", "position": {"x": 0, "y": 0}, "width": 1, "height": 1, "selected": false,
@@ -202,6 +247,62 @@ class WorkflowControllerGraphValidationTest {
 
     validateWorkflow(body = body, userId = "alice").andExpect(status().isOk).andExpect(jsonPath("$.valid").value(true))
     validateWorkflow(body = body).andExpect(status().isOk).andExpect(jsonPath("$.valid").value(true))
+  }
+
+  @Test
+  fun `a path that leaves a loop and comes back is 400 on start`() = assertRejected(
+    loopReentryWorkflow,
+    "The edges leave loop 'L' and come back into it through 'Y'."
+  )
+
+  @Test
+  fun `a path that leaves a loop and comes back is valid false on validate`() {
+    validateWorkflow(body = loopReentryWorkflow)
+      .andExpect(status().isOk)
+      .andExpect(jsonPath("$.valid").value(false))
+      .andExpect(jsonPath("$.errors", hasSize<Any>(1)))
+      .andExpect(jsonPath("$.errors[0].node").value("L"))
+
+    verifyNoInteractions(workflowClient)
+    verifyNoInteractions(workflowRunRepository)
+  }
+
+  @Test
+  fun `a loop with members connected through its members is valid`() {
+    val body = workflow(
+      nodes = listOf(node(id = "s", model = "org.test.Source"), loopNode(id = "L"), memberNode(id = "X1", parent = "L")),
+      edges = listOf(edge(source = "s", sourceHandle = "out", target = "X1", targetHandle = "in"))
+    )
+
+    validateWorkflow(body = body)
+      .andExpect(status().isOk)
+      .andExpect(jsonPath("$.valid").value(true))
+  }
+
+  @Test
+  fun `a rejected loop condition is 400 on start and valid false on validate, with one error on the condition`() {
+    listOf(
+      "now() > 1" to "does not type-check",
+      "vars[\"p\"] + 1" to "does not return true or false",
+      "cel.bind(a, 1, cel.bind(a, a + a, a > 0))" to "binds a name that is already bound"
+    ).forEach { (condition, reason) ->
+      val body = loopWorkflowWithCondition(condition = condition)
+
+      assertRejected(body, "Loop 'L': the condition $reason")
+      validateWorkflow(body = body)
+        .andExpect(status().isOk)
+        .andExpect(jsonPath("$.valid").value(false))
+        .andExpect(jsonPath("$.errors", hasSize<Any>(1)))
+        .andExpect(jsonPath("$.errors[0].node").value("L"))
+        .andExpect(jsonPath("$.errors[0].property").value("condition"))
+    }
+  }
+
+  @Test
+  fun `a full CEL condition is valid on validate`() {
+    validateWorkflow(body = loopWorkflowWithCondition(condition = "vars[\"page\"] < 10 && vars[\"hasMore\"]"))
+      .andExpect(status().isOk)
+      .andExpect(jsonPath("$.valid").value(true))
   }
 
   @Test

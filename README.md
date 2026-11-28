@@ -56,8 +56,10 @@ This monorepo contains the **core backend infrastructure** for Project Continuum
 | `continuum-commons` | Shared library — node model base classes, data types, Parquet/S3 utilities |
 | `continuum-worker-springboot-starter` | Spring Boot starter for building workers — auto-registers nodes with Temporal |
 | `continuum-api-server` | REST API server — manages workflows, node registry, executions |
+| `continuum-orchestration-service` | Temporal workflow engine — runs workflow DAGs and registers the built-in nodes (the Loop) at start-up |
 | `continuum-message-bridge` | Kafka-to-MQTT bridge — streams execution events to the browser |
 | `continuum-avro-schemas` | Shared Avro schemas for Kafka messages |
+| `continuum-loop-condition` | Loop condition validator and evaluator (full CEL, Google cel-java), used by the API server and the orchestration service only ([README](continuum-loop-condition/README.md)) |
 | `continuum-knime-base` | KNIME compatibility layer (experimental) |
 
 > **Looking for workflow nodes?** See [continuum-feature-base](https://github.com/projectcontinuum-org/continuum-feature-base) and [continuum-feature-ai](https://github.com/projectcontinuum-org/continuum-feature-ai).
@@ -115,6 +117,10 @@ A click turned outcome.
 | 🧪 | **AI / ML Ready** | Train models with Unsloth, run inference, all inside your flow |
 | 🐳 | **Self-Hostable** | Docker Compose up and you're running |
 
+**Operator note:** the api-server schedules the hard stop for cancel and terminate requests in an in-memory timer,
+5 seconds after signaling Temporal. If the api-server restarts in that interval, the pending stop and terminate
+recording are lost; reissue the request after the server is available. The stop scheduler is not durable across restarts.
+
 ---
 
 ## 🧱 How It Works
@@ -157,7 +163,7 @@ A click turned outcome.
 | **Storage** | AWS S3 / MinIO | Open, portable, no vendor lock-in |
 | **Backend** | Kotlin + Spring Boot | Type-safe, clean, battle-tested |
 | **Resilience** | Temporal | Fails? Retries. Crashes? Recovers. Forever. |
-| **Flow Control** | Output `null` on a port = flow stops | Simple guard logic. Real loops coming. |
+| **Flow Control** | Output `null` on a port = flow stops; the built-in **Loop** repeats the nodes inside it while a CEL condition over flow variables holds | Guard logic and while loops. |
 
 ---
 
@@ -242,6 +248,15 @@ git lfs pull
 ```
 
 CI checkouts that build modules use `actions/checkout` with `lfs: true` for the same reason.
+
+### Backend tests
+
+The message-bridge tests include a PostgreSQL integration test for the run-record upsert guard. Docker must be
+available to run it:
+
+```bash
+./gradlew :continuum-message-bridge:test
+```
 
 ### API documentation (OpenAPI)
 

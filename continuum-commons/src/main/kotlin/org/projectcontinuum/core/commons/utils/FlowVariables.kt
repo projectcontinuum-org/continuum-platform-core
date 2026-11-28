@@ -16,6 +16,14 @@ object FlowVariables {
   const val CONTENT_TYPE = "application/json"
 
   /**
+   * Read-only flow variable the orchestrator gives every node inside a loop, and the loop's condition: the number of
+   * the iteration running (1 in the first one). For a nested node it is the innermost enclosing loop's iteration; in
+   * a condition it is the iteration that just ended (0 in a check before the first iteration). A value a node sets
+   * under this name is ignored inside a loop and never carried to the next iteration.
+   */
+  const val ITERATION = "iteration"
+
+  /**
    * Returns the flow variables stored under `"$variable"` in [ports], or an empty map when the key is absent or its
    * `data` is not a JSON object. Keys are converted to strings; entries with a null key or value are dropped.
    */

@@ -98,6 +98,25 @@ continuum-core-event-FeatureRegistration-output:
 
 ---
 
+## Producer — `continuum-orchestration-service` (built-in nodes)
+
+**File:** `continuum-orchestration-service/src/main/kotlin/org/projectcontinuum/core/orchestration/registration/BuiltinNodeRegistrationPublisher.kt`
+
+Built-in nodes run inside the orchestrator, not on a worker (today only the Loop, `org.projectcontinuum.core.builtin.Loop`).
+On `ApplicationReadyEvent` the orchestrator publishes one `FeatureRegistrationRequest` per built-in node, with the same
+binding block as the worker starter:
+
+- `featureId` = `org.projectcontinuum.core.builtin`, `taskQueue` = `$builtin` (a marker, never a Temporal queue), `workerId` = `orchestration-<uuid>`
+- `nodeManifest` = the node's `NodeData` (for the Loop: `LoopNodeDescriptor.nodeData` in `continuum-commons`), `categories` = `["Flow Control"]`
+- Kafka message key = `nodeId`
+- The send runs on a background thread (`builtin-node-registration`), so start-up never waits for it, and is retried
+  with backoff (`RegistrationRetryPolicy`: 5 attempts, waiting 5, 10, 20 and 40 s, about two minutes). Every attempt
+  reuses the same `workerId`. A failed attempt is logged as a warning, the last one as an error naming the node and the
+  number of attempts; nothing is sent after a success; shutting the service down stops pending retries. If Kafka or
+  the schema registry was unreachable for longer, restart the orchestration service to register the node.
+
+---
+
 ## Consumer — `continuum-message-bridge`
 
 **File:** `continuum-message-bridge/src/main/kotlin/com/continuum/core/bridge/handler/FeatureRegistrationHandler.kt`

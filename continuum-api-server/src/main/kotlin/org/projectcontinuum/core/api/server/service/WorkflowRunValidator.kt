@@ -7,6 +7,8 @@ import org.projectcontinuum.core.commons.validation.ValidationMode
 import org.projectcontinuum.core.commons.validation.WorkflowIssue
 import org.projectcontinuum.core.commons.validation.WorkflowValidationResult
 import org.projectcontinuum.core.commons.validation.WorkflowValidator
+import org.projectcontinuum.core.commons.validation.loop.LoopConditionValidator
+import org.projectcontinuum.core.loopcondition.LoopConditionValidators
 import java.net.URI
 import java.net.URISyntaxException
 
@@ -21,9 +23,14 @@ import java.net.URISyntaxException
  * an error: without its descriptor nothing about it can be checked, and a run that skipped the check would only fail
  * later on the worker.
  *
+ * Loop conditions are checked by [conditionValidator] (the cel-java validator by default; tests may inject another).
+ *
  * The workflow `name` is also checked: it becomes the run's `workflowUri`, so it must parse as a URI.
  */
-class WorkflowRunValidator(nodeExplorerService: NodeExplorerService) {
+class WorkflowRunValidator(
+  nodeExplorerService: NodeExplorerService,
+  conditionValidator: LoopConditionValidator = LoopConditionValidators.default
+) {
 
   companion object {
     /** The issue for a workflow `name` that cannot be stored as a run's `workflowUri`, or null when it is fine. */
@@ -43,12 +50,22 @@ class WorkflowRunValidator(nodeExplorerService: NodeExplorerService) {
     }
   }
 
-  private val workflowValidator = WorkflowValidator { nodeModel -> nodeExplorerService.getNodeMetadata(nodeModel) }
+  private val workflowValidator = WorkflowValidator(
+    conditionValidator = conditionValidator,
+    descriptors = { nodeModel -> nodeExplorerService.getNodeMetadata(nodeModel) }
+  )
 
   fun validate(workflow: ContinuumWorkflowModel): WorkflowValidationResult {
     val graphResult = workflowValidator.validate(
       nodes = workflow.nodes.map { node ->
-        GraphNode(key = node.id, nodeId = node.data.nodeModel, properties = node.data.properties, embedded = node.data)
+        GraphNode(
+          key = node.id,
+          nodeId = node.data.nodeModel,
+          properties = node.data.properties,
+          embedded = node.data,
+          type = node.type,
+          parent = node.parentNode
+        )
       },
       edges = workflow.edges.map { edge ->
         GraphEdge(from = edge.source, fromPort = edge.sourceHandle, to = edge.target, toPort = edge.targetHandle)

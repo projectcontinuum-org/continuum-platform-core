@@ -3,14 +3,27 @@ package org.projectcontinuum.core.orchestration.workflow
 import org.projectcontinuum.core.commons.model.ContinuumWorkflowModel
 import org.projectcontinuum.core.commons.model.ContinuumWorkflowModel.EdgeStatus
 import org.projectcontinuum.core.commons.model.ContinuumWorkflowModel.NodeStatus
+import org.projectcontinuum.core.commons.model.LoopNode
 import org.projectcontinuum.core.commons.model.PortData
+import org.projectcontinuum.core.orchestration.workflow.loop.LoopReadinessGate
+import org.projectcontinuum.core.orchestration.workflow.loop.LoopReadinessGate.LoopEdgeVerdict
 
 /**
  * Pure readiness/skip decisions for [WorkflowDagExecutor]. Nothing here mutates the model or
  * the output maps, so decisions depend only on the workflow model and the two output maps
  * (safe under Temporal replay).
+ *
+ * Loops: every function takes a [LoopReadinessGate] (default [LoopReadinessGate.NONE], which changes nothing). It
+ * holds edges that leave an unfinished loop back and keeps nodes of inactive loops out of the decisions. Loop nodes
+ * themselves are never ready or skipped here (the loop runner owns their status).
  */
 internal object NodeReadiness {
+
+  /**
+   * Loop nodes are never ready and never skipped here: they have no activity, and the loop runner owns their status.
+   * Their members are decided like any node (subject to [LoopReadinessGate]).
+   */
+  private fun isDecidedByLoopRunner(node: ContinuumWorkflowModel.Node) = LoopNode.isLoop(node = node)
 
   /** A node that has not started, finished, failed or been skipped. */
   private fun isUntouched(
@@ -29,14 +42,20 @@ internal object NodeReadiness {
     return node.data.inputs?.any { input -> parentEdges.none { it.targetHandle == input.key } } ?: false
   }
 
-  /** Returns the edge's status, or `null` while its source has not finished. */
+  /** Returns the edge's status, or `null` while its source (or a loop it leaves) has not finished. */
   private fun edgeStatus(
     edge: ContinuumWorkflowModel.Edge,
     nodesById: Map<String, ContinuumWorkflowModel.Node>,
     nodeOutputMap: Map<String, Map<String, PortData>>,
     nodeErrorsMap: Map<String, Map<String, PortData>>,
+    loopGate: LoopReadinessGate,
     nodeIdsSkippedInThisPass: Set<String> = emptySet()
   ): EdgeStatus? {
+    when (loopGate.edgeVerdict(edge = edge)) {
+      LoopEdgeVerdict.PENDING -> return null
+      LoopEdgeVerdict.BROKEN -> return EdgeStatus.BROKEN
+      LoopEdgeVerdict.JUDGE_BY_SOURCE -> Unit
+    }
     val sourceStatus = nodesById[edge.source]?.data?.status
     val sourceOutputs = nodeOutputMap[edge.source]
     return when {
@@ -68,16 +87,19 @@ internal object NodeReadiness {
   fun getReadyNodes(
     continuumWorkflow: ContinuumWorkflowModel,
     nodeOutputMap: Map<String, Map<String, PortData>>,
-    nodeErrorsMap: Map<String, Map<String, PortData>>
+    nodeErrorsMap: Map<String, Map<String, PortData>>,
+    loopGate: LoopReadinessGate = LoopReadinessGate.NONE
   ): List<ContinuumWorkflowModel.Node> {
     val nodesById = continuumWorkflow.nodes.associateBy { it.id }
     return continuumWorkflow.nodes.filter { node ->
+      if (isDecidedByLoopRunner(node = node)) return@filter false
       if (!isUntouched(node = node, nodeOutputMap = nodeOutputMap, nodeErrorsMap = nodeErrorsMap)) {
         return@filter false
       }
+      if (!loopGate.isEligible(nodeId = node.id)) return@filter false
       if (hasUnconnectedInput(continuumWorkflow = continuumWorkflow, node = node)) return@filter false
       continuumWorkflow.getParentEdges(node).all { edge ->
-        when (edgeStatus(edge = edge, nodesById = nodesById, nodeOutputMap = nodeOutputMap, nodeErrorsMap = nodeErrorsMap)) {
+        when (edgeStatus(edge = edge, nodesById = nodesById, nodeOutputMap = nodeOutputMap, nodeErrorsMap = nodeErrorsMap, loopGate = loopGate)) {
           EdgeStatus.DELIVERED -> true
           EdgeStatus.BROKEN -> toleratesBrokenEdge(node = node, edge = edge)
           null -> false
@@ -94,7 +116,8 @@ internal object NodeReadiness {
   fun getNodesToSkip(
     continuumWorkflow: ContinuumWorkflowModel,
     nodeOutputMap: Map<String, Map<String, PortData>>,
-    nodeErrorsMap: Map<String, Map<String, PortData>>
+    nodeErrorsMap: Map<String, Map<String, PortData>>,
+    loopGate: LoopReadinessGate = LoopReadinessGate.NONE
   ): List<ContinuumWorkflowModel.Node> {
     val nodesById = continuumWorkflow.nodes.associateBy { it.id }
     val skippedNodeIds = mutableSetOf<String>()
@@ -107,6 +130,7 @@ internal object NodeReadiness {
           nodesById = nodesById,
           nodeOutputMap = nodeOutputMap,
           nodeErrorsMap = nodeErrorsMap,
+          loopGate = loopGate,
           nodeIdsSkippedInThisPass = skippedNodeIds
         )
         status == EdgeStatus.BROKEN && !toleratesBrokenEdge(node = node, edge = edge)
@@ -118,7 +142,9 @@ internal object NodeReadiness {
       var changed = false
       for (node in continuumWorkflow.nodes) {
         if (node.id in skippedNodeIds) continue
+        if (isDecidedByLoopRunner(node = node)) continue
         if (!isUntouched(node = node, nodeOutputMap = nodeOutputMap, nodeErrorsMap = nodeErrorsMap)) continue
+        if (!loopGate.isEligible(nodeId = node.id)) continue
         if (cannotRun(node)) {
           skippedNodeIds.add(node.id)
           changed = true
@@ -136,11 +162,12 @@ internal object NodeReadiness {
   fun getEdgeStatuses(
     continuumWorkflow: ContinuumWorkflowModel,
     nodeOutputMap: Map<String, Map<String, PortData>>,
-    nodeErrorsMap: Map<String, Map<String, PortData>>
+    nodeErrorsMap: Map<String, Map<String, PortData>>,
+    loopGate: LoopReadinessGate = LoopReadinessGate.NONE
   ): List<Pair<ContinuumWorkflowModel.Edge, EdgeStatus>> {
     val nodesById = continuumWorkflow.nodes.associateBy { it.id }
     return continuumWorkflow.edges.mapNotNull { edge ->
-      edgeStatus(edge = edge, nodesById = nodesById, nodeOutputMap = nodeOutputMap, nodeErrorsMap = nodeErrorsMap)
+      edgeStatus(edge = edge, nodesById = nodesById, nodeOutputMap = nodeOutputMap, nodeErrorsMap = nodeErrorsMap, loopGate = loopGate)
         ?.let { status -> edge to status }
     }
   }

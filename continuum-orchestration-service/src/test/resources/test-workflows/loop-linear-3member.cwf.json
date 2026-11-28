@@ -1,0 +1,243 @@
+{
+    "id": "loop-linear-3member-test-workflow",
+    "name": "/test-workflows/loop-linear-3member.cwf",
+    "active": false,
+    "nodes": [
+        {
+            "id": "seed",
+            "type": "BaseNode",
+            "position": {
+                "x": 0,
+                "y": 60
+            },
+            "data": {
+                "id": "org.projectcontinuum.test.node.SetSeedNodeModel",
+                "description": "Set seed",
+                "title": "Set seed",
+                "nodeModel": "org.projectcontinuum.test.node.SetSeedNodeModel",
+                "inputs": null,
+                "outputs": {
+                    "out": {
+                        "name": "seed",
+                        "contentType": "application/x-parquet"
+                    }
+                },
+                "properties": {},
+                "propertiesSchema": {},
+                "propertiesUISchema": {},
+                "status": null
+            },
+            "width": 224,
+            "height": 100,
+            "selected": false
+        },
+        {
+            "id": "L",
+            "type": "Loop",
+            "position": {
+                "x": 330,
+                "y": 0
+            },
+            "data": {
+                "id": "org.projectcontinuum.core.builtin.Loop",
+                "description": "Repeats the nodes inside the box while a CEL condition over flow variables holds.",
+                "title": "Loop",
+                "subTitle": "Repeat the nodes inside",
+                "nodeModel": "org.projectcontinuum.core.builtin.Loop",
+                "inputs": null,
+                "outputs": null,
+                "properties": {
+                    "condition": "vars[\"hasMore\"] == true",
+                    "maxIterations": 50,
+                    "onLimit": "fail",
+                    "onNonBooleanResult": "fail",
+                    "check": "after"
+                },
+                "propertiesSchema": {},
+                "propertiesUISchema": {},
+                "status": null,
+                "collapsed": false
+            },
+            "width": 1072,
+            "height": 220,
+            "selected": false,
+            "style": {
+                "width": 1072,
+                "height": 220
+            },
+            "zIndex": 0
+        },
+        {
+            "id": "fetch",
+            "type": "BaseNode",
+            "position": {
+                "x": 40,
+                "y": 60
+            },
+            "data": {
+                "id": "org.projectcontinuum.test.node.FetchPageNodeModel",
+                "description": "Fetch page",
+                "title": "Fetch page",
+                "nodeModel": "org.projectcontinuum.test.node.FetchPageNodeModel",
+                "inputs": {
+                    "in": {
+                        "name": "in",
+                        "contentType": "application/x-parquet"
+                    }
+                },
+                "outputs": {
+                    "out": {
+                        "name": "page",
+                        "contentType": "application/x-parquet"
+                    }
+                },
+                "properties": {},
+                "propertiesSchema": {},
+                "propertiesUISchema": {},
+                "status": null
+            },
+            "width": 224,
+            "height": 100,
+            "selected": false,
+            "parentNode": "L",
+            "extent": "parent"
+        },
+        {
+            "id": "parse",
+            "type": "BaseNode",
+            "position": {
+                "x": 370,
+                "y": 60
+            },
+            "data": {
+                "id": "org.projectcontinuum.test.node.ParsePageNodeModel",
+                "description": "Parse page",
+                "title": "Parse page",
+                "nodeModel": "org.projectcontinuum.test.node.ParsePageNodeModel",
+                "inputs": {
+                    "in": {
+                        "name": "in",
+                        "contentType": "application/x-parquet"
+                    }
+                },
+                "outputs": {
+                    "out": {
+                        "name": "rows",
+                        "contentType": "application/x-parquet"
+                    }
+                },
+                "properties": {},
+                "propertiesSchema": {},
+                "propertiesUISchema": {},
+                "status": null
+            },
+            "width": 224,
+            "height": 100,
+            "selected": false,
+            "parentNode": "L",
+            "extent": "parent"
+        },
+        {
+            "id": "append",
+            "type": "BaseNode",
+            "position": {
+                "x": 700,
+                "y": 60
+            },
+            "data": {
+                "id": "org.projectcontinuum.test.node.AppendRowsNodeModel",
+                "description": "Append rows",
+                "title": "Append rows",
+                "nodeModel": "org.projectcontinuum.test.node.AppendRowsNodeModel",
+                "inputs": {
+                    "in": {
+                        "name": "in",
+                        "contentType": "application/x-parquet"
+                    }
+                },
+                "outputs": {
+                    "out": {
+                        "name": "table",
+                        "contentType": "application/x-parquet"
+                    }
+                },
+                "properties": {},
+                "propertiesSchema": {},
+                "propertiesUISchema": {},
+                "status": null
+            },
+            "width": 224,
+            "height": 100,
+            "selected": false,
+            "parentNode": "L",
+            "extent": "parent"
+        },
+        {
+            "id": "write",
+            "type": "BaseNode",
+            "position": {
+                "x": 1500,
+                "y": 60
+            },
+            "data": {
+                "id": "org.projectcontinuum.test.node.WriteTableNodeModel",
+                "description": "Write table",
+                "title": "Write table",
+                "nodeModel": "org.projectcontinuum.test.node.WriteTableNodeModel",
+                "inputs": {
+                    "in": {
+                        "name": "in",
+                        "contentType": "application/x-parquet"
+                    }
+                },
+                "outputs": {
+                    "out": {
+                        "name": "written",
+                        "contentType": "application/x-parquet"
+                    }
+                },
+                "properties": {},
+                "propertiesSchema": {},
+                "propertiesUISchema": {},
+                "status": null
+            },
+            "width": 224,
+            "height": 100,
+            "selected": false
+        }
+    ],
+    "edges": [
+        {
+            "type": "BaseEdge",
+            "source": "seed",
+            "sourceHandle": "out",
+            "target": "fetch",
+            "targetHandle": "in",
+            "id": "reactflow__edge-seedout-fetchin"
+        },
+        {
+            "type": "BaseEdge",
+            "source": "fetch",
+            "sourceHandle": "out",
+            "target": "parse",
+            "targetHandle": "in",
+            "id": "reactflow__edge-fetchout-parsein"
+        },
+        {
+            "type": "BaseEdge",
+            "source": "parse",
+            "sourceHandle": "out",
+            "target": "append",
+            "targetHandle": "in",
+            "id": "reactflow__edge-parseout-appendin"
+        },
+        {
+            "type": "BaseEdge",
+            "source": "append",
+            "sourceHandle": "out",
+            "target": "write",
+            "targetHandle": "in",
+            "id": "reactflow__edge-appendout-writein"
+        }
+    ]
+}

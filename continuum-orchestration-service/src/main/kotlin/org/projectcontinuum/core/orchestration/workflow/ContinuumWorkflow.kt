@@ -85,7 +85,7 @@ class ContinuumWorkflow : IContinuumWorkflow {
    * 1. Initializes the workflow state and publishes "STARTED" event
    * 2. Updates Temporal search attributes to track execution status
    * 3. Executes the workflow DAG via [WorkflowDagExecutor.run]
-   * 4. Publishes completion/failure events
+   * 4. Publishes the final event: FAILED when any node or loop failed, otherwise FINISHED
    * 5. Returns all node outputs or throws an exception if any node failed
    *
    * @param continuumWorkflow The workflow model containing nodes and edges to execute
@@ -113,12 +113,7 @@ class ContinuumWorkflow : IContinuumWorkflow {
       // Execute the workflow DAG
       dagExecutor.run(continuumWorkflow, nodeIdToActivityMap, nodeToOutputsMap, nodeErrorsMap)
 
-      // Update search attribute to indicate successful completion
-      Workflow.upsertTypedSearchAttributes(
-        IContinuumWorkflow.WORKFLOW_STATUS
-          .valueSet(ExecutionStatus.WORKFLOW_EXECUTION_COMPLETED.value)
-      )
-      statusReporter.publishUpdate("FINISHED")
+      publishCompletion()
     } catch (e: CanceledFailure) {
       handleCancellation(e)
       throw e
@@ -152,6 +147,22 @@ class ContinuumWorkflow : IContinuumWorkflow {
         )
     }
     return nodeToOutputsMap
+  }
+
+  /**
+   * Publishes the end of a run that executed to its end. A run in which any node or loop failed ends FAILED (and
+   * [start] then raises the failure), so the run record says FAILED, as Temporal does; otherwise it ends FINISHED.
+   * Both paths upsert the search attribute once, as before; Temporal matches an upsert on replay by its command type,
+   * not its value, so a run recorded with the old FINISHED/COMPLETED values still replays.
+   */
+  private fun publishCompletion() {
+    val anyNodeFailed = nodeErrorsMap.isNotEmpty()
+    val executionStatus = if (anyNodeFailed) ExecutionStatus.WORKFLOW_EXECUTION_FAILED else ExecutionStatus.WORKFLOW_EXECUTION_COMPLETED
+    Workflow.upsertTypedSearchAttributes(
+      IContinuumWorkflow.WORKFLOW_STATUS
+        .valueSet(executionStatus.value)
+    )
+    statusReporter.publishUpdate(if (anyNodeFailed) "FAILED" else "FINISHED")
   }
 
   /**

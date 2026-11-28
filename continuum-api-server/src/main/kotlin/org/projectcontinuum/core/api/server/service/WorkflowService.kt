@@ -15,7 +15,6 @@ import io.temporal.api.common.v1.WorkflowExecution
 import io.temporal.client.WorkflowClient
 import io.temporal.client.WorkflowNotFoundException
 import io.temporal.client.WorkflowOptions
-import io.temporal.client.WorkflowStub
 import io.temporal.common.SearchAttributes
 import org.projectcontinuum.core.api.server.model.WorkflowRunData
 import org.projectcontinuum.core.commons.context.ContinuumOwnerContext
@@ -23,8 +22,7 @@ import org.slf4j.LoggerFactory
 import org.springframework.scheduling.annotation.EnableScheduling
 import org.springframework.stereotype.Service
 import java.net.URI
-import java.util.Timer
-import java.util.TimerTask
+import java.time.Instant
 import java.util.UUID
 
 @Service
@@ -32,7 +30,8 @@ import java.util.UUID
 class WorkflowService(
   val workflowClient: WorkflowClient,
   val workflowRunRepository: WorkflowRunRepository,
-  nodeExplorerService: NodeExplorerService
+  nodeExplorerService: NodeExplorerService,
+  private val stopScheduler: WorkflowStopScheduler
 ) {
 
   private val workflowRunValidator = WorkflowRunValidator(nodeExplorerService)
@@ -40,8 +39,8 @@ class WorkflowService(
   companion object {
     private val LOGGER = LoggerFactory.getLogger(WorkflowService::class.java)
 
-    private const val STOP_SIGNAL_GRACE_PERIOD_MS = 5000L
-    private val stopScheduler = Timer("workflow-stop-scheduler", true)
+    /** How long a run gets to handle its stop signal before Temporal stops it. */
+    const val STOP_SIGNAL_GRACE_PERIOD_MS = 5000L
   }
 
   fun startWorkflow(
@@ -182,15 +181,13 @@ class WorkflowService(
       LOGGER.warn("Failed to signal notifyCancelling for workflow $workflowId, proceeding with cancel anyway", e)
     }
     // Give the workflow a chance to process the signal before the hard-stop is issued.
-    stopScheduler.schedule(object : TimerTask() {
-      override fun run() {
-        try {
-          WorkflowStub.fromTyped(stub).cancel()
-        } catch (e: Exception) {
-          LOGGER.warn("Failed to cancel workflow $workflowId", e)
-        }
+    stopScheduler.schedule(delayMillis = STOP_SIGNAL_GRACE_PERIOD_MS) {
+      try {
+        workflowClient.newUntypedWorkflowStub(workflowId).cancel()
+      } catch (e: Exception) {
+        LOGGER.warn("Failed to cancel workflow $workflowId", e)
       }
-    }, STOP_SIGNAL_GRACE_PERIOD_MS)
+    }
   }
 
   fun terminateWorkflow(ownedBy: String, workflowId: String, reason: String?) {
@@ -206,14 +203,35 @@ class WorkflowService(
     // Give the workflow a chance to process the signal before the hard-stop is issued.
     // This matters most for terminate() since it kills the workflow with no chance to
     // run any code afterward.
-    stopScheduler.schedule(object : TimerTask() {
-      override fun run() {
-        try {
-          WorkflowStub.fromTyped(stub).terminate(reason ?: "Terminated via API")
-        } catch (e: Exception) {
-          LOGGER.warn("Failed to terminate workflow $workflowId", e)
-        }
-      }
-    }, STOP_SIGNAL_GRACE_PERIOD_MS)
+    stopScheduler.schedule(delayMillis = STOP_SIGNAL_GRACE_PERIOD_MS) {
+      terminateAndRecord(ownedBy = ownedBy, workflowId = workflowId, reason = reason)
+    }
+  }
+
+  /**
+   * Terminates the run in Temporal and then records `TERMINATED` on its run row. The run's own signal handler
+   * publishes that status normally, but a run that keeps retrying a workflow task (for example a loop check that
+   * waits for an evaluation thread, retried minutes apart) runs no code before the hard stop, so without this its
+   * record would say `RUNNING` for ever. A run that already ended (Temporal has nothing to terminate) keeps the status
+   * it ended with, and a row that is already `TERMINATED` is not written again.
+   */
+  private fun terminateAndRecord(ownedBy: String, workflowId: String, reason: String?) {
+    try {
+      workflowClient.newUntypedWorkflowStub(workflowId).terminate(reason ?: "Terminated via API")
+    } catch (e: WorkflowNotFoundException) {
+      LOGGER.info("Workflow $workflowId ended before it could be terminated; its run record keeps its final status")
+      return
+    } catch (e: Exception) {
+      LOGGER.warn("Failed to terminate workflow $workflowId", e)
+      return
+    }
+    val changedRows = workflowRunRepository.markTerminated(
+      workflowId = workflowId,
+      ownedBy = ownedBy,
+      terminatedAt = Instant.now()
+    )
+    if (changedRows == 0) {
+      LOGGER.debug("The run record of workflow {} already says TERMINATED", workflowId)
+    }
   }
 }

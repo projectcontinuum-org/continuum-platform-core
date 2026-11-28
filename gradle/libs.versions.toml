@@ -5,7 +5,17 @@
 springdoc = "3.0.3"
 # swagger-core version that springdoc above is built against (springdoc-openapi parent POM `swagger-api.version`)
 swagger = "2.2.47"
+# Google cel-java: loop condition validator and evaluator (continuum-loop-condition only; it brings protobuf-java 4.x and
+# guava 33.x, so nothing that feature workers depend on may use it)
+cel = "0.15.0"
+# protobuf-java-util for the two services that get cel-java (orchestration-service, api-server): cel-java raises
+# protobuf-java to 4.36.2 there, while Temporal's serviceclient still declares protobuf-java-util 3.25.x. Keep the util
+# on the same version as protobuf-java (Temporal's own CI tests the pair together on 4.x). Applied as a dependency
+# constraint in those two build files only; feature workers and continuum-commons stay on protobuf 3.25.x.
+protobuf = "4.36.2"
 
 [libraries]
 springdoc-openapi-starter-webmvc-ui = { module = "org.springdoc:springdoc-openapi-starter-webmvc-ui", version.ref = "springdoc" }
 swagger-annotations = { module = "io.swagger.core.v3:swagger-annotations-jakarta", version.ref = "swagger" }
+cel = { module = "dev.cel:cel", version.ref = "cel" }
+protobuf-java-util = { module = "com.google.protobuf:protobuf-java-util", version.ref = "protobuf" }
